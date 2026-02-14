@@ -1,0 +1,20 @@
+{
+  "name": "bandplatform",
+  "version": "1.0.0",
+  "description": "Managing band website, e-shop and live sales ",
+  "homepage": "https://github.com/RaphaelDarras/bandPlatform#readme",
+  "bugs": {
+    "url": "https://github.com/RaphaelDarras/bandPlatform/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RaphaelDarras/bandPlatform.git"
+  },
+  "license": "ISC",
+  "author": "Raph",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
