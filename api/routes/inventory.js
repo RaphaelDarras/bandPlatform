@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const Sale = require('../models/Sale');
+const InventoryAdjustment = require('../models/InventoryAdjustment');
 const { authenticateToken } = require('../middleware/auth');
 
 // All routes require authentication
@@ -283,6 +285,143 @@ router.post('/release', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/inventory/restock:
+ *   post:
+ *     summary: Restock inventory (increase stock)
+ *     description: Increase stock for a product variant using optimistic locking. Creates InventoryAdjustment audit record.
+ *     tags: [Inventory]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [productId, variantSku, quantity]
+ *             properties:
+ *               productId:
+ *                 type: string
+ *               variantSku:
+ *                 type: string
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 1
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Stock increased successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 stockBefore:
+ *                   type: number
+ *                 stockAfter:
+ *                   type: number
+ *                 version:
+ *                   type: number
+ *                 adjustmentId:
+ *                   type: string
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Product or variant not found
+ *       409:
+ *         description: Version conflict — retry with current data
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/restock', async (req, res) => {
+  try {
+    const { productId, variantSku, quantity, reason } = req.body;
+
+    // Validate required fields
+    if (!productId || !variantSku || !quantity) {
+      return res.status(400).json({
+        error: 'productId, variantSku, and quantity are required'
+      });
+    }
+
+    // Validate quantity is a positive integer
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return res.status(400).json({
+        error: 'quantity must be a positive integer'
+      });
+    }
+
+    // Find product and specific variant
+    const product = await Product.findOne({
+      _id: productId,
+      'variants.sku': variantSku
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product or variant not found' });
+    }
+
+    // Extract matching variant
+    const variant = product.variants.find(v => v.sku === variantSku);
+    const stockBefore = variant.stock;
+
+    // Optimistic locking update - atomically increase stock with version check
+    const updatedProduct = await Product.findOneAndUpdate(
+      {
+        _id: productId,
+        'variants.sku': variantSku,
+        'variants.$.version': variant.version
+      },
+      {
+        $inc: {
+          'variants.$.stock': quantity,
+          'variants.$.version': 1
+        }
+      },
+      { new: true }
+    );
+
+    // Check for version conflict
+    if (!updatedProduct) {
+      return res.status(409).json({
+        error: 'Stock conflict - version mismatch. Please retry with updated stock data.'
+      });
+    }
+
+    // Capture stockAfter from updated variant
+    const updatedVariant = updatedProduct.variants.find(v => v.sku === variantSku);
+    const stockAfter = updatedVariant.stock;
+
+    // Create InventoryAdjustment audit record
+    const auditRecord = await InventoryAdjustment.create({
+      productId,
+      variantSku,
+      type: 'restock',
+      quantity,
+      stockBefore,
+      stockAfter,
+      reason,
+      createdBy: req.user.userId
+    });
+
+    res.status(200).json({
+      success: true,
+      stockBefore,
+      stockAfter,
+      version: updatedVariant.version,
+      adjustmentId: auditRecord._id
+    });
+  } catch (error) {
+    console.error('Restock error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /audit - Query inventory audit trail from Order/Sale documents
 router.get('/audit', async (req, res) => {
   try {
@@ -292,18 +431,21 @@ router.get('/audit', async (req, res) => {
       return res.status(400).json({ error: 'productId is required' });
     }
 
-    const matchConditions = { 'items.productId': productId };
+    const itemMatchConditions = { 'items.productId': productId };
+    const adjustmentMatchConditions = { productId: new mongoose.Types.ObjectId(productId) };
 
     if (startDate || endDate) {
-      matchConditions.createdAt = {};
-      if (startDate) matchConditions.createdAt.$gte = new Date(startDate);
-      if (endDate) matchConditions.createdAt.$lte = new Date(endDate);
+      const dateRange = {};
+      if (startDate) dateRange.$gte = new Date(startDate);
+      if (endDate) dateRange.$lte = new Date(endDate);
+      itemMatchConditions.createdAt = dateRange;
+      adjustmentMatchConditions.createdAt = dateRange;
     }
 
     // Aggregate from Order documents
     const orderAudits = await Order.aggregate([
       { $unwind: '$items' },
-      { $match: matchConditions },
+      { $match: itemMatchConditions },
       {
         $project: {
           timestamp: '$createdAt',
@@ -320,7 +462,7 @@ router.get('/audit', async (req, res) => {
     // Aggregate from Sale documents
     const saleAudits = await Sale.aggregate([
       { $unwind: '$items' },
-      { $match: matchConditions },
+      { $match: itemMatchConditions },
       {
         $project: {
           timestamp: '$createdAt',
@@ -334,8 +476,24 @@ router.get('/audit', async (req, res) => {
       }
     ]);
 
+    // Aggregate from InventoryAdjustment documents (top-level productId — no $unwind needed)
+    const restockAudits = await InventoryAdjustment.aggregate([
+      { $match: adjustmentMatchConditions },
+      {
+        $project: {
+          timestamp: '$createdAt',
+          source: '$type',
+          quantity: '$quantity',
+          stockBefore: '$stockBefore',
+          stockAfter: '$stockAfter',
+          adjustmentId: '$_id',
+          variantSku: '$variantSku'
+        }
+      }
+    ]);
+
     // Combine and sort by timestamp
-    const auditLog = [...orderAudits, ...saleAudits].sort(
+    const auditLog = [...orderAudits, ...saleAudits, ...restockAudits].sort(
       (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
     );
 
