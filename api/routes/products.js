@@ -143,29 +143,143 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   put:
+ *     summary: Update product details (admin only)
+ *     description: |
+ *       Safely updates product-level fields and variant metadata.
+ *       **Protected fields:** `stock` and `version` on any variant are never modified
+ *       through this endpoint — use `/api/inventory` endpoints to manage stock.
+ *       **Variant updates:** matched by `sku`; only `size`, `color`, and `priceAdjustment`
+ *       are updated. Variants cannot be added or removed via this endpoint.
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               basePrice:
+ *                 type: number
+ *                 minimum: 0
+ *               category:
+ *                 type: string
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               active:
+ *                 type: boolean
+ *               variants:
+ *                 type: array
+ *                 description: List of variant updates matched by sku (only size, color, priceAdjustment are writable)
+ *                 items:
+ *                   type: object
+ *                   required: [sku]
+ *                   properties:
+ *                     sku:
+ *                       type: string
+ *                       description: Identifier used to match the variant — not updatable
+ *                     size:
+ *                       type: string
+ *                     color:
+ *                       type: string
+ *                     priceAdjustment:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Product updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Product'
+ *       400:
+ *         description: No valid update fields provided
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */
+
+// Whitelisted product-level fields — all other fields are ignored
+const allowedProductFields = ['name', 'description', 'basePrice', 'category', 'images', 'active'];
+
+// Whitelisted variant metadata fields — stock and version are intentionally excluded
+const allowedVariantFields = ['size', 'color', 'priceAdjustment'];
+
 // PUT /:id - Update product (protected)
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const { stock, ...allowedUpdates } = req.body;
-
-    // Prevent direct stock updates
-    if (stock !== undefined) {
-      return res.status(400).json({
-        error: 'Direct stock updates not allowed. Use /api/inventory endpoints.'
-      });
+    const productLevelSet = {};
+    for (const field of allowedProductFields) {
+      if (req.body[field] !== undefined) {
+        productLevelSet[field] = req.body[field];
+      }
     }
 
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      allowedUpdates,
-      { new: true, runValidators: true }
-    );
+    const hasVariants = Array.isArray(req.body.variants) && req.body.variants.length > 0;
+    const hasProductFields = Object.keys(productLevelSet).length > 0;
 
-    if (!product) {
+    if (!hasProductFields && !hasVariants) {
+      return res.status(400).json({ error: 'No valid update fields provided' });
+    }
+
+    // Apply product-level field updates
+    if (hasProductFields) {
+      await Product.findByIdAndUpdate(
+        req.params.id,
+        { $set: productLevelSet },
+        { new: false, runValidators: true }
+      );
+    }
+
+    // Apply variant metadata updates (matched by SKU, positional operator)
+    if (hasVariants) {
+      for (const variant of req.body.variants) {
+        if (!variant.sku) continue;
+
+        const variantUpdate = {};
+        for (const field of allowedVariantFields) {
+          if (variant[field] !== undefined) {
+            variantUpdate[`variants.$.${field}`] = variant[field];
+          }
+        }
+
+        if (Object.keys(variantUpdate).length > 0) {
+          await Product.updateOne(
+            { _id: req.params.id, 'variants.sku': variant.sku },
+            { $set: variantUpdate }
+          );
+        }
+      }
+    }
+
+    // Fetch and return the updated product
+    const updatedProduct = await Product.findById(req.params.id);
+
+    if (!updatedProduct) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    res.status(200).json(product);
+    res.status(200).json(updatedProduct);
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ error: 'Internal server error' });
