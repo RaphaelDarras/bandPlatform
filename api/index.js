@@ -2,12 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { connectDatabase } = require('./config/database');
+const { swaggerUi, swaggerSpec } = require('./config/swagger');
 
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(cors({ origin: '*' }));
+
+// Swagger API Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -27,6 +31,7 @@ async function startServer() {
     await connectDatabase();
     app.listen(PORT, () => {
       console.log(`API server running on port ${PORT}`);
+      console.log(`API Documentation: http://localhost:${PORT}/api-docs`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

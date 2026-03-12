@@ -3,7 +3,31 @@ const router = express.Router();
 const Product = require('../models/Product');
 const { authenticateToken } = require('../middleware/auth');
 
-// GET / - Get all active products (public)
+/**
+ * @swagger
+ * /api/products:
+ *   get:
+ *     summary: Get all active products
+ *     description: Retrieve all active products, optionally filtered by category
+ *     tags: [Products]
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by product category
+ *     responses:
+ *       200:
+ *         description: List of products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Product'
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/', async (req, res) => {
   try {
     const { category } = req.query;
@@ -21,7 +45,32 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /:id - Get product by ID (public)
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   get:
+ *     summary: Get product by ID
+ *     description: Retrieve a single product by its ID
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     responses:
+ *       200:
+ *         description: Product details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Product'
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -37,7 +86,35 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST / - Create new product (protected)
+/**
+ * @swagger
+ * /api/products:
+ *   post:
+ *     summary: Create new product
+ *     description: Create a new product with variants (requires authentication)
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Product'
+ *     responses:
+ *       201:
+ *         description: Product created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Product'
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { name, basePrice, variants } = req.body;

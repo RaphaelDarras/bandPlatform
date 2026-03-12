@@ -4,7 +4,41 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const { authenticateToken } = require('../middleware/auth');
 
-// POST /login - Authenticate admin and return JWT token
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Admin login
+ *     description: Authenticate admin credentials and receive JWT token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       400:
+ *         description: Missing username or password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ */
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -56,7 +90,40 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /verify - Verify JWT token
+/**
+ * @swagger
+ * /api/auth/verify:
+ *   post:
+ *     summary: Verify JWT token
+ *     description: Validate JWT token and return user information
+ *     tags: [Authentication]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Token is valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 valid:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     userId:
+ *                       type: string
+ *                     username:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *       401:
+ *         description: Invalid or missing token
+ *       403:
+ *         description: Token verification failed
+ */
 router.post('/verify', authenticateToken, (req, res) => {
   res.status(200).json({
     valid: true,

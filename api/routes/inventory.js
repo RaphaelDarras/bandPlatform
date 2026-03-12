@@ -8,7 +8,46 @@ const { authenticateToken } = require('../middleware/auth');
 // All routes require authentication
 router.use(authenticateToken);
 
-// POST /deduct - Primary stock deduction endpoint (online shop and POS)
+/**
+ * @swagger
+ * /api/inventory/deduct:
+ *   post:
+ *     summary: Deduct stock (final sale)
+ *     description: Permanently deduct stock for a completed sale using optimistic locking. Creates audit trail (Order for online, Sale for POS).
+ *     tags: [Inventory]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/InventoryDeductRequest'
+ *     responses:
+ *       200:
+ *         description: Stock deducted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 stockBefore:
+ *                   type: number
+ *                 stockAfter:
+ *                   type: number
+ *                 auditId:
+ *                   type: string
+ *       400:
+ *         description: Validation error
+ *       404:
+ *         description: Product or variant not found
+ *       409:
+ *         description: Insufficient stock or version conflict
+ *       500:
+ *         description: Internal server error
+ */
 router.post('/deduct', async (req, res) => {
   try {
     const { productId, variantSku, quantity, source, metadata } = req.body;
