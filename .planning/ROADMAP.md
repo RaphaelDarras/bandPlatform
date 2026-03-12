@@ -32,13 +32,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. System logs every inventory change with timestamp and source channel
   4. System stores admin credentials securely (hashed, never plaintext)
   5. API endpoints respond to product queries and inventory updates
-**Plans**: 4 plans in 2 waves
+**Plans**: 5 plans in 2 waves
 
 Plans:
 - [ ] 01-01-PLAN.md — Database schemas with optimistic locking (Products, Orders, Concerts)
 - [ ] 01-02-PLAN.md — Authentication system (bcrypt password hashing, JWT tokens)
 - [ ] 01-03-PLAN.md — API endpoints with atomic inventory operations
 - [ ] 01-04-PLAN.md — Gap closure: Inventory restock endpoint with audit trail
+- [ ] 01-05-PLAN.md — Gap closure: Safe product update endpoint protecting inventory fields
 
 ### Phase 2: Mobile POS Core
 **Goal**: Band members can track concert sales and manage inventory offline with automatic sync when connectivity returns
@@ -140,7 +141,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Inventory Core | 4/4 | Complete   | 2026-03-12 |
+| 1. Foundation & Inventory Core | 5/5 | Complete   | 2026-03-12 |
 | 2. Mobile POS Core | 0/TBD | Not started | - |
 | 3. Mobile POS Optimization | 0/TBD | Not started | - |
 | 4. Showcase Website | 0/TBD | Not started | - |
@@ -150,4 +151,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 ---
 *Created: 2026-02-13*
-*Last updated: 2026-03-12 after gap closure planning (01-04 added for restock endpoint)*
+*Last updated: 2026-03-12 after gap closure planning (01-05 added for safe product update endpoint)*

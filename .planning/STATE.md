@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-04-PLAN.md - Inventory Restock Endpoint
-last_updated: "2026-03-12T21:26:41.716Z"
+stopped_at: Completed 01-05-PLAN.md - Safe PUT Product Endpoint
+last_updated: "2026-03-12T21:48:10.380Z"
 last_activity: "2026-03-12 — Completed Plan 01-02: Authentication Foundation"
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 5
+  completed_plans: 5
   percent: 67
 ---
 
@@ -46,6 +46,7 @@ Progress: [███████░░░] 67%
 | 01 | 2 | 4 min | 2 min |
 | Phase 01 P03 | 3 | 3 tasks | 6 files |
 | Phase 01 P04 | 1 | 1 tasks | 2 files |
+| Phase 01 P05 | 2 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 01]: POST /deduct creates Order or Sale documents with stockBefore/stockAfter for audit trail (no separate Inventory collection)
 - [Phase 01]: Reserve/release endpoints modify stock but don't create audit entries (temporary holds only)
 - [Phase 01]: InventoryAdjustment stores productId as top-level field (not nested in items array), so no unwind needed in audit aggregation
+- [Phase 01]: Use allowedProductFields and allowedVariantFields arrays for explicit $set whitelisting — prevents any future field slipping through untested
+- [Phase 01]: Return 400 for PUT body with no recognized fields rather than silently accepting no-ops
 
 ### Pending Todos
 
@@ -83,8 +86,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T21:26:41.713Z
-Stopped at: Completed 01-04-PLAN.md - Inventory Restock Endpoint
+Last session: 2026-03-12T21:48:10.377Z
+Stopped at: Completed 01-05-PLAN.md - Safe PUT Product Endpoint
 Resume file: None
 
 ---
