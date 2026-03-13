@@ -422,6 +422,93 @@ router.post('/restock', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/inventory/stock:
+ *   get:
+ *     summary: Get stock summary across all active products
+ *     description: Returns a read-only stock summary with grand total, per-product totals, and per-variant breakdown. Only active products are included.
+ *     tags: [Inventory]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Stock summary retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 grandTotal:
+ *                   type: number
+ *                   description: Total stock units across all active products and variants
+ *                 productCount:
+ *                   type: number
+ *                   description: Number of active products included
+ *                 products:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       productId:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       category:
+ *                         type: string
+ *                       productTotal:
+ *                         type: number
+ *                         description: Sum of stock across all variants for this product
+ *                       variants:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             sku:
+ *                               type: string
+ *                             size:
+ *                               type: string
+ *                             color:
+ *                               type: string
+ *                             stock:
+ *                               type: number
+ *       401:
+ *         description: Unauthorized — missing or invalid token
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/stock', async (req, res) => {
+  try {
+    const results = await Product.find({ active: true })
+      .select('name category variants.sku variants.size variants.color variants.stock')
+      .lean();
+
+    const products = results.map(product => {
+      const variants = product.variants.map(v => ({
+        sku: v.sku,
+        size: v.size || null,
+        color: v.color || null,
+        stock: v.stock
+      }));
+      const productTotal = variants.reduce((sum, v) => sum + v.stock, 0);
+      return {
+        productId: product._id,
+        name: product.name,
+        category: product.category || null,
+        productTotal,
+        variants
+      };
+    });
+
+    const grandTotal = products.reduce((sum, p) => sum + p.productTotal, 0);
+
+    res.status(200).json({ grandTotal, productCount: products.length, products });
+  } catch (error) {
+    console.error('Stock summary error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /audit - Query inventory audit trail from Order/Sale documents
 router.get('/audit', async (req, res) => {
   try {
