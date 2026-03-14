@@ -24,8 +24,17 @@ import * as outboxModule from '@/db/outbox';
 import * as dbModule from '@/db';
 
 // Mock db modules
+const mockDb = {
+  _mock: 'db',
+  runAsync: jest.fn(() => Promise.resolve({ lastInsertRowId: 1, changes: 1 })),
+  getAllAsync: jest.fn(() => Promise.resolve([])),
+  getFirstAsync: jest.fn(() => Promise.resolve(null)),
+  execAsync: jest.fn(() => Promise.resolve()),
+  withTransactionAsync: jest.fn((fn: () => Promise<void>) => fn()),
+};
+
 jest.mock('@/db', () => ({
-  getDb: jest.fn(() => Promise.resolve({ _mock: 'db' })),
+  getDb: jest.fn(() => Promise.resolve(mockDb)),
 }));
 
 jest.mock('@/db/sales', () => ({
@@ -58,6 +67,13 @@ jest.mock('@/db/outbox', () => ({
   getPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   markOutboxDone: jest.fn(() => Promise.resolve()),
   incrementAttempt: jest.fn(() => Promise.resolve()),
+}));
+
+// Mock API sales (void/unvoid — network calls silenced in tests)
+jest.mock('@/api/sales', () => ({
+  apiGetSales: jest.fn(() => Promise.resolve([])),
+  apiVoidSale: jest.fn(() => Promise.resolve()),
+  apiUnvoidSale: jest.fn(() => Promise.resolve()),
 }));
 
 const mockGetLocalSales = salesModule.getLocalSales as jest.Mock;
@@ -104,6 +120,12 @@ beforeEach(() => {
   const { v4 } = require('uuid');
   (v4 as jest.Mock).mockReturnValue('outbox-uuid');
   mockGetLocalSales.mockResolvedValue([]);
+  // Reset mockDb methods after clearAllMocks
+  mockDb.runAsync.mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
+  mockDb.getAllAsync.mockResolvedValue([]);
+  mockDb.getFirstAsync.mockResolvedValue(null);
+  mockDb.execAsync.mockResolvedValue(undefined);
+  mockDb.withTransactionAsync.mockImplementation((fn: () => Promise<void>) => fn());
 });
 
 describe('useHistory — grouping and sorting', () => {
@@ -216,9 +238,8 @@ describe('useHistory — voidSale', () => {
   });
 
   it('inserts an outbox entry with type sale_void when voiding', async () => {
-    const mockRunAsync = jest.fn(() => Promise.resolve({ lastInsertRowId: 1, changes: 1 }));
-    const mockDb = { runAsync: mockRunAsync, getAllAsync: jest.fn(() => Promise.resolve([])), withTransactionAsync: jest.fn((fn: () => Promise<void>) => fn()), execAsync: jest.fn(() => Promise.resolve()), getFirstAsync: jest.fn(() => Promise.resolve(null)) };
-    (dbModule.getDb as jest.Mock).mockResolvedValue(mockDb);
+    // Clear runAsync spy so we can check fresh calls
+    mockDb.runAsync.mockClear();
 
     mockGetLocalSales.mockResolvedValue([
       makeSaleRow({ id: 'sale-1', concertId: 'concert-1', voided: 0 }),
@@ -235,12 +256,12 @@ describe('useHistory — voidSale', () => {
     });
 
     // Should call runAsync to insert outbox entry with type sale_void
-    const insertCalls = mockRunAsync.mock.calls.filter(
-      (call: unknown[]) => typeof call[0] === 'string' && call[0].includes('outbox')
+    const insertCalls = mockDb.runAsync.mock.calls.filter(
+      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('outbox')
     );
     expect(insertCalls.length).toBeGreaterThan(0);
     const outboxInsert = insertCalls.find(
-      (call: unknown[]) => typeof call[1] === 'string' || (Array.isArray(call[1]) && call[1].includes('sale_void'))
+      (call: unknown[]) => Array.isArray(call[1]) && (call[1] as unknown[]).includes('sale_void')
     );
     expect(outboxInsert).toBeDefined();
   });
