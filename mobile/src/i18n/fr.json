@@ -22,7 +22,9 @@
     "pinRequired": "Code PIN requis",
     "loginFailed": "Connexion échouée",
     "logout": "Se déconnecter",
-    "needOnlineFirst": "Connectez-vous à internet une fois pour configurer votre PIN"
+    "needOnlineFirst": "Connectez-vous à internet une fois pour configurer votre PIN",
+    "sessionExpiring": "Session expirante",
+    "sessionExpiringMessage": "Votre session expire dans 30 minutes. Veuillez vous reconnecter pour rester connecté."
   },
   "cart": {
     "total": "Total",

@@ -22,7 +22,9 @@
     "pinRequired": "PIN required",
     "loginFailed": "Login failed",
     "logout": "Log out",
-    "needOnlineFirst": "Connect to internet once to set up your PIN"
+    "needOnlineFirst": "Connect to internet once to set up your PIN",
+    "sessionExpiring": "Session Expiring",
+    "sessionExpiringMessage": "Your session expires in 30 minutes. Please log in again to stay connected."
   },
   "cart": {
     "total": "Total",

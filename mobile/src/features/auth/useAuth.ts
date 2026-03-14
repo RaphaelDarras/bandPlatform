@@ -4,12 +4,14 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { apiPinLogin } from '@/api/auth';
 import { setupPinLocally, verifyPinOffline, getCachedToken } from './pinAuth';
+import { scheduleExpiryWarning, clearExpiryWarning } from './sessionExpiry';
+import i18n from '@/i18n';
 
 /**
  * Auth hook providing login, logout, and auth state.
  *
  * Login flow:
- * - Online: calls API, stores token + PIN hash locally
+ * - Online: calls API, stores token + PIN hash locally, schedules session expiry warning
  * - Offline: verifies PIN against local hash, uses cached JWT
  */
 export function useAuth() {
@@ -26,7 +28,14 @@ export function useAuth() {
           const { token, user: apiUser } = await apiPinLogin(pin);
           await setupPinLocally(pin, token);
           setToken(token, apiUser);
-          scheduleWarning(token);
+          clearExpiryWarning();
+          scheduleExpiryWarning(token, () => {
+            Alert.alert(
+              i18n.t('auth.sessionExpiring'),
+              i18n.t('auth.sessionExpiringMessage'),
+              [{ text: i18n.t('common.ok') }]
+            );
+          });
           return;
         } catch (networkError: unknown) {
           // If it's a network error, fall through to offline path
@@ -45,17 +54,23 @@ export function useAuth() {
       // Offline login path (or online failed with network error)
       const isValid = await verifyPinOffline(pin);
       if (!isValid) {
-        throw new Error('Invalid PIN');
+        throw new Error(i18n.t('auth.loginFailed'));
       }
       const cachedToken = await getCachedToken();
       if (!cachedToken) {
-        throw new Error('No cached session. Please connect to the internet to log in.');
+        throw new Error(i18n.t('auth.needOnlineFirst'));
       }
       // Use cached token — user object isn't cached separately; use auth store's last known user
-      // Re-set token to refresh auth state
       const currentUser = useAuthStore.getState().user;
       setToken(cachedToken, currentUser ?? { id: '', username: '', role: '' });
-      scheduleWarning(cachedToken);
+      clearExpiryWarning();
+      scheduleExpiryWarning(cachedToken, () => {
+        Alert.alert(
+          i18n.t('auth.sessionExpiring'),
+          i18n.t('auth.sessionExpiringMessage'),
+          [{ text: i18n.t('common.ok') }]
+        );
+      });
     } finally {
       setIsLoading(false);
     }
@@ -64,9 +79,7 @@ export function useAuth() {
   function logout(): void {
     // Do NOT clear SecureStore PIN hash — enables offline re-login
     clearAuth();
-    import('./sessionExpiry').then(({ clearExpiryWarning }) => {
-      clearExpiryWarning();
-    });
+    clearExpiryWarning();
   }
 
   return {
@@ -76,21 +89,4 @@ export function useAuth() {
     user,
     isLoading,
   };
-}
-
-/**
- * Schedule expiry warning after login.
- * Imported dynamically to avoid circular dependency issues.
- */
-function scheduleWarning(token: string): void {
-  import('./sessionExpiry').then(({ scheduleExpiryWarning, clearExpiryWarning }) => {
-    clearExpiryWarning();
-    scheduleExpiryWarning(token, () => {
-      Alert.alert(
-        'Session Expiring',
-        'Your session expires in 30 minutes. Please log in again to stay connected.',
-        [{ text: 'OK' }]
-      );
-    });
-  });
 }
