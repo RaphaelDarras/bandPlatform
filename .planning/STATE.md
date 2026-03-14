@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-06-PLAN.md - Stock Summary Endpoint
-last_updated: "2026-03-13T10:03:38.153Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-14T13:17:12.033Z"
 last_activity: "2026-03-12 — Completed Plan 01-02: Authentication Foundation"
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 13
+  completed_plans: 7
   percent: 67
 ---
 
@@ -48,6 +48,7 @@ Progress: [███████░░░] 67%
 | Phase 01 P04 | 1 | 1 tasks | 2 files |
 | Phase 01 P05 | 2 | 1 tasks | 3 files |
 | Phase 01 P06 | 5 | 1 tasks | 2 files |
+| Phase 02 P01 | 5 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Return 400 for PUT body with no recognized fields rather than silently accepting no-ops
 - [Phase 01]: Return productCount alongside grandTotal and products array for convenience (avoids client-side array length calculation)
 - [Phase 01]: Use Product.find({ active: true }).lean() for read-only stock query (no Mongoose document overhead)
+- [Phase 02-01]: pinHash stored verbatim in Admin model — PIN hashing done in route handler to avoid double-hashing risk
+- [Phase 02-01]: Sparse unique index on idempotencyKey allows many null values but enforces uniqueness when set
+- [Phase 02-01]: city request field maps to location DB field in Concert creation — matches mobile app naming
+- [Phase 02-01]: PIN login uses Admin.findOne({ active: true }) — assumes single active admin for band mobile POS
 
 ### Pending Todos
 
@@ -89,8 +94,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T10:03:38.149Z
-Stopped at: Completed 01-06-PLAN.md - Stock Summary Endpoint
+Last session: 2026-03-14T13:17:12.030Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
 
 ---

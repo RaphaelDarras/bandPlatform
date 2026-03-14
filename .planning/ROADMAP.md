@@ -54,10 +54,16 @@ Plans:
   5. User can see real-time inventory levels that update when app connects to network
   6. User can authenticate into app with PIN or password
   7. App syncs queued offline transactions automatically when connectivity restored
-**Plans**: TBD
+**Plans**: 7 plans in 3 waves
 
 Plans:
-- [ ] TBD during phase planning
+- [ ] 02-01-PLAN.md — API extensions: Sale model migration, PIN auth endpoints, Concert CRUD
+- [ ] 02-02-PLAN.md — API extensions: Batch sale submission with idempotency, void/unvoid endpoints
+- [ ] 02-03-PLAN.md — Mobile project scaffold: Expo init, SQLite data layer, Zustand stores, i18n
+- [ ] 02-04-PLAN.md — PIN authentication flow and tab navigation shell with dashboard
+- [ ] 02-05-PLAN.md — Selling flow: product grid, variant picker, cart, review screen, sale recording
+- [ ] 02-06-PLAN.md — Concert management screens, transaction history with void/unvoid
+- [ ] 02-07-PLAN.md — Sync manager, stock overview, restock, dashboard wiring, product management
 
 ### Phase 3: Mobile POS Optimization
 **Goal**: Mobile POS operates reliably during 4-6 hour concert events with low-bandwidth sync and inventory reconciliation
@@ -138,12 +144,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Inventory Core | 6/6 | Complete   | 2026-03-13 |
-| 2. Mobile POS Core | 0/TBD | Not started | - |
+| 2. Mobile POS Core | 1/7 | In Progress|  |
 | 3. Mobile POS Optimization | 0/TBD | Not started | - |
 | 4. Showcase Website | 0/TBD | Not started | - |
 | 5. Online Shop Core | 0/TBD | Not started | - |
@@ -152,4 +158,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 ---
 *Created: 2026-02-13*
-*Last updated: 2026-03-13 after gap closure planning (01-06 added for stock summary endpoint)*
+*Last updated: 2026-03-14 after Phase 2 planning (7 plans in 3 waves)*

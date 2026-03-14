@@ -13,7 +13,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **POS-02**: User can quickly select products with touch-friendly interface
 - [ ] **POS-03**: User can view transaction history for current concert
 - [ ] **POS-04**: User can see real-time inventory levels that sync when online
-- [ ] **POS-05**: User can authenticate with PIN or password
+- [x] **POS-05**: User can authenticate with PIN or password
 - [ ] **POS-06**: App maintains battery efficiency for 4-6 hour events
 - [ ] **POS-07**: User sees warnings when product stock is low (< 5 units)
 - [ ] **POS-08**: User can view sales report with total amounts by concert
@@ -57,7 +57,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Authentication & Security
 
-- [ ] **AUTH-01**: Admin can log in to mobile POS app securely
+- [x] **AUTH-01**: Admin can log in to mobile POS app securely
 - [x] **AUTH-02**: System securely stores authentication credentials
 - [ ] **AUTH-03**: System validates payment webhooks from Stripe/PayPal
 
@@ -111,10 +111,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | POS-02 | Phase 2 | Pending |
 | POS-03 | Phase 2 | Pending |
 | POS-04 | Phase 2 | Pending |
-| POS-05 | Phase 2 | Pending |
+| POS-05 | Phase 2 | Complete |
 | POS-09 | Phase 2 | Pending |
 | POS-10 | Phase 2 | Pending |
-| AUTH-01 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
 | POS-06 | Phase 3 | Pending |
 | POS-07 | Phase 3 | Pending |
 | POS-08 | Phase 3 | Pending |
