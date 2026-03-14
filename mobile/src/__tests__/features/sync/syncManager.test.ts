@@ -13,7 +13,7 @@ jest.mock('uuid', () => ({
   v4: jest.fn().mockReturnValue('test-uuid'),
 }));
 
-import { requestSync, startPeriodicSync, stopPeriodicSync } from '@/features/sync/SyncManager';
+import { requestSync, startPeriodicSync, stopPeriodicSync, _resetSyncState } from '@/features/sync/SyncManager';
 import * as outboxModule from '@/db/outbox';
 import { useSyncStore } from '@/stores/syncStore';
 
@@ -94,9 +94,15 @@ const mockApiClient = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  _resetSyncState(); // Reset singleton syncInProgress guard between tests
+  // Restore useSyncStore.getState implementation after clearAllMocks clears it
+  (useSyncStore.getState as jest.Mock).mockReturnValue(mockSyncStore);
+  // Use mockReset on getPendingOutboxRows to clear any queued Once implementations from prior tests
+  mockGetPendingOutboxRows.mockReset();
   mockGetPendingOutboxRows.mockResolvedValue([]);
   mockMarkOutboxDone.mockResolvedValue(undefined);
   mockIncrementAttempt.mockResolvedValue(undefined);
+  mockApiClient.post.mockReset();
   mockApiClient.post.mockResolvedValue({ data: {} });
   mockSyncStore.consecutiveFailures = 0;
   mockSyncStore.pendingCount = 0;
@@ -193,9 +199,9 @@ describe('requestSync — basic processing', () => {
 
 describe('requestSync — concurrent sync prevention', () => {
   it('prevents concurrent sync (second call returns early while first is running)', async () => {
-    let resolveFirstPost: ((value: unknown) => void) | null = null;
+    let resolveFirstPost: ((value: { data: Record<string, unknown> }) => void) | null = null;
     mockApiClient.post.mockReturnValueOnce(
-      new Promise((resolve) => { resolveFirstPost = resolve; })
+      new Promise<{ data: Record<string, unknown> }>((resolve) => { resolveFirstPost = resolve; })
     );
 
     const row1 = makeOutboxRow({ id: 'row-1', type: 'sale_create' });
@@ -208,7 +214,9 @@ describe('requestSync — concurrent sync prevention', () => {
     const secondSync = requestSync(mockDb as never, mockApiClient as never);
 
     // Resolve first sync
-    resolveFirstPost?.({ data: {} });
+    if (resolveFirstPost) {
+      (resolveFirstPost as (value: { data: Record<string, unknown> }) => void)({ data: {} });
+    }
 
     await Promise.all([firstSync, secondSync]);
 
