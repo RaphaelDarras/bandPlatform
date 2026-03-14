@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-mobile-pos-core-06-PLAN.md
-last_updated: "2026-03-14T15:25:11.876Z"
+stopped_at: Completed 02-mobile-pos-core-07-PLAN.md
+last_updated: "2026-03-14T15:46:12.257Z"
 last_activity: "2026-03-14 — Completed Plan 02-05: Selling Flow (product grid, variant picker, cart, atomic sale recording)"
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
   percent: 77
 ---
 
@@ -54,6 +54,7 @@ Progress: [████████░░] 77%
 | Phase 02-mobile-pos-core P04 | 15min | 3 tasks | 16 files |
 | Phase 02-mobile-pos-core P05 | 14min | 2 tasks | 12 files |
 | Phase 02 P06 | 14 | 2 tasks | 11 files |
+| Phase 02-mobile-pos-core P07 | 17 | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Recent decisions affecting current work:
 - [Phase 02-06]: useConcerts.closeConcert calculates totals from local SQLite sales (not API) — offline-first, no network dependency for totals
 - [Phase 02-06]: useHistory void/unvoid create outbox entries via db.runAsync directly (not recordSaleLocally) — void is a separate operation type, not a new sale
 - [Phase 02-06]: LocalSaleRow total_amount: accessed via cast to Record<string, number> since SQLite returns snake_case but TypeScript type uses camelCase totalAmount
+- [Phase 02-mobile-pos-core]: _resetSyncState export for test isolation of module-level syncInProgress singleton — avoids jest.resetModules() overhead
+- [Phase 02-mobile-pos-core]: useSyncStore.getState mock must be restored after jest.clearAllMocks() in beforeEach — clearAllMocks removes mockReturnValue implementations
+- [Phase 02-mobile-pos-core]: useStock reads from local cache after API upsert — cache is always source of truth for offline-first consistency
 
 ### Pending Todos
 
@@ -112,8 +116,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T15:25:11.873Z
-Stopped at: Completed 02-mobile-pos-core-06-PLAN.md
+Last session: 2026-03-14T15:46:12.252Z
+Stopped at: Completed 02-mobile-pos-core-07-PLAN.md
 Resume file: None
 
 ---
