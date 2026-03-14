@@ -32,6 +32,9 @@ const AdminSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    pinHash: {
+      type: String,
+    },
   },
   {
     timestamps: true,

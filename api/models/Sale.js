@@ -42,8 +42,31 @@ const SaleSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'other'],
+    enum: ['cash', 'card', 'etransfer', 'paypal', 'other'],
     default: 'cash'
+  },
+  currency: {
+    type: String,
+    default: 'EUR'
+  },
+  discount: {
+    type: Number,
+    default: 0
+  },
+  discountType: {
+    type: String,
+    enum: ['flat', 'percent'],
+    default: 'flat'
+  },
+  voidedAt: {
+    type: Date
+  },
+  voidedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+  idempotencyKey: {
+    type: String
   },
   source: {
     type: String,
@@ -62,5 +85,8 @@ SaleSchema.index({ concertId: 1 });
 
 // Index on createdAt (descending) for recent sales
 SaleSchema.index({ createdAt: -1 });
+
+// Sparse unique index on idempotencyKey — allows many null values but enforces uniqueness when set
+SaleSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Sale', SaleSchema);
