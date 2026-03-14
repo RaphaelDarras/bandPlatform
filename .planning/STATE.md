@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-mobile-pos-core-04-PLAN.md
-last_updated: "2026-03-14T14:47:07.515Z"
-last_activity: "2026-03-14 — Completed Plan 02-03: Mobile Foundation (Expo project, SQLite outbox, Zustand stores, expo prebuild)"
+stopped_at: Completed 02-mobile-pos-core-05-PLAN.md
+last_updated: "2026-03-14T15:05:13Z"
+last_activity: "2026-03-14 — Completed Plan 02-05: Selling Flow (product grid, variant picker, cart, atomic sale recording)"
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 13
-  completed_plans: 10
-  percent: 69
+  completed_plans: 11
+  percent: 77
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 2 of 7 (Mobile POS Core)
-Plan: 3 of 7 in current phase (02-03 complete)
+Plan: 5 of 7 in current phase (02-05 complete)
 Status: Executing
-Last activity: 2026-03-14 — Completed Plan 02-03: Mobile Foundation (Expo project, SQLite outbox, Zustand stores, expo prebuild)
+Last activity: 2026-03-14 — Completed Plan 02-05: Selling Flow (product grid, variant picker, cart, atomic sale recording)
 
-Progress: [███████░░░] 69%
+Progress: [████████░░] 77%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [███████░░░] 69%
 | Phase 02-mobile-pos-core P02 | 2 | 2 tasks | 3 files |
 | Phase 02-mobile-pos-core P03 | 14min | 3 tasks | 23 files |
 | Phase 02-mobile-pos-core P04 | 15min | 3 tasks | 16 files |
+| Phase 02-mobile-pos-core P05 | 14min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 02-mobile-pos-core]: JS Tabs used (not NativeTabs) — NativeTabs is alpha and cannot hide tab bar for selling mode
 - [Phase 02-mobile-pos-core]: sessionExpiry.ts created during Task 2 (not Task 3) to allow TypeScript compilation — full implementation completed in same plan
 - [Phase 02-mobile-pos-core]: useAuth uses i18n.t() directly (not useTranslation hook) — hook is a plain function, not a React component
+- [Phase 02-05]: VariantPicker rendered inline (not BottomSheet) — simpler to test, avoids nested sheet issues
+- [Phase 02-05]: getByLabelText used in RTL tests for variant rows — getByA11yLabel does not exist in @testing-library/react-native v13
 
 ### Pending Todos
 
@@ -105,8 +108,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T14:47:07.512Z
-Stopped at: Completed 02-mobile-pos-core-04-PLAN.md
+Last session: 2026-03-14T15:05:13Z
+Stopped at: Completed 02-mobile-pos-core-05-PLAN.md
 Resume file: None
 
 ---
