@@ -18,15 +18,16 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock react-native-mmkv
+// Mock react-native-mmkv (v4.x uses createMMKV instead of new MMKV())
 jest.mock('react-native-mmkv', () => {
   const store = {};
+  const mmkvInstance = {
+    getString: jest.fn((key) => store[key] ?? undefined),
+    set: jest.fn((key, value) => { store[key] = value; }),
+    remove: jest.fn((key) => { delete store[key]; }),
+  };
   return {
-    MMKV: jest.fn().mockImplementation(() => ({
-      getString: jest.fn((key) => store[key] ?? undefined),
-      set: jest.fn((key, value) => { store[key] = value; }),
-      delete: jest.fn((key) => { delete store[key]; }),
-    })),
+    createMMKV: jest.fn(() => mmkvInstance),
   };
 });
 

@@ -1,0 +1,60 @@
+{
+  "appName": "BandPOS",
+  "tabs": {
+    "dashboard": "Tableau de bord",
+    "history": "Historique",
+    "stock": "Stock",
+    "settings": "Paramètres"
+  },
+  "common": {
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "retry": "Réessayer"
+  },
+  "auth": {
+    "enterPin": "Entrez le code PIN",
+    "pinRequired": "Code PIN requis",
+    "loginFailed": "Connexion échouée",
+    "logout": "Se déconnecter",
+    "needOnlineFirst": "Connectez-vous à internet une fois pour configurer votre PIN"
+  },
+  "cart": {
+    "total": "Total",
+    "items": "{{count}} article",
+    "items_other": "{{count}} articles",
+    "empty": "Panier vide",
+    "discount": "Réduction",
+    "addDiscount": "Ajouter une réduction"
+  },
+  "sale": {
+    "confirm": "Confirmer la vente",
+    "paymentMethod": "Mode de paiement",
+    "cash": "Espèces",
+    "card": "Carte",
+    "etransfer": "Virement",
+    "paypal": "PayPal",
+    "success": "Vente enregistrée",
+    "void": "Annuler la vente",
+    "unvoid": "Réactiver la vente",
+    "voided": "ANNULÉE"
+  },
+  "concert": {
+    "active": "Concert en cours",
+    "select": "Choisir un concert",
+    "none": "Aucun concert actif",
+    "start": "Démarrer le concert",
+    "close": "Fermer le concert"
+  },
+  "sync": {
+    "syncing": "Synchronisation...",
+    "offline": "Hors ligne",
+    "pending": "{{count}} en attente",
+    "lastSync": "Dernière sync : {{time}}"
+  }
+}

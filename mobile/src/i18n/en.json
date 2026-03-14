@@ -1,0 +1,60 @@
+{
+  "appName": "BandPOS",
+  "tabs": {
+    "dashboard": "Dashboard",
+    "history": "History",
+    "stock": "Stock",
+    "settings": "Settings"
+  },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "back": "Back",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry"
+  },
+  "auth": {
+    "enterPin": "Enter PIN",
+    "pinRequired": "PIN required",
+    "loginFailed": "Login failed",
+    "logout": "Log out",
+    "needOnlineFirst": "Connect to internet once to set up your PIN"
+  },
+  "cart": {
+    "total": "Total",
+    "items": "{{count}} item",
+    "items_other": "{{count}} items",
+    "empty": "Cart is empty",
+    "discount": "Discount",
+    "addDiscount": "Add discount"
+  },
+  "sale": {
+    "confirm": "Confirm Sale",
+    "paymentMethod": "Payment Method",
+    "cash": "Cash",
+    "card": "Card",
+    "etransfer": "E-Transfer",
+    "paypal": "PayPal",
+    "success": "Sale recorded",
+    "void": "Void Sale",
+    "unvoid": "Unvoid Sale",
+    "voided": "VOIDED"
+  },
+  "concert": {
+    "active": "Active Concert",
+    "select": "Select Concert",
+    "none": "No active concert",
+    "start": "Start Concert",
+    "close": "Close Concert"
+  },
+  "sync": {
+    "syncing": "Syncing...",
+    "offline": "Offline",
+    "pending": "{{count}} pending",
+    "lastSync": "Last sync: {{time}}"
+  }
+}
