@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Concert POS (Mobile App)
 
-- [ ] **POS-01**: User can record sales offline without internet connectivity
+- [x] **POS-01**: User can record sales offline without internet connectivity
 - [ ] **POS-02**: User can quickly select products with touch-friendly interface
-- [ ] **POS-03**: User can view transaction history for current concert
+- [x] **POS-03**: User can view transaction history for current concert
 - [ ] **POS-04**: User can see real-time inventory levels that sync when online
 - [x] **POS-05**: User can authenticate with PIN or password
 - [ ] **POS-06**: App maintains battery efficiency for 4-6 hour events
@@ -107,9 +107,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INV-03 | Phase 1 | Complete |
 | INV-04 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
-| POS-01 | Phase 2 | Pending |
+| POS-01 | Phase 2 | Complete |
 | POS-02 | Phase 2 | Pending |
-| POS-03 | Phase 2 | Pending |
+| POS-03 | Phase 2 | Complete |
 | POS-04 | Phase 2 | Pending |
 | POS-05 | Phase 2 | Complete |
 | POS-09 | Phase 2 | Pending |
