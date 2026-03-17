@@ -43,8 +43,8 @@ export async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS concerts (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
       date INTEGER NOT NULL,
+      country TEXT NOT NULL DEFAULT '',
       venue TEXT,
       city TEXT,
       active INTEGER NOT NULL DEFAULT 1,
@@ -58,4 +58,10 @@ export async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       PRIMARY KEY (concert_id, product_id)
     );
   `);
+
+  // Migrate existing concerts table: add country, drop name
+  try { await db.execAsync(`ALTER TABLE concerts ADD COLUMN country TEXT NOT NULL DEFAULT ''`); } catch {}
+  try { await db.execAsync(`ALTER TABLE concerts DROP COLUMN name`); } catch {}
+  // Remove rows with null id (accumulated before _id→id mapping was fixed)
+  try { await db.execAsync(`DELETE FROM concerts WHERE id IS NULL`); } catch {}
 }

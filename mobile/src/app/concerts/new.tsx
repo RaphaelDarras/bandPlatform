@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -16,33 +18,153 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useConcerts } from '@/features/concerts/useConcerts';
 
+const ITEM_HEIGHT = 44;
+const VISIBLE_ITEMS = 5;
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function daysInMonth(month: number, year: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function buildYears() {
+  const current = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = current - 1; y <= current + 5; y++) years.push(y);
+  return years;
+}
+
+interface ColumnProps {
+  data: (string | number)[];
+  selectedIndex: number;
+  onChange: (index: number) => void;
+}
+
+function PickerColumn({ data, selectedIndex, onChange }: ColumnProps) {
+  const ref = useRef<FlatList>(null);
+
+  const handleMomentumEnd = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+    const index = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+    const clamped = Math.max(0, Math.min(index, data.length - 1));
+    onChange(clamped);
+  };
+
+  return (
+    <View style={col.wrapper}>
+      <View style={col.highlight} pointerEvents="none" />
+      <FlatList
+        ref={ref}
+        data={data}
+        keyExtractor={(_, i) => String(i)}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_HEIGHT}
+        decelerationRate="fast"
+        contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+        getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
+        initialScrollIndex={selectedIndex}
+        onMomentumScrollEnd={handleMomentumEnd}
+        renderItem={({ item, index }) => (
+          <View style={col.item}>
+            <Text style={[col.itemText, index === selectedIndex && col.itemTextSelected]}>
+              {item}
+            </Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const col = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    height: ITEM_HEIGHT * VISIBLE_ITEMS,
+    overflow: 'hidden',
+  },
+  highlight: {
+    position: 'absolute',
+    top: ITEM_HEIGHT * 2,
+    left: 0,
+    right: 0,
+    height: ITEM_HEIGHT,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#208AEF',
+    zIndex: 1,
+  },
+  item: {
+    height: ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemText: {
+    fontSize: 16,
+    color: '#888',
+  },
+  itemTextSelected: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+});
+
 /**
  * Quick-create concert form.
- * Fields: name, venue, date (YYYY-MM-DD), city — all required.
+ * Fields: venue, date, city, country — all required.
  */
 export default function NewConcertScreen() {
   const { createConcert } = useConcerts();
 
-  const [name, setName] = useState('');
+  const today = new Date();
+  const years = buildYears();
+
+  const submittingRef = useRef(false);
   const [venue, setVenue] = useState('');
-  const [date, setDate] = useState('');
   const [city, setCity] = useState('');
+  const [country, setCountry] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1); // 1-12
+  const [selectedDay, setSelectedDay] = useState(today.getDate());
+
+  const numDays = daysInMonth(selectedMonth, selectedYear);
+  const days = Array.from({ length: numDays }, (_, i) => i + 1);
+  const monthNames = MONTHS;
+
+  const formattedDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+  const displayDate = `${MONTHS[selectedMonth - 1]} ${selectedDay}, ${selectedYear}`;
+
+  const handleMonthChange = (index: number) => {
+    setSelectedMonth(index + 1);
+    const maxDay = daysInMonth(index + 1, selectedYear);
+    if (selectedDay > maxDay) setSelectedDay(maxDay);
+  };
+
+  const handleYearChange = (index: number) => {
+    setSelectedYear(years[index]);
+    const maxDay = daysInMonth(selectedMonth, years[index]);
+    if (selectedDay > maxDay) setSelectedDay(maxDay);
+  };
 
   const validate = (): string | null => {
-    if (!name.trim()) return 'Concert name is required.';
     if (!venue.trim()) return 'Venue is required.';
-    if (!date.trim()) return 'Date is required (YYYY-MM-DD).';
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
-      return 'Date must be in YYYY-MM-DD format.';
-    }
     if (!city.trim()) return 'City is required.';
+    if (!country.trim()) return 'Country is required.';
     return null;
   };
 
   const handleCreate = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     const validationError = validate();
     if (validationError) {
+      submittingRef.current = false;
       Alert.alert('Validation Error', validationError);
       return;
     }
@@ -50,10 +172,10 @@ export default function NewConcertScreen() {
     setLoading(true);
     try {
       await createConcert({
-        name: name.trim(),
         venue: venue.trim(),
-        date: date.trim(),
+        date: formattedDate,
         city: city.trim(),
+        country: country.trim(),
       });
       router.back();
     } catch (err) {
@@ -61,6 +183,7 @@ export default function NewConcertScreen() {
       Alert.alert('Error', 'Failed to create concert. Please try again.');
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -84,19 +207,6 @@ export default function NewConcertScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Name */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Concert Name *</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="e.g. Summer Tour Night 1"
-              accessibilityLabel="Concert Name"
-              returnKeyType="next"
-            />
-          </View>
-
           {/* Venue */}
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Venue *</Text>
@@ -113,15 +223,16 @@ export default function NewConcertScreen() {
           {/* Date */}
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Date *</Text>
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              accessibilityLabel="Date"
-              keyboardType="numbers-and-punctuation"
-              returnKeyType="next"
-            />
+            <Pressable
+              style={styles.dateInputWrapper}
+              onPress={() => setShowPicker(true)}
+              accessibilityLabel="Select date"
+            >
+              <View style={styles.dateInput}>
+                <Text style={styles.dateInputText}>{displayDate}</Text>
+                <Text style={styles.dateInputIcon}>📅</Text>
+              </View>
+            </Pressable>
           </View>
 
           {/* City */}
@@ -133,6 +244,19 @@ export default function NewConcertScreen() {
               onChangeText={setCity}
               placeholder="e.g. San Francisco"
               accessibilityLabel="City"
+              returnKeyType="next"
+            />
+          </View>
+
+          {/* Country */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Country *</Text>
+            <TextInput
+              style={styles.input}
+              value={country}
+              onChangeText={setCountry}
+              placeholder="e.g. United States"
+              accessibilityLabel="Country"
               returnKeyType="done"
             />
           </View>
@@ -141,23 +265,57 @@ export default function NewConcertScreen() {
         {/* Create button */}
         <View style={styles.footer}>
           <Pressable
-            style={({ pressed }) => [
-              styles.createBtn,
-              pressed && styles.createBtnPressed,
-              loading && styles.createBtnDisabled,
-            ]}
+            style={styles.createBtnWrapper}
             onPress={handleCreate}
             disabled={loading}
             accessibilityLabel="Create Concert"
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.createBtnText}>Create Concert</Text>
+            {({ pressed }) => (
+              <View style={[
+                styles.createBtn,
+                pressed && styles.createBtnPressed,
+                loading && styles.createBtnDisabled,
+              ]}>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.createBtnText}>Create Concert</Text>
+                )}
+              </View>
             )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Date picker modal */}
+      <Modal visible={showPicker} transparent animationType="slide">
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHeader}>
+              <Pressable onPress={() => setShowPicker(false)}>
+                <Text style={styles.pickerDone}>Done</Text>
+              </Pressable>
+            </View>
+            <View style={styles.pickerColumns}>
+              <PickerColumn
+                data={monthNames}
+                selectedIndex={selectedMonth - 1}
+                onChange={handleMonthChange}
+              />
+              <PickerColumn
+                data={days}
+                selectedIndex={selectedDay - 1}
+                onChange={(i) => setSelectedDay(i + 1)}
+              />
+              <PickerColumn
+                data={years}
+                selectedIndex={years.indexOf(selectedYear)}
+                onChange={handleYearChange}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -214,9 +372,64 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     minHeight: 48,
   },
+  dateInputWrapper: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  dateInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  dateInputIcon: {
+    fontSize: 18,
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  pickerSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 32,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  pickerDone: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#208AEF',
+  },
+  pickerColumns: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+  },
   footer: {
     padding: 16,
     backgroundColor: '#f8f9fa',
+  },
+  createBtnWrapper: {
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   createBtn: {
     backgroundColor: '#208AEF',

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import { useCallback, useState } from 'react';
+import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
 
 import { getDb } from '@/db';
@@ -52,14 +52,25 @@ export function useConcerts() {
           const now = Date.now();
           const mapped: CachedConcert[] = apiConcerts.map((c) => ({
             id: c.id,
-            name: c.name,
             venue: c.venue ?? null,
+            country: c.country ?? '',
             city: c.city ?? null,
             date: c.date ? new Date(c.date).getTime() : now,
             active: c.active ? 1 : 0,
             updated_at: c.updatedAt ? new Date(c.updatedAt).getTime() : now,
           }));
           await upsertConcerts(db, mapped);
+          // Prune local rows that no longer exist on the server
+          const serverIds = mapped.map((c) => c.id);
+          if (serverIds.length > 0) {
+            const placeholders = serverIds.map(() => '?').join(',');
+            await db.runAsync(
+              `DELETE FROM concerts WHERE id NOT IN (${placeholders})`,
+              serverIds
+            );
+          } else {
+            await db.runAsync('DELETE FROM concerts');
+          }
         } catch (apiErr) {
           console.warn('[useConcerts] API fetch failed, falling back to cache:', apiErr);
         }
@@ -90,35 +101,33 @@ export function useConcerts() {
         const apiConcert = await apiCreateConcert(data);
         const cached: CachedConcert = {
           id: apiConcert.id,
-          name: apiConcert.name,
           venue: apiConcert.venue ?? null,
+          country: apiConcert.country ?? '',
           city: apiConcert.city ?? null,
           date: apiConcert.date ? new Date(apiConcert.date).getTime() : now,
           active: apiConcert.active ? 1 : 0,
           updated_at: apiConcert.updatedAt ? new Date(apiConcert.updatedAt).getTime() : now,
         };
         await upsertConcert(db, cached);
-        await loadConcerts();
         return cached;
       } else {
         // Offline: create locally with UUID
-        const localId = uuidv4();
+        const localId = Crypto.randomUUID();
         const dateTs = data.date ? new Date(data.date).getTime() : now;
         const localConcert: CachedConcert = {
           id: localId,
-          name: data.name,
           venue: data.venue ?? null,
+          country: data.country ?? '',
           city: data.city ?? null,
           date: dateTs,
           active: 1,
           updated_at: now,
         };
         await upsertConcert(db, localConcert);
-        await loadConcerts();
         return localConcert;
       }
     },
-    [loadConcerts]
+    []
   );
 
   /**
@@ -155,11 +164,9 @@ export function useConcerts() {
         return sum + items.reduce((iSum, item) => iSum + item.quantity, 0);
       }, 0);
 
-      await loadConcerts();
-
       return { totalRevenue, transactionCount, itemsSold };
     },
-    [loadConcerts]
+    []
   );
 
   /**
@@ -179,9 +186,8 @@ export function useConcerts() {
       }
 
       await updateConcertActive(db, id, true);
-      await loadConcerts();
     },
-    [loadConcerts]
+    []
   );
 
   /**
@@ -202,10 +208,6 @@ export function useConcerts() {
     }, 0);
     return { totalRevenue, transactionCount, itemsSold };
   }, []);
-
-  useEffect(() => {
-    loadConcerts();
-  }, [loadConcerts]);
 
   return {
     concerts,

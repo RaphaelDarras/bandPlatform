@@ -24,7 +24,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
   const sheetRef = useRef<BottomSheet>(null);
   const items = useCartStore((state) => state.items);
   const currency = useCartStore((state) => state.currency);
-  const total = useCartStore((state) => state.total);
+  const total = useCartStore((state) => state.total());
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
 
@@ -96,21 +96,25 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
 
         <View style={styles.footer}>
           <View style={styles.subtotalRow}>
-            <Text style={styles.subtotalLabel}>Subtotal</Text>
+            <Text style={styles.subtotalLabel}>Total</Text>
             <Text style={styles.subtotalValue}>
-              {`${symbol}${total().toFixed(2)}`}
+              {`${symbol}${total.toFixed(2)}`}
             </Text>
           </View>
 
           <Pressable
             testID="review-sale-btn"
-            style={({ pressed }) => [styles.reviewBtn, pressed && styles.reviewBtnPressed]}
+            style={styles.reviewBtnWrapper}
             onPress={() => {
               sheetRef.current?.close();
               router.push('/selling/review');
             }}
           >
-            <Text style={styles.reviewBtnText}>Review Sale</Text>
+            {({ pressed }) => (
+              <View style={[styles.reviewBtn, pressed && styles.reviewBtnPressed]}>
+                <Text style={styles.reviewBtnText}>Review Sale</Text>
+              </View>
+            )}
           </Pressable>
         </View>
       </BottomSheetView>
@@ -217,6 +221,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#1a1a1a',
+  },
+  reviewBtnWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   reviewBtn: {
     backgroundColor: '#208AEF',

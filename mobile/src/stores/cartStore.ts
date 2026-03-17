@@ -43,7 +43,20 @@ export const useCartStore = create<CartStore>()(
       discount: 0,
       discountType: 'flat',
 
-      addItem: (item) => set((s) => ({ items: [...s.items, item] })),
+      addItem: (item) =>
+        set((s) => {
+          const existing = s.items.find((i) => i.variantSku === item.variantSku);
+          if (existing) {
+            return {
+              items: s.items.map((i) =>
+                i.variantSku === item.variantSku
+                  ? { ...i, quantity: i.quantity + item.quantity }
+                  : i
+              ),
+            };
+          }
+          return { items: [...s.items, item] };
+        }),
 
       removeItem: (sku) =>
         set((s) => ({ items: s.items.filter((i) => i.variantSku !== sku) })),
@@ -77,6 +90,19 @@ export const useCartStore = create<CartStore>()(
     {
       name: 'cart',
       storage: createJSONStorage(() => mmkvStorage),
+      merge: (persisted, current) => {
+        const state = persisted as Partial<CartStore>;
+        const rawItems: CartItem[] = state.items ?? [];
+        const deduped = rawItems.reduce<CartItem[]>((acc, item) => {
+          const existing = acc.find((i) => i.variantSku === item.variantSku);
+          if (existing) {
+            existing.quantity += item.quantity;
+            return acc;
+          }
+          return [...acc, item];
+        }, []);
+        return { ...current, ...state, items: deduped };
+      },
     }
   )
 );

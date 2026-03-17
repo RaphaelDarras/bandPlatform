@@ -2,16 +2,16 @@ const mongoose = require('mongoose');
 
 // Concert schema for sales attribution
 const ConcertSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
   date: {
     type: Date,
     required: true
   },
-  location: {
+  country: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  city: {
     type: String,
     required: true,
     trim: true
@@ -25,7 +25,15 @@ const ConcertSchema = new mongoose.Schema({
     default: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret) => {
+      ret.id = ret._id.toString();
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    },
+  },
 });
 
 // Index on date (descending) for recent concerts first

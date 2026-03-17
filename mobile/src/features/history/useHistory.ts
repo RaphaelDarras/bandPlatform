@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 
 import { getDb } from '@/db';
 import type { LocalSaleRow } from '@/db/sales';
@@ -105,7 +105,7 @@ export function useHistory() {
     }
 
     // 3. Add outbox entry for background API sync
-    const outboxId = uuidv4();
+    const outboxId = Crypto.randomUUID();
     const now = Date.now();
     await db.runAsync(
       `INSERT OR IGNORE INTO outbox
@@ -157,7 +157,7 @@ export function useHistory() {
     }
 
     // 3. Add outbox entry for background API sync
-    const outboxId = uuidv4();
+    const outboxId = Crypto.randomUUID();
     const now = Date.now();
     await db.runAsync(
       `INSERT OR IGNORE INTO outbox

@@ -1,4 +1,4 @@
-import { router, Stack } from 'expo-router';
+import { router, Stack, useSegments } from 'expo-router';
 import React from 'react';
 import { Pressable, Text } from 'react-native';
 
@@ -8,10 +8,12 @@ import { CartBar } from '@/features/cart/CartBar';
 /**
  * Selling mode stack layout.
  * - Back button exits selling mode: clears concertId, navigates back to tabs
- * - CartBar renders at bottom, replacing the tab bar
+ * - CartBar renders at bottom on all selling screens except the review screen
  */
 export default function SellingLayout() {
   const setConcertId = useCartStore((state) => state.setConcertId);
+  const segments = useSegments();
+  const isOnReview = segments[segments.length - 1] === 'review';
 
   const handleExit = () => {
     setConcertId(null);
@@ -47,7 +49,7 @@ export default function SellingLayout() {
         />
       </Stack>
 
-      <CartBar />
+      {!isOnReview && <CartBar />}
     </>
   );
 }

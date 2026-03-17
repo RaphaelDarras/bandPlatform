@@ -36,15 +36,24 @@ export async function getCachedProducts(
   const rows = await db.getAllAsync<ProductRow>(
     'SELECT * FROM products WHERE active = 1 ORDER BY name ASC'
   );
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    price: row.price,
-    imageUrl: row.image_url,
-    active: row.active,
-    updatedAt: row.updated_at,
-    variants: JSON.parse(row.variants_json ?? '[]') as ProductVariant[],
-  }));
+  return rows.map((row) => {
+    const variants = JSON.parse(row.variants_json ?? '[]') as ProductVariant[];
+    const seen = new Set<string>();
+    const uniqueVariants = variants.filter((v) => {
+      if (seen.has(v.sku)) return false;
+      seen.add(v.sku);
+      return true;
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      imageUrl: row.image_url,
+      active: row.active,
+      updatedAt: row.updated_at,
+      variants: uniqueVariants,
+    };
+  });
 }
 
 /**

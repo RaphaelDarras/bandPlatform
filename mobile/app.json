@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.bandpos"
     },
     "web": {
       "output": "static",
@@ -40,6 +41,9 @@
       "expo-image",
       "expo-localization"
     ],
+    "extra": {
+      "apiUrl": "http://10.0.2.2:5000/api"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

@@ -7,8 +7,9 @@
 import { useState, useCallback } from 'react';
 
 import { getDb } from '@/db';
-import { getCachedProducts, upsertProducts, type CachedProduct } from '@/db/products';
+import { getCachedProducts, upsertProducts, type CachedProduct, type ProductVariant } from '@/db/products';
 import { apiGetStock, apiRestock } from '@/api/inventory';
+import { apiGetProducts } from '@/api/products';
 import { useSyncStore } from '@/stores/syncStore';
 
 export function useStock() {
@@ -27,11 +28,35 @@ export function useStock() {
       const db = await getDb();
 
       if (isOnline) {
-        // Fetch fresh data from API
-        const apiProducts = await apiGetStock();
-        // Update local cache with API data
-        if (apiProducts.length > 0) {
-          await upsertProducts(db, apiProducts);
+        const [stockProducts, priceProducts] = await Promise.all([
+          apiGetStock(),
+          apiGetProducts(),
+        ]);
+        // Preserve local stock — the outbox may have unsynced sales that the API doesn't know about yet
+        const localProducts = await getCachedProducts(db);
+        const localStockMap = new Map<string, number>(
+          localProducts.flatMap((p) => p.variants.map((v: ProductVariant) => [`${p.id}:${v.sku}`, v.stock] as [string, number]))
+        );
+        const priceProductMap = new Map(priceProducts.map((p) => [p.id, p]));
+        const merged = stockProducts.map((p) => {
+          const apiProd = priceProductMap.get(p.id);
+          const adjMap = new Map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (apiProd?.variants ?? []).map((v: any) => [v.sku, v.priceAdjustment ?? 0])
+          );
+          return {
+            ...p,
+            price: apiProd?.price ?? 0,
+            variants: p.variants.map((v) => ({
+              ...v,
+              priceAdjustment: adjMap.get(v.sku) ?? 0,
+              // Use local stock for known variants; fall back to API for new variants
+              stock: localStockMap.get(`${p.id}:${v.sku}`) ?? v.stock,
+            })),
+          };
+        });
+        if (merged.length > 0) {
+          await upsertProducts(db, merged);
         }
       }
 

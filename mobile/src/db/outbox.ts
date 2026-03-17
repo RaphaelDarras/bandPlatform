@@ -40,7 +40,8 @@ export async function recordSaleLocally(
   sale: LocalSale,
   outboxEntry: OutboxEntryInput
 ): Promise<void> {
-  await db.withTransactionAsync(async () => {
+  await db.execAsync('BEGIN');
+  try {
     await db.runAsync(
       `INSERT INTO sales (id, concert_id, items_json, total_amount, payment_method,
         currency, discount, discount_type, created_at)
@@ -70,7 +71,11 @@ export async function recordSaleLocally(
         outboxEntry.created_at,
       ]
     );
-  });
+    await db.execAsync('COMMIT');
+  } catch (e) {
+    await db.execAsync('ROLLBACK');
+    throw e;
+  }
 }
 
 /**

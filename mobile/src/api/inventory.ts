@@ -5,12 +5,44 @@
 import { apiClient } from '@/api/client';
 import type { CachedProduct } from '@/db/products';
 
+interface StockVariant {
+  sku: string;
+  size?: string | null;
+  color?: string | null;
+  stock: number;
+}
+
+interface StockProduct {
+  productId: string;
+  name: string;
+  variants: StockVariant[];
+}
+
+interface StockResponse {
+  grandTotal: number;
+  productCount: number;
+  products: StockProduct[];
+}
+
 /**
  * GET /inventory/stock — returns all products with per-variant stock counts.
  */
 export async function apiGetStock(): Promise<CachedProduct[]> {
-  const response = await apiClient.get<CachedProduct[]>('inventory/stock');
-  return response.data;
+  const response = await apiClient.get<StockResponse>('inventory/stock');
+  return response.data.products.map((p) => ({
+    id: String(p.productId),
+    name: p.name,
+    price: 0,
+    imageUrl: null,
+    active: 1,
+    updatedAt: Date.now(),
+    variants: p.variants.map((v) => ({
+      sku: v.sku,
+      label: [v.size, v.color].filter(Boolean).join(' / ') || v.sku,
+      priceAdjustment: 0,
+      stock: v.stock,
+    })),
+  }));
 }
 
 /**

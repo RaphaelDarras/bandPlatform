@@ -37,20 +37,34 @@ export interface UpdateProductInput {
   variants?: Omit<ApiProductVariant, 'stock'>[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapProduct(p: any): ApiProduct {
+  return {
+    id: p._id ?? p.id,
+    name: p.name,
+    price: p.basePrice ?? p.price,
+    imageUrl: p.images?.[0] ?? p.imageUrl ?? null,
+    active: p.active,
+    variants: p.variants ?? [],
+    updatedAt: p.updatedAt,
+  };
+}
+
 /**
  * GET /products — returns all active products.
  */
 export async function apiGetProducts(): Promise<ApiProduct[]> {
-  const response = await apiClient.get<ApiProduct[]>('products');
-  return response.data;
+  const response = await apiClient.get<unknown[]>('products');
+  return response.data.map(mapProduct);
 }
 
 /**
  * POST /products — creates a new product.
  */
 export async function apiCreateProduct(data: CreateProductInput): Promise<ApiProduct> {
-  const response = await apiClient.post<ApiProduct>('products', data);
-  return response.data;
+  const { price, ...rest } = data;
+  const response = await apiClient.post<unknown>('products', { ...rest, basePrice: price });
+  return mapProduct(response.data);
 }
 
 /**
@@ -60,14 +74,16 @@ export async function apiUpdateProduct(
   id: string,
   data: UpdateProductInput
 ): Promise<ApiProduct> {
-  const response = await apiClient.put<ApiProduct>(`products/${id}`, data);
-  return response.data;
+  const { price, ...rest } = data;
+  const body = price !== undefined ? { ...rest, basePrice: price } : rest;
+  const response = await apiClient.put<unknown>(`products/${id}`, body);
+  return mapProduct(response.data);
 }
 
 /**
  * PATCH /products/:id — deactivates a product (soft delete).
  */
 export async function apiDeactivateProduct(id: string): Promise<ApiProduct> {
-  const response = await apiClient.patch<ApiProduct>(`products/${id}`, { active: false });
-  return response.data;
+  const response = await apiClient.patch<unknown>(`products/${id}`, { active: false });
+  return mapProduct(response.data);
 }

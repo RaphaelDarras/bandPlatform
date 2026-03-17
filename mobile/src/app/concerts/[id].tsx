@@ -69,8 +69,12 @@ function TotalsModal({
             </View>
           )}
 
-          <Pressable style={styles.modalBtn} onPress={onClose} accessibilityLabel="Close summary">
-            <Text style={styles.modalBtnText}>Done</Text>
+          <Pressable style={styles.modalBtnWrapper} onPress={onClose} accessibilityLabel="Close summary">
+            {({ pressed }) => (
+              <View style={[styles.modalBtn, pressed && { opacity: 0.85 }]}>
+                <Text style={styles.modalBtnText}>Done</Text>
+              </View>
+            )}
           </Pressable>
         </View>
       </View>
@@ -160,7 +164,7 @@ export default function ConcertDetailScreen() {
     if (!concert) return;
     Alert.alert(
       'Close Concert',
-      `Are you sure you want to close "${concert.name}"? No more sales will be recorded for this concert.`,
+      `Are you sure you want to close this concert? No more sales will be recorded.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -189,7 +193,7 @@ export default function ConcertDetailScreen() {
     if (!concert) return;
     Alert.alert(
       'Reopen Concert',
-      `Reopen "${concert.name}" for selling?`,
+      `Reopen this concert for selling?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -264,7 +268,7 @@ export default function ConcertDetailScreen() {
           <Text style={styles.backText}>Back</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {concert.name}
+          {[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ')}
         </Text>
         <View style={{ width: 48 }} />
       </View>
@@ -326,52 +330,64 @@ export default function ConcertDetailScreen() {
           {isActive ? (
             <>
               <Pressable
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  styles.actionBtnPrimary,
-                  pressed && styles.actionBtnPressed,
-                  actionLoading && styles.actionBtnDisabled,
-                ]}
+                style={styles.actionBtnWrapper}
                 onPress={handleStartSelling}
                 disabled={actionLoading}
                 accessibilityLabel="Start Selling"
               >
-                <Text style={styles.actionBtnTextPrimary}>Start Selling</Text>
+                {({ pressed }) => (
+                  <View style={[
+                    styles.actionBtn,
+                    styles.actionBtnPrimary,
+                    pressed && styles.actionBtnPressed,
+                    actionLoading && styles.actionBtnDisabled,
+                  ]}>
+                    <Text style={styles.actionBtnTextPrimary}>Start Selling</Text>
+                  </View>
+                )}
               </Pressable>
               <Pressable
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  styles.actionBtnDanger,
-                  pressed && styles.actionBtnPressed,
-                  actionLoading && styles.actionBtnDisabled,
-                ]}
+                style={styles.actionBtnWrapper}
                 onPress={handleClose}
                 disabled={actionLoading}
                 accessibilityLabel="Close Concert"
               >
-                {actionLoading ? (
-                  <ActivityIndicator color="#dc2626" />
-                ) : (
-                  <Text style={styles.actionBtnTextDanger}>Close Concert</Text>
+                {({ pressed }) => (
+                  <View style={[
+                    styles.actionBtn,
+                    styles.actionBtnDanger,
+                    pressed && styles.actionBtnPressed,
+                    actionLoading && styles.actionBtnDisabled,
+                  ]}>
+                    {actionLoading ? (
+                      <ActivityIndicator color="#dc2626" />
+                    ) : (
+                      <Text style={styles.actionBtnTextDanger}>Close Concert</Text>
+                    )}
+                  </View>
                 )}
               </Pressable>
             </>
           ) : (
             <Pressable
-              style={({ pressed }) => [
-                styles.actionBtn,
-                styles.actionBtnSecondary,
-                pressed && styles.actionBtnPressed,
-                actionLoading && styles.actionBtnDisabled,
-              ]}
+              style={styles.actionBtnWrapper}
               onPress={handleReopen}
               disabled={actionLoading}
               accessibilityLabel="Reopen Concert"
             >
-              {actionLoading ? (
-                <ActivityIndicator color="#208AEF" />
-              ) : (
-                <Text style={styles.actionBtnTextSecondary}>Reopen Concert</Text>
+              {({ pressed }) => (
+                <View style={[
+                  styles.actionBtn,
+                  styles.actionBtnSecondary,
+                  pressed && styles.actionBtnPressed,
+                  actionLoading && styles.actionBtnDisabled,
+                ]}>
+                  {actionLoading ? (
+                    <ActivityIndicator color="#208AEF" />
+                  ) : (
+                    <Text style={styles.actionBtnTextSecondary}>Reopen Concert</Text>
+                  )}
+                </View>
               )}
             </Pressable>
           )}
@@ -442,11 +458,15 @@ export default function ConcertDetailScreen() {
                       accessibilityLabel="Override price"
                     />
                     <Pressable
-                      style={styles.addOverrideBtn}
+                      style={styles.addOverrideBtnWrapper}
                       onPress={handleAddOverride}
                       accessibilityLabel="Add price override"
                     >
-                      <Text style={styles.addOverrideBtnText}>Add</Text>
+                      {({ pressed }) => (
+                        <View style={[styles.addOverrideBtn, pressed && { opacity: 0.85 }]}>
+                          <Text style={styles.addOverrideBtnText}>Add</Text>
+                        </View>
+                      )}
                     </Pressable>
                   </View>
                 </View>
@@ -462,7 +482,7 @@ export default function ConcertDetailScreen() {
       <TotalsModal
         visible={showTotals}
         totals={totals}
-        concertName={concert.name}
+        concertName={[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ')}
         onClose={() => setShowTotals(false)}
       />
     </SafeAreaView>
@@ -536,6 +556,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  actionBtnWrapper: { borderRadius: 12, overflow: 'hidden' },
   actionBtn: {
     borderRadius: 12,
     paddingVertical: 14,
@@ -591,6 +612,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     minHeight: 44,
   },
+  addOverrideBtnWrapper: { borderRadius: 8, overflow: 'hidden' },
   addOverrideBtn: {
     backgroundColor: '#208AEF',
     borderRadius: 8,
@@ -621,6 +643,7 @@ const styles = StyleSheet.create({
   totalItem: { alignItems: 'center', gap: 4 },
   totalValue: { fontSize: 24, fontWeight: '800', color: '#1a1a1a' },
   totalLabel: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 },
+  modalBtnWrapper: { borderRadius: 12, overflow: 'hidden', width: '100%' },
   modalBtn: {
     backgroundColor: '#208AEF',
     borderRadius: 12,

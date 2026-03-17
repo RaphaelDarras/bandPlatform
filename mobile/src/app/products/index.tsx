@@ -97,10 +97,14 @@ export default function ProductsIndexScreen() {
         <Text style={styles.headerTitle}>Products</Text>
         <Pressable
           onPress={() => router.push('/products/new' as never)}
-          style={styles.addButton}
+          style={styles.addButtonWrapper}
           accessibilityLabel="Add new product"
         >
-          <Text style={styles.addButtonText}>+</Text>
+          {({ pressed }) => (
+            <View style={[styles.addButton, pressed && { opacity: 0.85 }]}>
+              <Text style={styles.addButtonText}>+</Text>
+            </View>
+          )}
         </Pressable>
       </View>
 
@@ -150,6 +154,7 @@ const styles = StyleSheet.create({
   backButton: { width: 60 },
   backText: { color: '#208AEF', fontSize: 15 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  addButtonWrapper: { borderRadius: 18, overflow: 'hidden' },
   addButton: {
     width: 36,
     height: 36,

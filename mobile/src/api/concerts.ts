@@ -2,9 +2,9 @@ import { apiClient } from './client';
 
 export interface Concert {
   id: string;
-  name: string;
   venue: string;
   date: string; // ISO date string
+  country: string;
   city: string;
   active: boolean;
   createdAt?: string;
@@ -12,9 +12,9 @@ export interface Concert {
 }
 
 export interface CreateConcertData {
-  name: string;
   venue: string;
   date: string;
+  country: string;
   city: string;
 }
 

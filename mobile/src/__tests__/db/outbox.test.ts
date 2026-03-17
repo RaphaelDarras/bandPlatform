@@ -6,7 +6,6 @@ const mockDb = {
   runAsync: jest.fn(() => Promise.resolve({ lastInsertRowId: 1, changes: 1 })),
   getFirstAsync: jest.fn(() => Promise.resolve(null)),
   getAllAsync: jest.fn(() => Promise.resolve([])),
-  withTransactionAsync: jest.fn((fn: () => Promise<void>) => fn()),
 };
 
 const mockSale: LocalSale = {
@@ -30,13 +29,13 @@ const mockOutboxEntry = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockDb.withTransactionAsync.mockImplementation((fn: () => Promise<void>) => fn());
 });
 
 describe('recordSaleLocally', () => {
-  it('calls withTransactionAsync to write atomically', async () => {
+  it('wraps writes in BEGIN/COMMIT', async () => {
     await recordSaleLocally(mockDb as any, mockSale, mockOutboxEntry);
-    expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
+    expect(mockDb.execAsync).toHaveBeenCalledWith('BEGIN');
+    expect(mockDb.execAsync).toHaveBeenCalledWith('COMMIT');
   });
 
   it('inserts into sales table with correct fields', async () => {

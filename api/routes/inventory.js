@@ -93,8 +93,7 @@ router.post('/deduct', async (req, res) => {
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: productId,
-        'variants.sku': variantSku,
-        'variants.$.version': variant.version
+        variants: { $elemMatch: { sku: variantSku, version: variant.version } }
       },
       {
         $inc: {
@@ -202,8 +201,7 @@ router.post('/reserve', async (req, res) => {
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: productId,
-        'variants.sku': variantSku,
-        'variants.$.version': variant.version
+        variants: { $elemMatch: { sku: variantSku, version: variant.version } }
       },
       {
         $inc: {
@@ -253,8 +251,7 @@ router.post('/release', async (req, res) => {
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: productId,
-        'variants.sku': variantSku,
-        'variants.$.version': currentVersion
+        variants: { $elemMatch: { sku: variantSku, version: currentVersion } }
       },
       {
         $inc: {
@@ -349,10 +346,10 @@ router.post('/restock', async (req, res) => {
       });
     }
 
-    // Validate quantity is a positive integer
-    if (!Number.isInteger(quantity) || quantity < 1) {
+    // Validate quantity is a non-zero integer (negative = removal)
+    if (!Number.isInteger(quantity) || quantity === 0) {
       return res.status(400).json({
-        error: 'quantity must be a positive integer'
+        error: 'quantity must be a non-zero integer'
       });
     }
 
@@ -374,8 +371,7 @@ router.post('/restock', async (req, res) => {
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: productId,
-        'variants.sku': variantSku,
-        'variants.$.version': variant.version
+        variants: { $elemMatch: { sku: variantSku, version: variant.version } }
       },
       {
         $inc: {
@@ -401,7 +397,7 @@ router.post('/restock', async (req, res) => {
     const auditRecord = await InventoryAdjustment.create({
       productId,
       variantSku,
-      type: 'restock',
+      type: quantity > 0 ? 'restock' : 'removal',
       quantity,
       stockBefore,
       stockAfter,

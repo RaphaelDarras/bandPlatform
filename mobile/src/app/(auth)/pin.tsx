@@ -73,10 +73,14 @@ export default function PinScreen() {
         <View style={styles.offlineContainer}>
           <Text style={styles.offlineTitle}>{t('auth.needOnlineFirst')}</Text>
           <Pressable
-            style={styles.retryButton}
+            style={styles.retryButtonWrapper}
             onPress={() => setOfflineNoCache(false)}
           >
-            <Text style={styles.retryText}>{t('common.retry')}</Text>
+            {({ pressed }) => (
+              <View style={[styles.retryButton, pressed && { opacity: 0.85 }]}>
+                <Text style={styles.retryText}>{t('common.retry')}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
       </SafeAreaView>
@@ -220,6 +224,7 @@ const styles = StyleSheet.create({
     color: '#444',
     lineHeight: 26,
   },
+  retryButtonWrapper: { borderRadius: 8, overflow: 'hidden' },
   retryButton: {
     backgroundColor: '#208AEF',
     paddingHorizontal: 32,

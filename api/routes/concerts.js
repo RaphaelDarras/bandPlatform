@@ -24,16 +24,16 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { name, date, city, venue } = req.body;
+    const { date, country, city, venue } = req.body;
 
-    if (!name || !date || !city) {
-      return res.status(400).json({ error: 'name, date, and city are required' });
+    if (!date || !country || !city) {
+      return res.status(400).json({ error: 'date, country, and city are required' });
     }
 
     const concert = await Concert.create({
-      name,
       date,
-      location: city,
+      country,
+      city,
       venue,
     });
 
@@ -67,7 +67,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
  */
 router.patch('/:id', authenticateToken, async (req, res) => {
   try {
-    const allowedFields = ['name', 'venue', 'date', 'location', 'active'];
+    const allowedFields = ['venue', 'date', 'country', 'city', 'active'];
     const updates = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {

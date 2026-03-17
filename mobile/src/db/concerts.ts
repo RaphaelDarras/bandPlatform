@@ -2,8 +2,8 @@ import * as SQLite from 'expo-sqlite';
 
 export interface CachedConcert {
   id: string;
-  name: string;
   venue: string | null;
+  country: string;
   city: string | null;
   date: number; // Unix timestamp (ms)
   active: number; // 1 = active, 0 = closed
@@ -43,12 +43,12 @@ export async function upsertConcerts(
 ): Promise<void> {
   for (const concert of concerts) {
     await db.runAsync(
-      `INSERT OR REPLACE INTO concerts (id, name, venue, city, date, active, updated_at)
+      `INSERT OR REPLACE INTO concerts (id, venue, country, city, date, active, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         concert.id,
-        concert.name,
         concert.venue ?? null,
+        concert.country,
         concert.city ?? null,
         concert.date,
         concert.active,
@@ -66,12 +66,12 @@ export async function upsertConcert(
   concert: CachedConcert
 ): Promise<void> {
   await db.runAsync(
-    `INSERT OR REPLACE INTO concerts (id, name, venue, city, date, active, updated_at)
+    `INSERT OR REPLACE INTO concerts (id, venue, country, city, date, active, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       concert.id,
-      concert.name,
       concert.venue ?? null,
+      concert.country,
       concert.city ?? null,
       concert.date,
       concert.active,

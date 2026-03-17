@@ -260,38 +260,46 @@ export default function SaleDetailScreen() {
         <View style={styles.actionsCard}>
           {!isVoided ? (
             <Pressable
-              style={({ pressed }) => [
-                styles.actionBtn,
-                styles.voidBtn,
-                pressed && styles.actionBtnPressed,
-                actionLoading && styles.actionBtnDisabled,
-              ]}
+              style={styles.actionBtnWrapper}
               onPress={handleVoid}
               disabled={actionLoading}
               accessibilityLabel="Void Sale"
             >
-              {actionLoading ? (
-                <ActivityIndicator color="#dc2626" />
-              ) : (
-                <Text style={styles.voidBtnText}>Void Sale</Text>
+              {({ pressed }) => (
+                <View style={[
+                  styles.actionBtn,
+                  styles.voidBtn,
+                  pressed && styles.actionBtnPressed,
+                  actionLoading && styles.actionBtnDisabled,
+                ]}>
+                  {actionLoading ? (
+                    <ActivityIndicator color="#dc2626" />
+                  ) : (
+                    <Text style={styles.voidBtnText}>Void Sale</Text>
+                  )}
+                </View>
               )}
             </Pressable>
           ) : (
             <Pressable
-              style={({ pressed }) => [
-                styles.actionBtn,
-                styles.unvoidBtn,
-                pressed && styles.actionBtnPressed,
-                actionLoading && styles.actionBtnDisabled,
-              ]}
+              style={styles.actionBtnWrapper}
               onPress={handleUnvoid}
               disabled={actionLoading}
               accessibilityLabel="Unvoid Sale"
             >
-              {actionLoading ? (
-                <ActivityIndicator color="#208AEF" />
-              ) : (
-                <Text style={styles.unvoidBtnText}>Unvoid Sale</Text>
+              {({ pressed }) => (
+                <View style={[
+                  styles.actionBtn,
+                  styles.unvoidBtn,
+                  pressed && styles.actionBtnPressed,
+                  actionLoading && styles.actionBtnDisabled,
+                ]}>
+                  {actionLoading ? (
+                    <ActivityIndicator color="#208AEF" />
+                  ) : (
+                    <Text style={styles.unvoidBtnText}>Unvoid Sale</Text>
+                  )}
+                </View>
               )}
             </Pressable>
           )}
@@ -394,6 +402,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  actionBtnWrapper: { borderRadius: 12, overflow: 'hidden' },
   actionBtn: {
     borderRadius: 12,
     paddingVertical: 14,

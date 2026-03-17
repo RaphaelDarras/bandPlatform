@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 
 import { getDb } from '@/db';
 import { recordSaleLocally } from '@/db/outbox';
@@ -30,8 +30,8 @@ export function useSaleRecording() {
    */
   const recordSale = async (paymentMethod: string): Promise<string> => {
     const db = await getDb();
-    const saleId = uuidv4();
-    const outboxId = uuidv4();
+    const saleId = Crypto.randomUUID();
+    const outboxId = Crypto.randomUUID();
     const now = Date.now();
 
     // Build LocalSale

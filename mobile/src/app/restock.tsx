@@ -1,6 +1,6 @@
 /**
- * Restock screen — separate from stock overview to prevent misclicks.
- * Step-by-step: select product → select variant → enter quantity → optional reason → confirm.
+ * Stock Adjustment screen — add or remove units per variant.
+ * Select product → adjust each variant inline with +/- → optional reason → confirm.
  * Requires internet connection.
  */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -18,15 +18,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useStock } from '@/features/stock/useStock';
 import { useSyncStore } from '@/stores/syncStore';
-import type { CachedProduct, ProductVariant } from '@/db/products';
+import type { CachedProduct } from '@/db/products';
 
 export default function RestockScreen() {
   const { products, loading, refreshStock, restock } = useStock();
   const { isOnline } = useSyncStore();
 
   const [selectedProduct, setSelectedProduct] = useState<CachedProduct | null>(null);
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
-  const [quantity, setQuantity] = useState('');
+  // quantities[sku] = current displayed quantity (starts at variant.stock)
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,33 +36,41 @@ export default function RestockScreen() {
 
   const handleProductSelect = useCallback((product: CachedProduct) => {
     setSelectedProduct(product);
-    setSelectedVariant(null);
+    const initial: Record<string, number> = {};
+    for (const v of product.variants) {
+      initial[v.sku] = v.stock;
+    }
+    setQuantities(initial);
+    setReason('');
   }, []);
 
-  const handleVariantSelect = useCallback((variant: ProductVariant) => {
-    setSelectedVariant(variant);
+  const adjust = useCallback((sku: string, by: number) => {
+    setQuantities((prev) => ({ ...prev, [sku]: (prev[sku] ?? 0) + by }));
   }, []);
+
+  const hasChanges = selectedProduct?.variants.some(
+    (v) => (quantities[v.sku] ?? v.stock) !== v.stock
+  ) ?? false;
 
   const handleConfirm = useCallback(async () => {
-    if (!selectedProduct || !selectedVariant) return;
-    const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0) {
-      Alert.alert('Invalid Quantity', 'Please enter a valid quantity greater than 0.');
-      return;
-    }
-
+    if (!selectedProduct || !hasChanges) return;
     setSubmitting(true);
     try {
-      await restock(selectedProduct.id, selectedVariant.sku, qty, reason);
-      Alert.alert('Restocked', `Added ${qty} units of ${selectedVariant.label} to ${selectedProduct.name}.`, [
+      for (const variant of selectedProduct.variants) {
+        const delta = (quantities[variant.sku] ?? variant.stock) - variant.stock;
+        if (delta !== 0) {
+          await restock(selectedProduct.id, variant.sku, delta, reason);
+        }
+      }
+      Alert.alert('Stock Updated', `${selectedProduct.name} stock has been adjusted.`, [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch {
-      Alert.alert('Restock Failed', 'Unable to restock. Please try again.');
+      Alert.alert('Failed', 'Unable to update stock. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }, [selectedProduct, selectedVariant, quantity, reason, restock]);
+  }, [selectedProduct, quantities, hasChanges, reason, restock]);
 
   if (!isOnline) {
     return (
@@ -71,14 +79,14 @@ export default function RestockScreen() {
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backText}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Restock</Text>
+          <Text style={styles.headerTitle}>Stock Adjustment</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.offlineState}>
           <Text style={styles.offlineIcon}>📵</Text>
           <Text style={styles.offlineTitle}>Internet Required</Text>
           <Text style={styles.offlineSubtext}>
-            Restock requires an internet connection. Please connect and try again.
+            Stock adjustments require an internet connection. Please connect and try again.
           </Text>
         </View>
       </SafeAreaView>
@@ -91,7 +99,7 @@ export default function RestockScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>← Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Restock</Text>
+        <Text style={styles.headerTitle}>Stock Adjustment</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -124,76 +132,90 @@ export default function RestockScreen() {
           )}
         </View>
 
-        {/* Step 2: Select Variant */}
+        {/* Step 2: Adjust variants inline */}
         {selectedProduct && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>2. Select Variant</Text>
-            {selectedProduct.variants.map((variant) => (
-              <Pressable
-                key={variant.sku}
-                style={[
-                  styles.selectItem,
-                  selectedVariant?.sku === variant.sku && styles.selectItemActive,
-                ]}
-                onPress={() => handleVariantSelect(variant)}
-              >
-                <Text
-                  style={[
-                    styles.selectItemText,
-                    selectedVariant?.sku === variant.sku && styles.selectItemTextActive,
-                  ]}
-                >
-                  {variant.label} ({variant.sku}) — {variant.stock} in stock
-                </Text>
-              </Pressable>
-            ))}
+            <Text style={styles.sectionTitle}>2. Adjust Quantities</Text>
+            <View style={styles.variantsCard}>
+              {selectedProduct.variants.map((variant, index) => {
+                const qty = quantities[variant.sku] ?? variant.stock;
+                const delta = qty - variant.stock;
+                const isLast = index === selectedProduct.variants.length - 1;
+                return (
+                  <View
+                    key={variant.sku}
+                    style={[styles.variantRow, !isLast && styles.variantRowBorder]}
+                  >
+                    <View style={styles.variantInfo}>
+                      <Text style={styles.variantLabel}>{variant.label}</Text>
+                      {delta !== 0 && (
+                        <Text style={[
+                          styles.variantDelta,
+                          delta > 0 ? styles.deltaPositive : styles.deltaNegative,
+                        ]}>
+                          {delta > 0 ? `+${delta}` : delta}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.stepper}>
+                      <Pressable
+                        style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
+                        onPress={() => adjust(variant.sku, -1)}
+                        accessibilityLabel={`Decrease ${variant.label}`}
+                      >
+                        <Text style={styles.stepBtnText}>−</Text>
+                      </Pressable>
+                      <Text style={[
+                        styles.stepQty,
+                        delta > 0 && styles.deltaPositive,
+                        delta < 0 && styles.deltaNegative,
+                      ]}>
+                        {qty}
+                      </Text>
+                      <Pressable
+                        style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
+                        onPress={() => adjust(variant.sku, 1)}
+                        accessibilityLabel={`Increase ${variant.label}`}
+                      >
+                        <Text style={styles.stepBtnText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
 
-        {/* Step 3: Enter Quantity */}
-        {selectedVariant && (
+        {/* Step 3: Optional Reason */}
+        {hasChanges && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>3. Quantity to Add</Text>
-            <TextInput
-              style={styles.input}
-              value={quantity}
-              onChangeText={setQuantity}
-              placeholder="Enter quantity"
-              keyboardType="number-pad"
-              accessibilityLabel="Restock quantity"
-            />
-          </View>
-        )}
-
-        {/* Step 4: Optional Reason */}
-        {selectedVariant && quantity ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>4. Reason (optional)</Text>
+            <Text style={styles.sectionTitle}>3. Reason (optional)</Text>
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               value={reason}
               onChangeText={setReason}
-              placeholder="e.g. Concert restock, online order fulfillment..."
+              placeholder="e.g. Concert restock, damaged goods, inventory correction..."
               multiline
               numberOfLines={3}
-              accessibilityLabel="Restock reason"
+              accessibilityLabel="Adjustment reason"
             />
           </View>
-        ) : null}
+        )}
 
         {/* Confirm */}
-        {selectedProduct && selectedVariant && quantity ? (
+        {hasChanges && (
           <Pressable
             style={[styles.confirmButton, submitting && styles.confirmButtonDisabled]}
             onPress={handleConfirm}
             disabled={submitting}
-            accessibilityLabel="Confirm Restock"
+            accessibilityLabel="Confirm adjustment"
           >
             <Text style={styles.confirmButtonText}>
-              {submitting ? 'Processing...' : 'Confirm Restock'}
+              {submitting ? 'Processing...' : 'Confirm Adjustment'}
             </Text>
           </Pressable>
-        ) : null}
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -225,13 +247,42 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
-  selectItemActive: {
-    borderColor: '#208AEF',
-    backgroundColor: '#e8f4ff',
-  },
+  selectItemActive: { borderColor: '#208AEF', backgroundColor: '#e8f4ff' },
   selectItemText: { fontSize: 14, color: '#333' },
   selectItemTextActive: { color: '#208AEF', fontWeight: '600' },
   loadingText: { fontSize: 14, color: '#888' },
+  variantsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    overflow: 'hidden',
+  },
+  variantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  variantRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  variantInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  variantLabel: { fontSize: 14, color: '#333', fontWeight: '500' },
+  variantDelta: { fontSize: 12, fontWeight: '700' },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  stepBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBtnPressed: { opacity: 0.6 },
+  stepBtnText: { fontSize: 20, fontWeight: '400', color: '#1a1a1a', lineHeight: 22 },
+  stepQty: { width: 40, textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
+  deltaPositive: { color: '#16a34a' },
+  deltaNegative: { color: '#ef4444' },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -249,7 +300,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  confirmButtonDisabled: { backgroundColor: '#93c5fd' },
+  confirmButtonDisabled: { opacity: 0.5 },
   confirmButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   offlineState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   offlineIcon: { fontSize: 48, marginBottom: 16 },

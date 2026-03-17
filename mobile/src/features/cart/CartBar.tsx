@@ -11,12 +11,12 @@ import { CartSheet, CartSheetHandle } from './CartSheet';
 
 /**
  * CartBar renders a sticky bottom bar during selling mode.
- * Shows item count + total. Tap to expand CartSheet.
+ * Shows item count + total. Tap to expand CartSheet for quantity editing.
  * Only visible when the cart has items.
  */
 export function CartBar() {
   const items = useCartStore((state) => state.items);
-  const total = useCartStore((state) => state.total);
+  const total = useCartStore((state) => state.total());
   const currency = useCartStore((state) => state.currency);
   const sheetRef = useRef<CartSheetHandle>(null);
 
@@ -29,20 +29,24 @@ export function CartBar() {
     <>
       <Pressable
         testID="cart-bar"
-        style={({ pressed }) => [styles.bar, pressed && styles.pressed]}
+        style={styles.wrapper}
         onPress={() => sheetRef.current?.open()}
-        accessibilityLabel={`Cart: ${itemCount} items, ${symbol}${total().toFixed(2)}`}
+        accessibilityLabel={`Cart: ${itemCount} items, ${symbol}${total.toFixed(2)}`}
       >
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{itemCount}</Text>
-        </View>
-        <Text style={styles.label}>
-          {itemCount === 1 ? '1 item' : `${itemCount} items`}
-        </Text>
-        <Text style={styles.total}>
-          {`${symbol}${total().toFixed(2)}`}
-        </Text>
-        <Text style={styles.chevron}>{'▲'}</Text>
+        {({ pressed }) => (
+          <View style={[styles.bar, pressed && styles.pressed]}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{itemCount}</Text>
+            </View>
+            <Text style={styles.label}>
+              {itemCount === 1 ? '1 item' : `${itemCount} items`}
+            </Text>
+            <Text style={styles.total}>
+              {`${symbol}${total.toFixed(2)}`}
+            </Text>
+            <Text style={styles.chevron}>{'▲'}</Text>
+          </View>
+        )}
       </Pressable>
 
       <CartSheet ref={sheetRef} />
@@ -51,11 +55,13 @@ export function CartBar() {
 }
 
 const styles = StyleSheet.create({
-  bar: {
+  wrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  bar: {
     backgroundColor: '#208AEF',
     flexDirection: 'row',
     alignItems: 'center',

@@ -40,7 +40,7 @@ export default function ReviewScreen() {
   const currency = useCartStore((state) => state.currency) as Currency;
   const discount = useCartStore((state) => state.discount);
   const discountType = useCartStore((state) => state.discountType);
-  const total = useCartStore((state) => state.total);
+  const total = useCartStore((state) => state.total());
   const setCurrency = useCartStore((state) => state.setCurrency);
   const setDiscount = useCartStore((state) => state.setDiscount);
 
@@ -199,7 +199,7 @@ export default function ReviewScreen() {
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>
-              {`${symbol}${total().toFixed(2)}`}
+              {`${symbol}${total.toFixed(2)}`}
             </Text>
           </View>
         </ScrollView>
@@ -208,19 +208,23 @@ export default function ReviewScreen() {
         <View style={styles.footer}>
           <Pressable
             testID="confirm-sale-btn"
-            style={({ pressed }) => [
-              styles.confirmBtn,
-              pressed && styles.confirmBtnPressed,
-              loading && styles.confirmBtnDisabled,
-            ]}
+            style={styles.confirmBtnWrapper}
             onPress={handleConfirm}
             disabled={loading}
             accessibilityLabel="Confirm Sale"
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.confirmBtnText}>Confirm Sale</Text>
+            {({ pressed }) => (
+              <View style={[
+                styles.confirmBtn,
+                pressed && styles.confirmBtnPressed,
+                loading && styles.confirmBtnDisabled,
+              ]}>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Confirm Sale</Text>
+                )}
+              </View>
             )}
           </Pressable>
         </View>
@@ -370,6 +374,10 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 8,
     backgroundColor: '#f8f9fa',
+  },
+  confirmBtnWrapper: {
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   confirmBtn: {
     backgroundColor: '#208AEF',

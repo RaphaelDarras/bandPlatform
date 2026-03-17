@@ -13,13 +13,12 @@ const InventoryAdjustmentSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['restock', 'correction'],
+    enum: ['restock', 'correction', 'removal'],
     default: 'restock'
   },
   quantity: {
     type: Number,
     required: true,
-    min: 1
   },
   stockBefore: {
     type: Number,

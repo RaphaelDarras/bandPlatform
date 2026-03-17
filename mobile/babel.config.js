@@ -10,6 +10,6 @@ module.exports = function (api) {
     ],
     plugins: isTest
       ? []
-      : ['nativewind/babel', 'react-native-reanimated/plugin'],
+      : ['react-native-reanimated/plugin'],
   };
 };

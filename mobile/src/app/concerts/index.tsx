@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import React, { useCallback } from 'react';
+import { router, useIsFocused } from 'expo-router';
+import React, { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,12 +28,13 @@ function ConcertRow({ concert }: { concert: CachedConcert }) {
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => router.push(`/concerts/${concert.id}` as never)}
-      accessibilityLabel={concert.name}
+      accessibilityLabel={[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ') || 'Concert'}
     >
       <View style={styles.rowInfo}>
-        <Text style={styles.rowName}>{concert.name}</Text>
+        <Text style={styles.rowName}>
+          {[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ')}
+        </Text>
         <Text style={styles.rowMeta}>
-          {concert.venue ? `${concert.venue} · ` : ''}
           {concert.city ?? ''}
         </Text>
         <Text style={styles.rowDate}>{formatDate(concert.date)}</Text>
@@ -51,6 +52,13 @@ function ConcertRow({ concert }: { concert: CachedConcert }) {
 
 export default function ConcertListScreen() {
   const { concerts, loading, loadConcerts } = useConcerts();
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (isFocused) {
+      loadConcerts();
+    }
+  }, [isFocused, loadConcerts]);
 
   const handleRefresh = useCallback(async () => {
     await loadConcerts();
@@ -70,6 +78,9 @@ export default function ConcertListScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Text style={styles.backText}>← Back</Text>
+        </Pressable>
         <Text style={styles.headerTitle}>Concerts</Text>
         <Pressable
           style={styles.addButton}
@@ -119,6 +130,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  backButton: { width: 60 },
+  backText: { color: '#208AEF', fontSize: 15 },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
