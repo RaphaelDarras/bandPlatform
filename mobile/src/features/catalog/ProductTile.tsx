@@ -8,6 +8,7 @@ import {
 
 import type { CachedProduct } from '@/db/products';
 import { useCartStore } from '@/stores/cartStore';
+import { stockColor } from '@/utils/stockColor';
 import { VariantPicker } from './VariantPicker';
 
 interface Props {
@@ -44,6 +45,8 @@ export function ProductTile({ product }: Props) {
     .map((v) => `${v.label}:${v.stock}`)
     .join(' ');
 
+  const minStock = Math.min(...product.variants.map((v) => v.stock));
+
   return (
     <View style={styles.wrapper}>
       <Pressable
@@ -65,7 +68,7 @@ export function ProductTile({ product }: Props) {
           {`€${product.price.toFixed(2)}`}
         </Text>
 
-        <Text style={styles.stock} numberOfLines={1}>
+        <Text style={[styles.stock, { color: stockColor(minStock) }]} numberOfLines={1}>
           {stockSummary}
         </Text>
       </Pressable>

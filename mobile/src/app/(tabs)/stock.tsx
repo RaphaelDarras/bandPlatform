@@ -20,11 +20,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useStock } from '@/features/stock/useStock';
 import type { CachedProduct } from '@/db/products';
+import { stockColor } from '@/utils/stockColor';
 
 function ProductRow({ product }: { product: CachedProduct }) {
   const [expanded, setExpanded] = useState(false);
 
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+  const minStock = Math.min(...product.variants.map((v) => v.stock));
 
   return (
     <Pressable
@@ -35,7 +37,7 @@ function ProductRow({ product }: { product: CachedProduct }) {
       <View style={styles.productHeader}>
         <Text style={styles.productName}>{product.name}</Text>
         <View style={styles.stockBadge}>
-          <Text style={styles.stockBadgeText}>{totalStock}</Text>
+          <Text style={[styles.stockBadgeText, { color: stockColor(minStock) }]}>{totalStock}</Text>
         </View>
       </View>
       <Text style={styles.expandHint}>{expanded ? '▲ Hide variants' : '▼ Show variants'}</Text>
@@ -46,7 +48,7 @@ function ProductRow({ product }: { product: CachedProduct }) {
             <View key={variant.sku} style={styles.variantRow}>
               <Text style={styles.variantSku}>{variant.sku}</Text>
               <Text style={styles.variantLabel}>{variant.label}</Text>
-              <Text style={styles.variantStock}>{variant.stock}</Text>
+              <Text style={[styles.variantStock, { color: stockColor(variant.stock) }]}>{variant.stock}</Text>
             </View>
           ))}
         </View>

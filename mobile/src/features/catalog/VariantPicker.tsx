@@ -8,6 +8,7 @@ import {
 
 import type { ProductVariant, CachedProduct } from '@/db/products';
 import { useCartStore } from '@/stores/cartStore';
+import { stockColor } from '@/utils/stockColor';
 
 interface Props {
   product: CachedProduct;
@@ -45,7 +46,7 @@ export function VariantPicker({ product, onClose }: Props) {
           accessibilityLabel={`${variant.label}, ${variant.stock} left`}
         >
           <Text style={styles.variantLabel}>{variant.label}</Text>
-          <Text style={styles.stockLabel}>
+          <Text style={[styles.stockLabel, { color: stockColor(variant.stock) }]}>
             {variant.stock} left
           </Text>
         </Pressable>

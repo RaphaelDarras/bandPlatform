@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStock } from '@/features/stock/useStock';
 import { useSyncStore } from '@/stores/syncStore';
 import type { CachedProduct } from '@/db/products';
+import { stockColor } from '@/utils/stockColor';
 
 export default function RestockScreen() {
   const { products, loading, refreshStock, restock } = useStock();
@@ -147,7 +148,10 @@ export default function RestockScreen() {
                     style={[styles.variantRow, !isLast && styles.variantRowBorder]}
                   >
                     <View style={styles.variantInfo}>
-                      <Text style={styles.variantLabel}>{variant.label}</Text>
+                      <Text style={styles.variantLabel}>
+                        {variant.label}
+                        <Text style={{ color: stockColor(variant.stock), fontSize: 12 }}> (stock: {variant.stock})</Text>
+                      </Text>
                       {delta !== 0 && (
                         <Text style={[
                           styles.variantDelta,

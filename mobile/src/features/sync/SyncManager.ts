@@ -5,6 +5,14 @@
  * Supports sale_create (batched), sale_void, and sale_unvoid types.
  * Exponential backoff on failure (capped at 30s).
  * After 3 consecutive failures, sets syncStore alert flag.
+ *
+ * POS-06 (battery efficiency): 60s periodic sync interval with exponential backoff
+ * is sufficient for 4-6 hour concert events on modern phones. No battery-specific
+ * optimizations needed per user decision (2026-03-18).
+ *
+ * POS-11 (end-of-event reconciliation): Satisfied by existing restock screen
+ * (mobile/src/app/restock.tsx) which supports positive and negative stock
+ * adjustments with reason field. No dedicated reconciliation screen needed.
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { AxiosInstance } from 'axios';
@@ -15,6 +23,7 @@ import {
   incrementAttempt,
   type OutboxRow,
 } from '@/db/outbox';
+import { apiUpdateSale } from '@/api/sales';
 import { useSyncStore } from '@/stores/syncStore';
 
 const BATCH_SIZE = 10;
@@ -64,10 +73,10 @@ export async function requestSync(
       await processOtherRow(db, apiClient, row);
     }
 
-    // Update pending count after processing: remaining = original - processed
-    const processed = saleCreateRows.slice(0, BATCH_SIZE).length + otherRows.length;
-    const estimatedRemaining = Math.max(0, pendingRows.length - processed);
-    useSyncStore.getState().setPendingCount(estimatedRemaining);
+    // Re-query actual pending count — don't estimate, since batch/individual
+    // processing can silently fail and leave rows still pending.
+    const remaining = await getPendingOutboxRows(db);
+    useSyncStore.getState().setPendingCount(remaining.length);
   } finally {
     syncInProgress = false;
   }
@@ -78,23 +87,41 @@ async function processSaleCreateBatch(
   apiClient: AxiosInstance,
   rows: OutboxRow[]
 ): Promise<void> {
+  const PAYMENT_METHOD_MAP: Record<string, string> = {
+    'Cash': 'cash', 'Card': 'card', 'E-transfer': 'etransfer', 'PayPal': 'paypal',
+  };
+
   const sales = rows.map((row) => {
     const payload = JSON.parse(row.payload);
-    return {
+    const sale: Record<string, unknown> = {
       ...payload,
       idempotencyKey: row.idempotency_key,
+      paymentMethod: PAYMENT_METHOD_MAP[payload.paymentMethod] ?? payload.paymentMethod.toLowerCase(),
     };
+    // Drop empty concertId — backend expects a valid ObjectId or nothing
+    if (!sale.concertId) {
+      delete sale.concertId;
+    }
+    return sale;
   });
 
+  console.log('[SyncManager] Sending batch:', JSON.stringify(sales, null, 2));
   try {
-    await apiClient.post('sales/batch', { sales });
+    const response = await apiClient.post('sales/batch', sales);
+    console.log('[SyncManager] Batch sync success:', JSON.stringify(response.data));
     // Mark all rows done and reset failure counter
     for (const row of rows) {
       await markOutboxDone(db, row.id);
     }
     useSyncStore.getState().resetFailures();
     useSyncStore.getState().setLastSyncAt(Date.now());
-  } catch {
+  } catch (err: unknown) {
+    const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
+    console.error(
+      '[SyncManager] Batch sync FAILED:',
+      axiosErr.response?.status,
+      JSON.stringify(axiosErr.response?.data ?? axiosErr.message),
+    );
     // Increment attempt for all rows in batch
     for (const row of rows) {
       const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
@@ -122,6 +149,8 @@ async function processOtherRow(
       await apiClient.post(`sales/${payload.saleId}/void`, {});
     } else if (row.type === 'sale_unvoid') {
       await apiClient.post(`sales/${payload.saleId}/unvoid`, {});
+    } else if (row.type === 'sale_update_concert') {
+      await apiUpdateSale(payload.saleId, { concertId: payload.concertId });
     } else {
       // Unknown type — skip and mark done to avoid blocking queue
       await markOutboxDone(db, row.id);
