@@ -16,7 +16,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **POS-05**: User can authenticate with PIN or password
 - [x] **POS-06**: App maintains battery efficiency for 4-6 hour events
 - [x] **POS-07**: User sees warnings when product stock is low (< 5 units)
-- [ ] **POS-08**: User can view sales report with total amounts by concert
+- [x] **POS-08**: User can view sales report with total amounts by concert
 - [x] **POS-09**: User can add multiple items to a single transaction
 - [x] **POS-10**: App automatically calculates transaction total based on selected items
 - [x] **POS-11**: User can perform end-of-event inventory reconciliation
@@ -117,7 +117,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-01 | Phase 2 | Complete |
 | POS-06 | Phase 3 | Complete |
 | POS-07 | Phase 3 | Complete |
-| POS-08 | Phase 3 | Pending |
+| POS-08 | Phase 3 | Complete |
 | POS-11 | Phase 3 | Complete |
 | POS-12 | Phase 3 | Pending |
 | WEB-01 | Phase 4 | Pending |
