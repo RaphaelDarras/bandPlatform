@@ -20,7 +20,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **POS-09**: User can add multiple items to a single transaction
 - [x] **POS-10**: App automatically calculates transaction total based on selected items
 - [x] **POS-11**: User can perform end-of-event inventory reconciliation
-- [ ] **POS-12**: App syncs transactions even in low-bandwidth conditions
+- [x] **POS-12**: App syncs transactions even in low-bandwidth conditions
 
 ### Online Shop (E-Commerce)
 
@@ -119,7 +119,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | POS-07 | Phase 3 | Complete |
 | POS-08 | Phase 3 | Complete |
 | POS-11 | Phase 3 | Complete |
-| POS-12 | Phase 3 | Pending |
+| POS-12 | Phase 3 | Complete |
 | WEB-01 | Phase 4 | Pending |
 | WEB-02 | Phase 4 | Pending |
 | WEB-03 | Phase 4 | Pending |
