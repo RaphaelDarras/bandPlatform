@@ -19,8 +19,8 @@ import { getConcertById, getConcertPriceOverrides, upsertPriceOverride, deletePr
 import type { ConcertPriceOverride } from '@/db/concerts';
 import { getCachedProducts } from '@/db/products';
 import type { CachedProduct } from '@/db/products';
-import { useConcerts } from '@/features/concerts/useConcerts';
-import type { ConcertTotals } from '@/features/concerts/useConcerts';
+import { useConcerts, getConcertReport } from '@/features/concerts/useConcerts';
+import type { ConcertReport } from '@/features/concerts/useConcerts';
 import { useCartStore } from '@/stores/cartStore';
 
 function formatDate(timestamp: number): string {
@@ -39,7 +39,7 @@ function TotalsModal({
   onClose,
 }: {
   visible: boolean;
-  totals: ConcertTotals | null;
+  totals: ConcertReport | null;
   concertName: string;
   onClose: () => void;
 }) {
@@ -53,9 +53,14 @@ function TotalsModal({
           {totals && (
             <View style={styles.totalsGrid}>
               <View style={styles.totalItem}>
-                <Text style={styles.totalValue}>
-                  {`€${totals.totalRevenue.toFixed(2)}`}
-                </Text>
+                {Object.entries(totals.revenuesByCurrency).map(([currency, amount]) => (
+                  <Text key={currency} style={styles.totalValue}>
+                    {`${currency} ${amount.toFixed(2)}`}
+                  </Text>
+                ))}
+                {Object.keys(totals.revenuesByCurrency).length === 0 && (
+                  <Text style={styles.totalValue}>—</Text>
+                )}
                 <Text style={styles.totalLabel}>Total Revenue</Text>
               </View>
               <View style={styles.totalItem}>
@@ -111,13 +116,14 @@ function PriceOverrideRow({
 
 export default function ConcertDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { closeConcert, reopenConcert, getConcertTotals } = useConcerts();
+  const { closeConcert, reopenConcert } = useConcerts();
   const setConcertId = useCartStore((state) => state.setConcertId);
+  const setConcertCurrency = useCartStore((state) => state.setCurrency);
 
   const [concert, setConcert] = useState<CachedConcert | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [totals, setTotals] = useState<ConcertTotals | null>(null);
+  const [totals, setTotals] = useState<ConcertReport | null>(null);
   const [showTotals, setShowTotals] = useState(false);
   const [overrides, setOverrides] = useState<ConcertPriceOverride[]>([]);
   const [products, setProducts] = useState<CachedProduct[]>([]);
@@ -139,8 +145,8 @@ export default function ConcertDetailScreen() {
         ]);
         setOverrides(ov);
         setProducts(prods);
-        // Load totals for display (especially for closed concerts)
-        const t = await getConcertTotals(id);
+        // Load full concert report for display (active and closed concerts)
+        const t = await getConcertReport(id);
         setTotals(t);
       }
     } catch (err) {
@@ -148,7 +154,7 @@ export default function ConcertDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, getConcertTotals]);
+  }, [id]);
 
   useEffect(() => {
     loadConcert();
@@ -157,6 +163,7 @@ export default function ConcertDetailScreen() {
   const handleStartSelling = () => {
     if (!concert) return;
     setConcertId(concert.id);
+    setConcertCurrency(concert.currency ?? 'EUR');
     router.push('/selling' as never);
   };
 
@@ -173,7 +180,8 @@ export default function ConcertDetailScreen() {
           onPress: async () => {
             setActionLoading(true);
             try {
-              const t = await closeConcert(concert.id);
+              await closeConcert(concert.id);
+              const t = await getConcertReport(concert.id);
               setTotals(t);
               setConcert((prev) => prev ? { ...prev, active: 0 } : prev);
               setShowTotals(true);
@@ -288,6 +296,10 @@ export default function ConcertDetailScreen() {
             <Text style={styles.infoLabel}>Date</Text>
             <Text style={styles.infoValue}>{formatDate(concert.date)}</Text>
           </View>
+          <View style={styles.cardRow}>
+            <Text style={styles.infoLabel}>Currency</Text>
+            <Text style={styles.infoValue}>{concert.currency ?? 'EUR'}</Text>
+          </View>
           {concert.venue && (
             <View style={styles.cardRow}>
               <Text style={styles.infoLabel}>Venue</Text>
@@ -302,15 +314,20 @@ export default function ConcertDetailScreen() {
           )}
         </View>
 
-        {/* Totals summary (always visible for closed, also shows after close) */}
+        {/* Totals summary (always visible for active and closed concerts) */}
         {totals && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Sales Summary</Text>
             <View style={styles.totalsRow}>
               <View style={styles.totalCell}>
-                <Text style={styles.totalCellValue}>
-                  {`€${totals.totalRevenue.toFixed(2)}`}
-                </Text>
+                {Object.entries(totals.revenuesByCurrency).map(([currency, amount]) => (
+                  <Text key={currency} style={styles.totalCellValue}>
+                    {`${currency} ${amount.toFixed(2)}`}
+                  </Text>
+                ))}
+                {Object.keys(totals.revenuesByCurrency).length === 0 && (
+                  <Text style={styles.totalCellValue}>—</Text>
+                )}
                 <Text style={styles.totalCellLabel}>Revenue</Text>
               </View>
               <View style={styles.totalCell}>
@@ -322,6 +339,61 @@ export default function ConcertDetailScreen() {
                 <Text style={styles.totalCellLabel}>Items Sold</Text>
               </View>
             </View>
+          </View>
+        )}
+
+        {/* Product Breakdown */}
+        {totals && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Product Breakdown</Text>
+            {totals.variantBreakdowns.length === 0 ? (
+              <Text style={styles.reportEmpty}>No sales recorded</Text>
+            ) : (
+              (() => {
+                // Group variantBreakdowns by productName
+                const groups = new Map<string, typeof totals.variantBreakdowns>();
+                for (const vb of totals.variantBreakdowns) {
+                  const existing = groups.get(vb.productName) ?? [];
+                  existing.push(vb);
+                  groups.set(vb.productName, existing);
+                }
+                return Array.from(groups.entries()).map(([productName, variants]) => (
+                  <View key={productName} style={styles.productGroup}>
+                    <Text style={styles.productGroupName}>{productName}</Text>
+                    {variants.map((vb) => (
+                      <View key={`${vb.variantSku}:${vb.currency}`} style={styles.variantRow}>
+                        <Text style={styles.variantLabel}>{vb.variantLabel}</Text>
+                        <Text style={styles.variantQty}>{`×${vb.quantitySold}`}</Text>
+                        <Text style={styles.variantRevenue}>{`${vb.currency} ${vb.revenue.toFixed(2)}`}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ));
+              })()
+            )}
+          </View>
+        )}
+
+        {/* Payment Methods */}
+        {totals && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Payment Methods</Text>
+            {totals.paymentBreakdowns.length === 0 ? (
+              <Text style={styles.reportEmpty}>No sales recorded</Text>
+            ) : (
+              totals.paymentBreakdowns.map((pb) => (
+                <View key={`${pb.method}:${pb.currency}`} style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>{pb.displayLabel}</Text>
+                  <Text style={styles.paymentTxns}>{`${pb.transactionCount} txn${pb.transactionCount !== 1 ? 's' : ''}`}</Text>
+                  <Text style={styles.paymentRevenue}>{`${pb.currency} ${pb.revenue.toFixed(2)}`}</Text>
+                </View>
+              ))
+            )}
+            {totals.voidedCount > 0 && (
+              <Text style={styles.voidedNote}>
+                {`${totals.voidedCount} voided sale${totals.voidedCount !== 1 ? 's' : ''} (${totals.voidedRevenue.toFixed(2)} voided)`}
+              </Text>
+            )}
           </View>
         )}
 
@@ -653,4 +725,30 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  // Report section styles
+  reportEmpty: { fontSize: 13, color: '#999', textAlign: 'center', paddingVertical: 8 },
+  productGroup: { gap: 4, paddingBottom: 8 },
+  productGroupName: { fontSize: 14, fontWeight: '700', color: '#1a1a1a', paddingTop: 4 },
+  variantRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingLeft: 16,
+    paddingVertical: 3,
+  },
+  variantLabel: { flex: 1, fontSize: 13, color: '#444' },
+  variantQty: { fontSize: 13, fontWeight: '600', color: '#666', marginRight: 12 },
+  variantRevenue: { fontSize: 13, fontWeight: '600', color: '#1a1a1a', minWidth: 80, textAlign: 'right' },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  paymentLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1a1a1a' },
+  paymentTxns: { fontSize: 13, color: '#888', marginRight: 12 },
+  paymentRevenue: { fontSize: 14, fontWeight: '700', color: '#1a1a1a', minWidth: 80, textAlign: 'right' },
+  voidedNote: { fontSize: 12, color: '#aaa', textAlign: 'center', paddingTop: 8, fontStyle: 'italic' },
 });
