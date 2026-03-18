@@ -32,22 +32,20 @@ interface VariantDraft {
   label: string;
   size: string;
   color: string;
-  priceAdjustment: string;
 }
 
 function productToVariantDrafts(variants: ApiProductVariant[]): VariantDraft[] {
   return variants.map((v, idx) => ({
     key: `v-${idx}-${v.sku}`,
     sku: v.sku,
-    label: v.label,
+    label: v.label || [v.size, v.color].filter(Boolean).join(' / ') || '',
     size: v.size ?? '',
     color: v.color ?? '',
-    priceAdjustment: String(v.priceAdjustment ?? 0),
   }));
 }
 
 function makeVariantDraft(): VariantDraft {
-  return { key: `v-${Date.now()}-${Math.random()}`, sku: '', label: '', size: '', color: '', priceAdjustment: '0' };
+  return { key: `v-${Date.now()}-${Math.random()}`, sku: '', label: '', size: '', color: '' };
 }
 
 export default function EditProductScreen() {
@@ -106,7 +104,7 @@ export default function EditProductScreen() {
       label: v.label.trim() || v.sku,
       size: v.size.trim() || undefined,
       color: v.color.trim() || undefined,
-      priceAdjustment: parseFloat(v.priceAdjustment) || 0,
+      priceAdjustment: 0,
     }));
 
     setSubmitting(true);
@@ -288,14 +286,6 @@ export default function EditProductScreen() {
                   accessibilityLabel={`Variant ${idx + 1} color`}
                 />
               </View>
-              <TextInput
-                style={styles.input}
-                value={variant.priceAdjustment}
-                onChangeText={(v) => updateVariant(variant.key, 'priceAdjustment', v)}
-                placeholder="Price adjustment"
-                keyboardType="decimal-pad"
-                accessibilityLabel={`Variant ${idx + 1} price adjustment`}
-              />
             </View>
           ))}
         </View>

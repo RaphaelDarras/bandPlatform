@@ -72,19 +72,26 @@ router.post('/batch', async (req, res) => {
         });
       }
 
+      // Normalise paymentMethod to backend enum
+      const PM_MAP = { Cash: 'cash', Card: 'card', 'E-transfer': 'etransfer', PayPal: 'paypal' };
+      const normalisedPM = PM_MAP[paymentMethod] ?? (paymentMethod || 'cash').toLowerCase();
+
       // Build and save sale
-      const saleDoc = await Sale.create({
-        concertId,
+      const createPayload = {
         items: resolvedItems,
         totalAmount,
-        paymentMethod: paymentMethod || 'cash',
+        paymentMethod: normalisedPM,
         currency: currency || 'EUR',
         discount: discount || 0,
         discountType: discountType || 'flat',
         idempotencyKey,
         source: 'pos',
         createdBy: req.user.userId,
-      });
+      };
+      // Only set concertId when it's a non-empty value (ObjectId field — empty string throws)
+      if (concertId) createPayload.concertId = concertId;
+
+      const saleDoc = await Sale.create(createPayload);
 
       sales.push(saleDoc);
       created++;
@@ -92,7 +99,31 @@ router.post('/batch', async (req, res) => {
 
     return res.status(201).json({ created, skipped, sales });
   } catch (error) {
-    console.error('Batch sale error:', error);
+    console.error('Batch sale error:', error.message, error.errors ?? '');
+    return res.status(500).json({ error: 'Internal server error', detail: error.message });
+  }
+});
+
+/**
+ * PATCH /api/sales/:id
+ * Update mutable fields on a sale. Currently supports: concertId.
+ */
+router.patch('/:id', async (req, res) => {
+  try {
+    const { concertId } = req.body;
+    const update = {};
+    if (concertId !== undefined) update.concertId = concertId || null;
+
+    // /:id is the local UUID — look up via idempotencyKey since MongoDB _id is never sent to the app
+    const sale = await Sale.findOneAndUpdate(
+      { idempotencyKey: `sale_create:${req.params.id}` },
+      { $set: update },
+      { new: true }
+    );
+    if (!sale) return res.status(404).json({ error: 'Sale not found' });
+    return res.status(200).json(sale);
+  } catch (error) {
+    console.error('Update sale error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

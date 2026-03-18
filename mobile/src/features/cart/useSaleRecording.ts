@@ -6,6 +6,8 @@ import type { LocalSale } from '@/db/outbox';
 import { updateLocalStock } from '@/db/products';
 import { useCartStore } from '@/stores/cartStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { requestSync } from '@/features/sync/SyncManager';
+import { apiClient } from '@/api/client';
 
 /**
  * Hook that encapsulates the sale recording flow.
@@ -51,18 +53,29 @@ export function useSaleRecording() {
       discountType,
     };
 
+    // Map UI payment method labels to backend enum values
+    const paymentMethodMap: Record<string, string> = {
+      'Cash': 'cash',
+      'Card': 'card',
+      'E-transfer': 'etransfer',
+      'PayPal': 'paypal',
+    };
+
     // Build outbox payload (matches API batch format)
-    const outboxPayload = {
+    const outboxPayload: Record<string, unknown> = {
       saleId,
-      concertId: sale.concertId,
       items: sale.items,
       totalAmount: sale.totalAmount,
-      paymentMethod,
+      paymentMethod: paymentMethodMap[paymentMethod] ?? paymentMethod.toLowerCase(),
       currency,
       discount,
       discountType,
       recordedAt: now,
     };
+    // Only include concertId when it's a valid ID (backend expects ObjectId)
+    if (sale.concertId) {
+      outboxPayload.concertId = sale.concertId;
+    }
 
     // 1. Atomic write: sale + outbox
     await recordSaleLocally(db, sale, {
@@ -83,6 +96,9 @@ export function useSaleRecording() {
 
     // 4. Increment sync pending count
     setPendingCount(pendingCount + 1);
+
+    // 5. Kick off sync immediately (fire-and-forget)
+    requestSync(db, apiClient);
 
     return saleId;
   };

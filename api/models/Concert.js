@@ -20,6 +20,11 @@ const ConcertSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  currency: {
+    type: String,
+    default: 'EUR',
+    trim: true
+  },
   active: {
     type: Boolean,
     default: true

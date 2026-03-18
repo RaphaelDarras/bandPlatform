@@ -6,6 +6,7 @@ export interface CachedConcert {
   country: string;
   city: string | null;
   date: number; // Unix timestamp (ms)
+  currency: string;
   active: number; // 1 = active, 0 = closed
   updated_at: number;
 }
@@ -43,14 +44,15 @@ export async function upsertConcerts(
 ): Promise<void> {
   for (const concert of concerts) {
     await db.runAsync(
-      `INSERT OR REPLACE INTO concerts (id, venue, country, city, date, active, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO concerts (id, venue, country, city, date, currency, active, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         concert.id,
         concert.venue ?? null,
         concert.country,
         concert.city ?? null,
         concert.date,
+        concert.currency ?? 'EUR',
         concert.active,
         concert.updated_at,
       ]
@@ -66,14 +68,15 @@ export async function upsertConcert(
   concert: CachedConcert
 ): Promise<void> {
   await db.runAsync(
-    `INSERT OR REPLACE INTO concerts (id, venue, country, city, date, active, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO concerts (id, venue, country, city, date, currency, active, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       concert.id,
       concert.venue ?? null,
       concert.country,
       concert.city ?? null,
       concert.date,
+      concert.currency ?? 'EUR',
       concert.active,
       concert.updated_at,
     ]

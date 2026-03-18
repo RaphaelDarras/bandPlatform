@@ -125,6 +125,7 @@ export default function NewConcertScreen() {
   const [venue, setVenue] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
+  const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -176,6 +177,7 @@ export default function NewConcertScreen() {
         date: formattedDate,
         city: city.trim(),
         country: country.trim(),
+        currency,
       });
       router.back();
     } catch (err) {
@@ -259,6 +261,23 @@ export default function NewConcertScreen() {
               accessibilityLabel="Country"
               returnKeyType="done"
             />
+          </View>
+
+          {/* Currency */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Currency</Text>
+            <View style={styles.chipRow}>
+              {(['EUR', 'GBP', 'USD', 'CAD'] as const).map((c) => (
+                <Pressable
+                  key={c}
+                  style={[styles.chip, currency === c && styles.chipSelected]}
+                  onPress={() => setCurrency(c)}
+                  accessibilityLabel={c}
+                >
+                  <Text style={[styles.chipText, currency === c && styles.chipTextSelected]}>{c}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         </ScrollView>
 
@@ -372,6 +391,18 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     minHeight: 48,
   },
+  chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  chipSelected: { backgroundColor: '#EBF4FF', borderColor: '#208AEF' },
+  chipText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  chipTextSelected: { color: '#208AEF', fontWeight: '700' },
   dateInputWrapper: {
     borderRadius: 10,
     overflow: 'hidden',

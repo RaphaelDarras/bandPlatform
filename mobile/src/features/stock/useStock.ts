@@ -7,75 +7,81 @@
 import { useState, useCallback } from 'react';
 
 import { getDb } from '@/db';
-import { getCachedProducts, upsertProducts, type CachedProduct, type ProductVariant } from '@/db/products';
+import { getCachedProducts, upsertProducts, type CachedProduct } from '@/db/products';
+import { getPendingOutboxRows } from '@/db/outbox';
 import { apiGetStock, apiRestock } from '@/api/inventory';
 import { apiGetProducts } from '@/api/products';
-import { useSyncStore } from '@/stores/syncStore';
+import { useAuthStore } from '@/stores/authStore';
 
 export function useStock() {
   const [products, setProducts] = useState<CachedProduct[]>([]);
   const [loading, setLoading] = useState(false);
-  const { isOnline } = useSyncStore();
 
   /**
    * Refreshes the stock list.
-   * When online: fetches from API and updates local cache.
-   * When offline: reads from local SQLite cache.
+   * Always attempts an API fetch first; falls back to SQLite cache on network failure.
    */
   const refreshStock = useCallback(async () => {
     setLoading(true);
+    const db = await getDb();
     try {
-      const db = await getDb();
+      if (!useAuthStore.getState().token) throw new Error('not authenticated');
+      const [stockProducts, priceProducts] = await Promise.all([
+        apiGetStock(),
+        apiGetProducts(),
+      ]);
 
-      if (isOnline) {
-        const [stockProducts, priceProducts] = await Promise.all([
-          apiGetStock(),
-          apiGetProducts(),
-        ]);
-        // Preserve local stock — the outbox may have unsynced sales that the API doesn't know about yet
-        const localProducts = await getCachedProducts(db);
-        const localStockMap = new Map<string, number>(
-          localProducts.flatMap((p) => p.variants.map((v: ProductVariant) => [`${p.id}:${v.sku}`, v.stock] as [string, number]))
-        );
-        const priceProductMap = new Map(priceProducts.map((p) => [p.id, p]));
-        const merged = stockProducts.map((p) => {
-          const apiProd = priceProductMap.get(p.id);
-          const adjMap = new Map(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (apiProd?.variants ?? []).map((v: any) => [v.sku, v.priceAdjustment ?? 0])
-          );
-          return {
-            ...p,
-            price: apiProd?.price ?? 0,
-            variants: p.variants.map((v) => ({
-              ...v,
-              priceAdjustment: adjMap.get(v.sku) ?? 0,
-              // Use local stock for known variants; fall back to API for new variants
-              stock: localStockMap.get(`${p.id}:${v.sku}`) ?? v.stock,
-            })),
-          };
-        });
-        if (merged.length > 0) {
-          await upsertProducts(db, merged);
+      // Build a per-variant delta from pending (unsynced) sale_create outbox rows.
+      // These have been deducted locally but the backend hasn't received them yet.
+      const pendingRows = await getPendingOutboxRows(db);
+      const pendingDelta = new Map<string, number>();
+      for (const row of pendingRows) {
+        if (row.type !== 'sale_create') continue;
+        const payload = JSON.parse(row.payload) as {
+          items: Array<{ productId: string; variantSku: string; quantity: number }>;
+        };
+        for (const item of payload.items) {
+          const key = `${item.productId}:${item.variantSku}`;
+          pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
         }
       }
 
-      // Always read from local cache as the source of truth
+      // Baseline = API stock (reflects all synced sales + restocks).
+      // Subtract only what the backend doesn't know about yet.
+      const priceProductMap = new Map(priceProducts.map((p) => [p.id, p]));
+      const merged = stockProducts.map((p) => {
+        const apiProd = priceProductMap.get(p.id);
+        const adjMap = new Map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (apiProd?.variants ?? []).map((v: any) => [v.sku, v.priceAdjustment ?? 0])
+        );
+        return {
+          ...p,
+          price: apiProd?.price ?? 0,
+          variants: p.variants.map((v) => ({
+            ...v,
+            priceAdjustment: adjMap.get(v.sku) ?? 0,
+            stock: v.stock - (pendingDelta.get(`${p.id}:${v.sku}`) ?? 0),
+          })),
+        };
+      });
+      if (merged.length > 0) {
+        await upsertProducts(db, merged);
+      }
+    } catch (err: unknown) {
+      console.error('[useStock] API fetch failed:', err instanceof Error ? err.message : String(err));
+    }
+
+    // Always read from SQLite as the final source of truth for the UI
+    try {
       const cached = await getCachedProducts(db);
       setProducts(cached);
-    } catch (error) {
-      // If API fails, fall back to local cache
-      try {
-        const db = await getDb();
-        const cached = await getCachedProducts(db);
-        setProducts(cached);
-      } catch {
-        // Silently fail — UI will show empty list
-      }
-    } finally {
-      setLoading(false);
+    } catch {
+      // Silently fail — UI will show empty list
     }
-  }, [isOnline]);
+
+    setLoading(false);
+  }, []);
 
   /**
    * Restocks a product variant via the API, then refreshes local cache.

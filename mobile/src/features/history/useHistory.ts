@@ -5,8 +5,16 @@ import { getDb } from '@/db';
 import type { LocalSaleRow } from '@/db/sales';
 import { getLocalSales, voidLocalSale, unvoidLocalSale } from '@/db/sales';
 import { updateLocalStock } from '@/db/products';
-import { getCachedConcerts } from '@/db/concerts';
+import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
 import { apiVoidSale, apiUnvoidSale } from '@/api/sales';
+
+function concertLabel(c: CachedConcert): string {
+  const location = [c.venue || c.city, c.country].filter(Boolean).join(', ');
+  const date = new Date(c.date).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+  return location ? `${location} — ${date}` : date;
+}
 
 /**
  * A parsed sale with items as an array (not raw JSON).
@@ -29,6 +37,7 @@ export interface SaleWithItems extends LocalSaleRow {
 export function useHistory() {
   const [salesByGroup, setSalesByGroup] = useState<Record<string, SaleWithItems[]>>({});
   const [concertNames, setConcertNames] = useState<Record<string, string>>({});
+  const [allConcertIds, setAllConcertIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   /**
@@ -50,10 +59,10 @@ export function useHistory() {
         parsedItems: JSON.parse(row.items_json ?? '[]') as SaleWithItems['parsedItems'],
       }));
 
-      // Group by concertId
+      // Group by concertId — SQLite returns snake_case column concert_id
       const groups: Record<string, SaleWithItems[]> = {};
       for (const sale of sales) {
-        const cid = sale.concertId;
+        const cid: string = (sale as unknown as { concert_id: string }).concert_id ?? sale.concertId ?? '';
         if (!groups[cid]) groups[cid] = [];
         groups[cid].push(sale);
       }
@@ -65,11 +74,17 @@ export function useHistory() {
 
       setSalesByGroup(groups);
 
+      // When loading unfiltered, record all concert IDs that have sales
+      // so the dropdown options stay stable when a filter is active.
+      if (concertFilter === undefined) {
+        setAllConcertIds(Object.keys(groups));
+      }
+
       // Load concert names from cache
       const concerts = await getCachedConcerts(db);
       const names: Record<string, string> = {};
       for (const c of concerts) {
-        names[c.id] = c.name;
+        names[c.id] = concertLabel(c);
       }
       setConcertNames(names);
     } catch (err) {
@@ -186,6 +201,7 @@ export function useHistory() {
   return {
     salesByGroup,
     concertNames,
+    allConcertIds,
     loading,
     loadHistory,
     voidSale,

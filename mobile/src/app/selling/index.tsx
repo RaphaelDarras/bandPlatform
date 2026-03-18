@@ -1,14 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import NetInfo from '@react-native-community/netinfo';
 
 import { getDb } from '@/db';
 import { getCachedProducts, upsertProducts } from '@/db/products';
+import { getPendingOutboxRows } from '@/db/outbox';
 import type { CachedProduct } from '@/db/products';
 import { apiGetProducts } from '@/api/products';
 import { ProductGrid } from '@/features/catalog/ProductGrid';
@@ -28,53 +29,60 @@ export default function SellingScreen() {
   const loadProducts = useCallback(async () => {
     try {
       const db = await getDb();
-      const netState = await NetInfo.fetch();
-      const online = !!(netState.isConnected && netState.isInternetReachable);
+      let fetchedFromApi = false;
 
-      if (online) {
-        try {
-          const apiProducts = await apiGetProducts();
-          if (apiProducts.length > 0) {
-            // Preserve local stock — only the sync manager should update stock from the server.
-            // The selling screen only needs catalog data (name, price, variants metadata).
-            const localProducts = await getCachedProducts(db);
-            const localStockMap = new Map(
-              localProducts.flatMap((p) => p.variants.map((v) => [`${p.id}:${v.sku}`, v.stock]))
-            );
-            await upsertProducts(db, apiProducts.map((p) => ({
-              id: p.id,
-              name: p.name,
-              price: p.price,
-              imageUrl: p.imageUrl ?? null,
-              active: 1 as const,
-              updatedAt: Date.now(),
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              variants: (p.variants as any[]).map((v) => ({
-                sku: v.sku,
-                label: v.label || [v.size, v.color].filter(Boolean).join(' / ') || v.sku,
-                priceAdjustment: v.priceAdjustment ?? 0,
-                // Use local stock if available, fall back to API stock for new products
-                stock: localStockMap.get(`${p.id}:${v.sku}`) ?? v.stock ?? 0,
-              })),
-            })));
+      try {
+        const apiProducts = await apiGetProducts();
+        if (apiProducts.length > 0) {
+          fetchedFromApi = true;
+          // Build pending delta from unsynced sale_create outbox rows.
+          const pendingRows = await getPendingOutboxRows(db);
+          const pendingDelta = new Map<string, number>();
+          for (const row of pendingRows) {
+            if (row.type !== 'sale_create') continue;
+            const payload = JSON.parse(row.payload) as {
+              items: Array<{ productId: string; variantSku: string; quantity: number }>;
+            };
+            for (const item of payload.items) {
+              const key = `${item.productId}:${item.variantSku}`;
+              pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
+            }
           }
-        } catch {
-          // API unavailable — fall through to cache
+
+          await upsertProducts(db, apiProducts.map((p) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            imageUrl: p.imageUrl ?? null,
+            active: 1 as const,
+            updatedAt: Date.now(),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            variants: (p.variants as any[]).map((v) => ({
+              sku: v.sku,
+              label: v.label || [v.size, v.color].filter(Boolean).join(' / ') || v.sku,
+              priceAdjustment: v.priceAdjustment ?? 0,
+              stock: (v.stock ?? 0) - (pendingDelta.get(`${p.id}:${v.sku}`) ?? 0),
+            })),
+          })));
         }
+      } catch {
+        // Network unavailable — fall through to cache
       }
 
       const cached = await getCachedProducts(db);
       setProducts(cached);
-      setIsOffline(!online && cached.length === 0);
+      setIsOffline(!fetchedFromApi && cached.length === 0);
     } catch (err) {
       console.error('[SellingScreen] Failed to load products:', err);
     }
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    loadProducts().finally(() => setLoading(false));
-  }, [loadProducts]);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      loadProducts().finally(() => setLoading(false));
+    }, [loadProducts])
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

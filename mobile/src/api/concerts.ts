@@ -6,6 +6,7 @@ export interface Concert {
   date: string; // ISO date string
   country: string;
   city: string;
+  currency: string;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -16,6 +17,7 @@ export interface CreateConcertData {
   date: string;
   country: string;
   city: string;
+  currency: string;
 }
 
 /**

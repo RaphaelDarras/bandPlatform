@@ -59,9 +59,10 @@ export async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     );
   `);
 
-  // Migrate existing concerts table: add country, drop name
+  // Migrate existing concerts table: add country, drop name, add currency
   try { await db.execAsync(`ALTER TABLE concerts ADD COLUMN country TEXT NOT NULL DEFAULT ''`); } catch {}
   try { await db.execAsync(`ALTER TABLE concerts DROP COLUMN name`); } catch {}
+  try { await db.execAsync(`ALTER TABLE concerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'`); } catch {}
   // Remove rows with null id (accumulated before _id→id mapping was fixed)
   try { await db.execAsync(`DELETE FROM concerts WHERE id IS NULL`); } catch {}
 }

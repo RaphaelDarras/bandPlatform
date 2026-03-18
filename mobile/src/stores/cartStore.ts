@@ -68,7 +68,7 @@ export const useCartStore = create<CartStore>()(
           ),
         })),
 
-      clearCart: () => set({ items: [], discount: 0, discountType: 'flat' }),
+      clearCart: () => set({ items: [], discount: 0, discountType: 'flat', currency: 'EUR' }),
 
       setConcertId: (id) => set({ concertId: id }),
 

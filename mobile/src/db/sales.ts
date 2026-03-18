@@ -16,7 +16,7 @@ export async function getLocalSales(
   db: SQLite.SQLiteDatabase,
   concertId?: string
 ): Promise<LocalSaleRow[]> {
-  if (concertId) {
+  if (concertId !== undefined) {
     return db.getAllAsync<LocalSaleRow>(
       `SELECT * FROM sales WHERE concert_id = ? ORDER BY created_at DESC`,
       [concertId]
@@ -37,6 +37,20 @@ export async function voidLocalSale(
   await db.runAsync(
     `UPDATE sales SET voided = 1, voided_at = ? WHERE id = ?`,
     [Date.now(), id]
+  );
+}
+
+/**
+ * Updates the concert_id for a local sale.
+ */
+export async function updateSaleConcert(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  concertId: string
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE sales SET concert_id = ? WHERE id = ?`,
+    [concertId, id]
   );
 }
 

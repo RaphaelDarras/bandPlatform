@@ -55,8 +55,10 @@ interface SaleRowItem {
 }
 
 function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) {
+  const raw = sale as unknown as { total_amount?: number; payment_method?: string };
   const itemCount = sale.parsedItems.reduce((sum, i) => sum + i.quantity, 0);
-  const total = (sale as unknown as { total_amount?: number }).total_amount ?? sale.totalAmount;
+  const total = raw.total_amount ?? sale.totalAmount;
+  const paymentMethod = raw.payment_method ?? sale.paymentMethod;
   const isVoided = sale.voided === 1;
 
   return (
@@ -74,7 +76,7 @@ function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) 
           {formatTimestamp(sale.created_at)}
         </Text>
         <Text style={[styles.saleMeta, isVoided && styles.saleTextVoided]}>
-          {`${itemCount} item${itemCount !== 1 ? 's' : ''} · ${sale.paymentMethod}`}
+          {`${itemCount} item${itemCount !== 1 ? 's' : ''} · ${paymentMethod}`}
         </Text>
       </View>
       <View style={styles.saleRight}>
@@ -99,7 +101,7 @@ interface ConcertSection {
 }
 
 export default function HistoryScreen() {
-  const { salesByGroup, concertNames, loading, loadHistory } = useHistory();
+  const { salesByGroup, concertNames, allConcertIds, loading, loadHistory } = useHistory();
   const [filter, setFilter] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -114,7 +116,7 @@ export default function HistoryScreen() {
   // Build sections for SectionList
   const sections: ConcertSection[] = Object.entries(salesByGroup).map(([concertId, sales]) => ({
     concertId,
-    concertName: concertNames[concertId] ?? concertId,
+    concertName: concertNames[concertId] ?? (concertId || 'No concert'),
     data: sales as SaleRowItem[],
   }));
 
@@ -125,10 +127,11 @@ export default function HistoryScreen() {
     return bTop - aTop;
   });
 
-  // Get unique concerts for filter dropdown
-  const concertOptions = Object.keys(salesByGroup).map((id) => ({
+  // Get unique concerts for filter dropdown — use allConcertIds so options
+  // stay stable when a filter is active (salesByGroup only has filtered data).
+  const concertOptions = allConcertIds.map((id) => ({
     id,
-    name: concertNames[id] ?? id,
+    name: concertNames[id] ?? (id || 'No concert'),
   }));
 
   return (
@@ -146,11 +149,11 @@ export default function HistoryScreen() {
           accessibilityLabel="Filter by concert"
         >
           <Text style={styles.filterBtnText}>
-            {filter ? (concertNames[filter] ?? filter) : 'All Concerts'}
+            {filter !== null ? (concertNames[filter] ?? (filter || 'No concert')) : 'All Concerts'}
           </Text>
           <Text style={styles.filterBtnChevron}>{filterOpen ? '▲' : '▼'}</Text>
         </Pressable>
-        {filter && (
+        {filter !== null && (
           <Pressable
             onPress={() => setFilter(null)}
             style={styles.clearFilterBtn}
@@ -165,11 +168,11 @@ export default function HistoryScreen() {
       {filterOpen && (
         <View style={styles.filterDropdown}>
           <Pressable
-            style={[styles.filterOption, !filter && styles.filterOptionSelected]}
+            style={[styles.filterOption, filter === null && styles.filterOptionSelected]}
             onPress={() => { setFilter(null); setFilterOpen(false); }}
             accessibilityLabel="All Concerts"
           >
-            <Text style={[styles.filterOptionText, !filter && styles.filterOptionTextSelected]}>
+            <Text style={[styles.filterOptionText, filter === null && styles.filterOptionTextSelected]}>
               All Concerts
             </Text>
           </Pressable>

@@ -33,7 +33,7 @@ const SaleSchema = new mongoose.Schema({
   concertId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Concert',
-    required: true
+    required: false
   },
   items: [SaleItemSchema],
   totalAmount: {

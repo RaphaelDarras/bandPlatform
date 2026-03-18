@@ -28,6 +28,13 @@ export async function apiGetSales(concertId?: string): Promise<ApiSale[]> {
 }
 
 /**
+ * PATCH /sales/:id — update mutable fields (concertId).
+ */
+export async function apiUpdateSale(id: string, data: { concertId?: string }): Promise<void> {
+  await apiClient.patch(`/sales/${id}`, data);
+}
+
+/**
  * POST /sales/:id/void — void a sale on the server.
  */
 export async function apiVoidSale(id: string): Promise<void> {

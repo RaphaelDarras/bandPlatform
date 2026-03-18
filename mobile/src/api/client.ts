@@ -34,11 +34,11 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: on 401, clear auth state
+// Response interceptor: on 401/403, clear auth state so the user is sent back to login
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
       useAuthStore.getState().clearAuth();
     }
     return Promise.reject(error);

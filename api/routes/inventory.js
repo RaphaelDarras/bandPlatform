@@ -367,26 +367,14 @@ router.post('/restock', async (req, res) => {
     const variant = product.variants.find(v => v.sku === variantSku);
     const stockBefore = variant.stock;
 
-    // Optimistic locking update - atomically increase stock with version check
     const updatedProduct = await Product.findOneAndUpdate(
-      {
-        _id: productId,
-        variants: { $elemMatch: { sku: variantSku, version: variant.version } }
-      },
-      {
-        $inc: {
-          'variants.$.stock': quantity,
-          'variants.$.version': 1
-        }
-      },
+      { _id: productId, 'variants.sku': variantSku },
+      { $inc: { 'variants.$.stock': quantity } },
       { new: true }
     );
 
-    // Check for version conflict
     if (!updatedProduct) {
-      return res.status(409).json({
-        error: 'Stock conflict - version mismatch. Please retry with updated stock data.'
-      });
+      return res.status(404).json({ error: 'Product or variant not found' });
     }
 
     // Capture stockAfter from updated variant
@@ -409,7 +397,6 @@ router.post('/restock', async (req, res) => {
       success: true,
       stockBefore,
       stockAfter,
-      version: updatedVariant.version,
       adjustmentId: auditRecord._id
     });
   } catch (error) {

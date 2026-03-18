@@ -44,6 +44,7 @@ export default function ReviewScreen() {
   const setCurrency = useCartStore((state) => state.setCurrency);
   const setDiscount = useCartStore((state) => state.setDiscount);
 
+  const setConcertId = useCartStore((state) => state.setConcertId);
   const { recordSale } = useSaleRecording();
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
@@ -77,10 +78,11 @@ export default function ReviewScreen() {
     setLoading(true);
     try {
       await recordSale(paymentMethod);
+      setConcertId(null);
       Alert.alert('Sale recorded!', '', [
         {
           text: 'OK',
-          onPress: () => router.replace('/selling'),
+          onPress: () => router.dismiss(2),
         },
       ]);
     } catch (err) {

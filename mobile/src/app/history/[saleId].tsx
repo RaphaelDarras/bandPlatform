@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,10 +13,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getDb } from '@/db';
-import { getLocalSales } from '@/db/sales';
+import { getLocalSales, updateSaleConcert } from '@/db/sales';
 import type { LocalSaleRow } from '@/db/sales';
 import { useHistory } from '@/features/history/useHistory';
-import { getCachedConcerts } from '@/db/concerts';
+import * as Crypto from 'expo-crypto';
+import { requestSync } from '@/features/sync/SyncManager';
+import { apiClient } from '@/api/client';
+import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
+
+function concertLabel(c: CachedConcert): string {
+  const location = [c.venue || c.city, c.country].filter(Boolean).join(', ');
+  const date = new Date(c.date).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+  return location ? `${location} — ${date}` : date;
+}
 
 interface ParsedItem {
   productId: string;
@@ -46,6 +58,9 @@ export default function SaleDetailScreen() {
 
   const [sale, setSale] = useState<SaleDetail | null>(null);
   const [concertName, setConcertName] = useState<string>('');
+  const [concertId, setConcertId] = useState<string>('');
+  const [concerts, setConcerts] = useState<CachedConcert[]>([]);
+  const [showConcertPicker, setShowConcertPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -63,10 +78,13 @@ export default function SaleDetailScreen() {
         };
         setSale(detail);
 
-        // Load concert name
-        const concerts = await getCachedConcerts(db);
-        const concert = concerts.find((c) => c.id === row.concertId);
-        setConcertName(concert?.name ?? row.concertId);
+        const allConcerts = await getCachedConcerts(db);
+        setConcerts(allConcerts);
+
+        const rawConcertId = (row as unknown as { concert_id: string }).concert_id ?? row.concertId ?? '';
+        setConcertId(rawConcertId);
+        const concert = allConcerts.find((c) => c.id === rawConcertId);
+        setConcertName(concert ? concertLabel(concert) : (rawConcertId || 'No concert'));
       }
     } catch (err) {
       console.error('[SaleDetailScreen] Load error:', err);
@@ -74,6 +92,38 @@ export default function SaleDetailScreen() {
       setLoading(false);
     }
   }, [saleId]);
+
+  const handleAssignConcert = useCallback(async (selectedId: string) => {
+    if (!saleId) return;
+    setShowConcertPicker(false);
+    try {
+      const db = await getDb();
+      const now = Date.now();
+      // 1. Update local SQLite
+      await updateSaleConcert(db, saleId, selectedId);
+      // 2. Queue outbox entry — idempotency key ensures only the latest assignment wins
+      await db.runAsync(
+        `INSERT OR REPLACE INTO outbox
+         (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
+         VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
+        [
+          Crypto.randomUUID(),
+          'sale_update_concert',
+          JSON.stringify({ saleId, concertId: selectedId }),
+          `sale_update_concert:${saleId}`,   // one active entry per sale — INSERT OR REPLACE overwrites previous
+          now,
+        ]
+      );
+      setConcertId(selectedId);
+      const concert = concerts.find((c) => c.id === selectedId);
+      setConcertName(concert ? concertLabel(concert) : (selectedId || 'No concert'));
+      // Kick off sync immediately (fire-and-forget)
+      requestSync(db, apiClient);
+    } catch (err) {
+      console.error('[SaleDetailScreen] Assign concert error:', err);
+      Alert.alert('Error', 'Failed to assign concert.');
+    }
+  }, [saleId, concerts]);
 
   useEffect(() => {
     loadSale();
@@ -188,7 +238,16 @@ export default function SaleDetailScreen() {
         <View style={styles.card}>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Concert</Text>
-            <Text style={styles.metaValue}>{concertName}</Text>
+            <View style={styles.metaValueRow}>
+              <Text style={styles.metaValue}>{concertName}</Text>
+              <Pressable
+                onPress={() => setShowConcertPicker(true)}
+                accessibilityLabel="Change concert"
+                style={styles.changeBtn}
+              >
+                <Text style={styles.changeBtnText}>Change</Text>
+              </Pressable>
+            </View>
           </View>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Date & Time</Text>
@@ -305,6 +364,45 @@ export default function SaleDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Concert picker modal */}
+      <Modal
+        visible={showConcertPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowConcertPicker(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowConcertPicker(false)}>
+          <View style={styles.pickerSheet}>
+            <Text style={styles.pickerTitle}>Assign Concert</Text>
+
+            <Pressable
+              style={[styles.pickerOption, !concertId && styles.pickerOptionSelected]}
+              onPress={() => handleAssignConcert('')}
+            >
+              <Text style={[styles.pickerOptionText, !concertId && styles.pickerOptionTextSelected]}>
+                No concert
+              </Text>
+            </Pressable>
+
+            {concerts.map((c) => (
+              <Pressable
+                key={c.id}
+                style={[styles.pickerOption, concertId === c.id && styles.pickerOptionSelected]}
+                onPress={() => handleAssignConcert(c.id)}
+              >
+                <Text style={[styles.pickerOptionText, concertId === c.id && styles.pickerOptionTextSelected]}>
+                  {concertLabel(c)}
+                </Text>
+              </Pressable>
+            ))}
+
+            <Pressable style={styles.pickerCancel} onPress={() => setShowConcertPicker(false)}>
+              <Text style={styles.pickerCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -361,6 +459,18 @@ const styles = StyleSheet.create({
   },
   metaLabel: { fontSize: 14, color: '#888', fontWeight: '500', flex: 1 },
   metaValue: { fontSize: 14, color: '#1a1a1a', fontWeight: '600', flex: 2, textAlign: 'right' },
+  metaValueRow: { flex: 2, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
+  changeBtn: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: '#EBF4FF' },
+  changeBtnText: { fontSize: 12, color: '#208AEF', fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  pickerSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, gap: 4 },
+  pickerTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', marginBottom: 8, textAlign: 'center' },
+  pickerOption: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 10 },
+  pickerOptionSelected: { backgroundColor: '#EBF4FF' },
+  pickerOptionText: { fontSize: 15, color: '#333' },
+  pickerOptionTextSelected: { color: '#208AEF', fontWeight: '700' },
+  pickerCancel: { paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  pickerCancelText: { fontSize: 15, color: '#ef4444', fontWeight: '600' },
   voidedText: { color: '#dc2626' },
   itemRow: {
     flexDirection: 'row',
