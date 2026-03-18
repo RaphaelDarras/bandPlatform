@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
-import React from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { apiClient } from '@/api/client';
+import { getDb } from '@/db';
+import { requestSync } from '@/features/sync/SyncManager';
+import { useStock } from '@/features/stock/useStock';
 import { useSyncStore } from '@/stores/syncStore';
+import { formatRelativeTime } from '@/utils/formatRelativeTime';
 
 interface ActionCard {
   id: string;
@@ -21,18 +27,48 @@ interface ActionCard {
   primary?: boolean;
   badge?: number;
   badgeColor?: string;
+  alert?: boolean;
+  disabled?: boolean;
 }
 
 function SyncIndicator() {
-  const { isOnline, pendingCount } = useSyncStore();
+  const { isOnline, pendingCount, lastSyncAt, consecutiveFailures } = useSyncStore();
+  const [syncing, setSyncing] = useState(false);
 
-  const color = !isOnline ? '#ef4444' : pendingCount > 0 ? '#f59e0b' : '#22c55e';
-  const label = !isOnline ? 'Offline' : pendingCount > 0 ? `${pendingCount} pending` : 'Online';
+  const color = !isOnline ? '#ef4444'
+    : (pendingCount > 0 || consecutiveFailures > 0) ? '#f59e0b'
+    : '#22c55e';
+
+  const statusLabel = !isOnline ? 'Offline' : pendingCount > 0 ? `${pendingCount} pending` : 'Online';
+  const lastSyncLabel = lastSyncAt ? formatRelativeTime(lastSyncAt) : '';
+  const fullLabel = lastSyncLabel ? `${statusLabel} · ${lastSyncLabel}` : statusLabel;
+
+  const handleSyncNow = useCallback(async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const db = await getDb();
+      await requestSync(db, apiClient);
+    } finally {
+      setSyncing(false);
+    }
+  }, [syncing]);
 
   return (
     <View style={styles.syncRow}>
       <View style={[styles.syncDot, { backgroundColor: color }]} />
-      <Text style={styles.syncLabel}>{label}</Text>
+      <Text style={styles.syncLabel}>{fullLabel}</Text>
+      <Pressable
+        onPress={handleSyncNow}
+        disabled={syncing}
+        accessibilityLabel="Sync now"
+        style={styles.syncNowBtn}
+      >
+        {syncing
+          ? <ActivityIndicator size="small" color="#888" />
+          : <Text style={styles.syncNowIcon}>{'↻'}</Text>
+        }
+      </Pressable>
     </View>
   );
 }
@@ -43,10 +79,13 @@ function ActionCardItem({ card }: { card: ActionCard }) {
       style={({ pressed }) => [
         styles.card,
         card.primary && styles.cardPrimary,
-        pressed && styles.cardPressed,
+        card.alert && styles.cardAlert,
+        card.disabled && styles.cardDisabled,
+        pressed && !card.disabled && styles.cardPressed,
       ]}
-      onPress={card.onPress}
+      onPress={card.disabled ? undefined : card.onPress}
       accessibilityLabel={card.title}
+      disabled={card.disabled}
     >
       <View style={styles.cardIcon}>
         <Text style={styles.cardIconText}>{card.icon}</Text>
@@ -68,15 +107,27 @@ function ActionCardItem({ card }: { card: ActionCard }) {
 
 export default function DashboardScreen() {
   const { t } = useTranslation();
+  const { products, needsReproduction, refreshStock } = useStock();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshStock();
+    }, [refreshStock])
+  );
+
+  const hasProducts = products.length > 0;
 
   const actionCards: ActionCard[] = [
     {
       id: 'selling',
       title: 'Start Selling',
-      subtitle: 'Open the selling screen',
+      subtitle: hasProducts
+        ? 'Open the selling screen'
+        : 'Connect to internet to load products first',
       icon: '🎸',
-      onPress: () => router.push('/selling' as never),
+      onPress: hasProducts ? () => router.push('/selling' as never) : () => {},
       primary: true,
+      disabled: !hasProducts,
     },
     {
       id: 'concerts',
@@ -104,9 +155,10 @@ export default function DashboardScreen() {
       title: 'Needs Restock',
       subtitle: 'Items with negative stock',
       icon: '⚠️',
-      onPress: () => router.push('/restock' as never),
-      badge: 0,
+      onPress: () => router.push('/deficit' as never),
+      badge: needsReproduction.length,
       badgeColor: '#ef4444',
+      alert: needsReproduction.length > 0,
     },
     {
       id: 'restock',
@@ -185,6 +237,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  syncNowBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  syncNowIcon: {
+    fontSize: 16,
+    color: '#666',
+  },
   grid: {
     padding: 12,
     gap: 12,
@@ -210,6 +270,15 @@ const styles = StyleSheet.create({
   },
   cardPrimary: {
     backgroundColor: '#208AEF',
+  },
+  cardAlert: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+  },
+  cardDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#e5e7eb',
   },
   cardPressed: {
     opacity: 0.85,
