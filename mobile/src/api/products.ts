@@ -81,9 +81,10 @@ export async function apiUpdateProduct(
 }
 
 /**
- * PATCH /products/:id — deactivates a product (soft delete).
+ * DELETE /products/:id — deactivates a product (soft delete).
+ * Server sets active: false internally; no request body needed.
  */
 export async function apiDeactivateProduct(id: string): Promise<ApiProduct> {
-  const response = await apiClient.patch<unknown>(`products/${id}`, { active: false });
+  const response = await apiClient.delete<unknown>(`products/${id}`);
   return mapProduct(response.data);
 }
