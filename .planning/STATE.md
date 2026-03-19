@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-mobile-pos-optimization-03-03-PLAN.md
-last_updated: "2026-03-18T20:58:55.689Z"
+stopped_at: Completed 02-mobile-pos-core-02-08-PLAN.md
+last_updated: "2026-03-19T20:43:43.657Z"
 last_activity: 2026-03-18 — Post-Phase 2 production bug fixes and feature additions
 progress:
   total_phases: 7
-  completed_phases: 3
-  total_plans: 16
-  completed_plans: 16
+  completed_phases: 2
+  total_plans: 18
+  completed_plans: 17
   percent: 77
 ---
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 77%
 | Phase 03-mobile-pos-optimization P01 | 3 | 2 tasks | 7 files |
 | Phase 03-mobile-pos-optimization P02 | 4min | 2 tasks | 3 files |
 | Phase 03-mobile-pos-optimization P03 | 2 | 1 tasks | 4 files |
+| Phase 02-mobile-pos-core P08 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,9 @@ Recent decisions affecting current work:
 - [Phase 03-mobile-pos-optimization]: closeConcert() still returns ConcertTotals; concert detail calls getConcertReport() separately after close to get full report
 - [Phase 03-mobile-pos-optimization]: handleSyncNow uses local useState syncing flag (not syncStore) — spinner state is purely local UI concern
 - [Phase 03-mobile-pos-optimization]: cardDisabled style appears after cardPrimary in StyleSheet array — ensures gray background overrides blue for disabled primary card
+- [Phase 02-mobile-pos-core]: getLocalSales SELECT aliases all snake_case columns to camelCase at query level — removes need for runtime casts throughout the app
+- [Phase 02-mobile-pos-core]: voidSale/unvoidSale accept optional items array — callers with pre-loaded parsedItems pass them directly, avoiding salesByGroup lookup that is empty in standalone screens
+- [Phase 02-mobile-pos-core]: apiDeactivateProduct switched from PATCH to DELETE — server only exposes DELETE route for soft-delete deactivation
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -162,8 +166,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T20:55:32.028Z
-Stopped at: Completed 03-mobile-pos-optimization-03-03-PLAN.md
+Last session: 2026-03-19T20:43:43.654Z
+Stopped at: Completed 02-mobile-pos-core-02-08-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
