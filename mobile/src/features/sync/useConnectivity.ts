@@ -18,7 +18,11 @@ export function useConnectivitySync(
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const isOnline = !!(state.isConnected && state.isInternetReachable);
+      const deviceOnline = !!(state.isConnected && state.isInternetReachable);
+      const { consecutiveFailures } = useSyncStore.getState();
+
+      // Device has network BUT server is unreachable (3+ consecutive sync failures)
+      const isOnline = deviceOnline && consecutiveFailures < 3;
       useSyncStore.getState().setIsOnline(isOnline);
 
       // Trigger sync when transitioning from offline to online

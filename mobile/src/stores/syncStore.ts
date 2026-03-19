@@ -43,6 +43,11 @@ export const useSyncStore = create<SyncStore>()(
     {
       name: 'sync',
       storage: createJSONStorage(() => mmkvStorage),
+      partialize: (state) => ({
+        pendingCount: state.pendingCount,
+        lastSyncAt: state.lastSyncAt,
+        consecutiveFailures: state.consecutiveFailures,
+      }),
     }
   )
 );
