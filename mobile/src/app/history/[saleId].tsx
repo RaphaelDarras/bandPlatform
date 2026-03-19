@@ -38,7 +38,6 @@ interface ParsedItem {
 
 interface SaleDetail extends LocalSaleRow {
   parsedItems: ParsedItem[];
-  total_amount?: number; // actual SQLite column (snake_case)
 }
 
 function formatTimestamp(ts: number): string {
@@ -81,7 +80,7 @@ export default function SaleDetailScreen() {
         const allConcerts = await getCachedConcerts(db);
         setConcerts(allConcerts);
 
-        const rawConcertId = (row as unknown as { concert_id: string }).concert_id ?? row.concertId ?? '';
+        const rawConcertId = row.concertId ?? '';
         setConcertId(rawConcertId);
         const concert = allConcerts.find((c) => c.id === rawConcertId);
         setConcertName(concert ? concertLabel(concert) : (rawConcertId || 'No concert'));
@@ -142,7 +141,7 @@ export default function SaleDetailScreen() {
           onPress: async () => {
             setActionLoading(true);
             try {
-              await voidSale(sale.id);
+              await voidSale(sale.id, sale.parsedItems);
               setSale((prev) => prev ? { ...prev, voided: 1 } : prev);
             } catch (err) {
               console.error('[SaleDetailScreen] Void error:', err);
@@ -168,7 +167,7 @@ export default function SaleDetailScreen() {
           onPress: async () => {
             setActionLoading(true);
             try {
-              await unvoidSale(sale.id);
+              await unvoidSale(sale.id, sale.parsedItems);
               setSale((prev) => prev ? { ...prev, voided: 0 } : prev);
             } catch (err) {
               console.error('[SaleDetailScreen] Unvoid error:', err);
@@ -203,7 +202,7 @@ export default function SaleDetailScreen() {
   }
 
   const isVoided = sale.voided === 1;
-  const totalAmount = (sale as unknown as Record<string, number>)['total_amount'] ?? sale.totalAmount ?? 0;
+  const totalAmount = sale.totalAmount ?? 0;
 
   // Calculate subtotal from items
   const subtotal = sale.parsedItems.reduce(

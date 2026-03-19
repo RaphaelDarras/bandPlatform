@@ -7,6 +7,14 @@ export interface LocalSaleRow extends Omit<LocalSale, 'items'> {
   voided_at: number | null;
   synced: number;
   created_at: number;
+  // Aliased camelCase columns from SELECT aliases (SQLite returns snake_case by default)
+  discountType: 'flat' | 'percent';
+  totalAmount: number;
+  paymentMethod: string;
+  concertId: string;
+  createdAt: number;
+  voidedAt: number | null;
+  itemsJson: string;
 }
 
 /**
@@ -16,14 +24,24 @@ export async function getLocalSales(
   db: SQLite.SQLiteDatabase,
   concertId?: string
 ): Promise<LocalSaleRow[]> {
+  const selectCols = `
+    *,
+    discount_type   AS discountType,
+    total_amount    AS totalAmount,
+    payment_method  AS paymentMethod,
+    concert_id      AS concertId,
+    created_at      AS createdAt,
+    voided_at       AS voidedAt,
+    items_json      AS itemsJson
+  `;
   if (concertId !== undefined) {
     return db.getAllAsync<LocalSaleRow>(
-      `SELECT * FROM sales WHERE concert_id = ? ORDER BY created_at DESC`,
+      `SELECT ${selectCols} FROM sales WHERE concert_id = ? ORDER BY created_at DESC`,
       [concertId]
     );
   }
   return db.getAllAsync<LocalSaleRow>(
-    `SELECT * FROM sales ORDER BY created_at DESC`
+    `SELECT ${selectCols} FROM sales ORDER BY created_at DESC`
   );
 }
 

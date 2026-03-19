@@ -54,7 +54,7 @@ Plans:
   5. User can see real-time inventory levels that update when app connects to network
   6. User can authenticate into app with PIN or password
   7. App syncs queued offline transactions automatically when connectivity restored
-**Plans**: 7 plans in 3 waves
+**Plans**: 9 plans in 3 waves
 
 Plans:
 - [ ] 02-01-PLAN.md — API extensions: Sale model migration, PIN auth endpoints, Concert CRUD
@@ -64,6 +64,8 @@ Plans:
 - [ ] 02-05-PLAN.md — Selling flow: product grid, variant picker, cart, review screen, sale recording
 - [ ] 02-06-PLAN.md — Concert management screens, transaction history with void/unvoid
 - [ ] 02-07-PLAN.md — Sync manager, stock overview, restock, dashboard wiring, product management
+- [ ] 02-08-PLAN.md — Gap closure: Fix discount display, void stock reversal, product deactivation
+- [ ] 02-09-PLAN.md — Gap closure: i18n settings screen, offline detection improvements
 
 ### Phase 3: Mobile POS Optimization
 **Goal**: Mobile POS operates reliably during 4-6 hour concert events with low-bandwidth sync and inventory reconciliation
@@ -151,7 +153,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Inventory Core | 6/6 | Complete   | 2026-03-13 |
-| 2. Mobile POS Core | 7/7 | Complete   | 2026-03-14 |
+| 2. Mobile POS Core | 7/9 | UAT gap closure | - |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 0/TBD | Not started | - |
 | 5. Online Shop Core | 0/TBD | Not started | - |
@@ -160,4 +162,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 ---
 *Created: 2026-02-13*
-*Last updated: 2026-03-18 after Phase 3 planning (3 plans in 1 wave)*
+*Last updated: 2026-03-19 after Phase 2 UAT gap closure planning (2 gap closure plans)*

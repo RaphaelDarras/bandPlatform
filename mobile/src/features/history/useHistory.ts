@@ -59,10 +59,10 @@ export function useHistory() {
         parsedItems: JSON.parse(row.items_json ?? '[]') as SaleWithItems['parsedItems'],
       }));
 
-      // Group by concertId — SQLite returns snake_case column concert_id
+      // Group by concertId — now aliased in SELECT so sale.concertId is always populated
       const groups: Record<string, SaleWithItems[]> = {};
       for (const sale of sales) {
-        const cid: string = (sale as unknown as { concert_id: string }).concert_id ?? sale.concertId ?? '';
+        const cid: string = sale.concertId ?? '';
         if (!groups[cid]) groups[cid] = [];
         groups[cid].push(sale);
       }
@@ -98,23 +98,34 @@ export function useHistory() {
    * Voids a sale locally and adds an outbox entry for API sync.
    * Also reverses local stock (adds items back).
    * If online, immediately calls the API void endpoint.
+   *
+   * @param items - Optional items array. When provided, stock reversal uses this
+   *   directly instead of searching salesByGroup (which may be empty if the caller
+   *   never loaded history).
    */
-  const voidSale = useCallback(async (saleId: string) => {
+  const voidSale = useCallback(async (
+    saleId: string,
+    items?: Array<{ productId: string; variantSku: string; quantity: number }>
+  ) => {
     const db = await getDb();
 
-    // Find the sale in current state to get items
-    let sale: SaleWithItems | undefined;
-    for (const group of Object.values(salesByGroup)) {
-      sale = group.find((s) => s.id === saleId);
-      if (sale) break;
+    // Use caller-supplied items when available; fall back to salesByGroup lookup
+    let resolvedItems = items;
+    if (!resolvedItems) {
+      let sale: SaleWithItems | undefined;
+      for (const group of Object.values(salesByGroup)) {
+        sale = group.find((s) => s.id === saleId);
+        if (sale) break;
+      }
+      resolvedItems = sale?.parsedItems;
     }
 
     // 1. Void in SQLite
     await voidLocalSale(db, saleId);
 
     // 2. Reverse local stock (add items back)
-    if (sale) {
-      for (const item of sale.parsedItems) {
+    if (resolvedItems) {
+      for (const item of resolvedItems) {
         await updateLocalStock(db, item.productId, item.variantSku, item.quantity);
       }
     }
@@ -150,23 +161,33 @@ export function useHistory() {
    * Unvoids a sale locally and adds an outbox entry for API sync.
    * Also re-deducts local stock.
    * If online, immediately calls the API unvoid endpoint.
+   *
+   * @param items - Optional items array. When provided, stock deduction uses this
+   *   directly instead of searching salesByGroup.
    */
-  const unvoidSale = useCallback(async (saleId: string) => {
+  const unvoidSale = useCallback(async (
+    saleId: string,
+    items?: Array<{ productId: string; variantSku: string; quantity: number }>
+  ) => {
     const db = await getDb();
 
-    // Find the sale in current state to get items
-    let sale: SaleWithItems | undefined;
-    for (const group of Object.values(salesByGroup)) {
-      sale = group.find((s) => s.id === saleId);
-      if (sale) break;
+    // Use caller-supplied items when available; fall back to salesByGroup lookup
+    let resolvedItems = items;
+    if (!resolvedItems) {
+      let sale: SaleWithItems | undefined;
+      for (const group of Object.values(salesByGroup)) {
+        sale = group.find((s) => s.id === saleId);
+        if (sale) break;
+      }
+      resolvedItems = sale?.parsedItems;
     }
 
     // 1. Unvoid in SQLite
     await unvoidLocalSale(db, saleId);
 
     // 2. Re-deduct local stock (apply sale again)
-    if (sale) {
-      for (const item of sale.parsedItems) {
+    if (resolvedItems) {
+      for (const item of resolvedItems) {
         await updateLocalStock(db, item.productId, item.variantSku, -item.quantity);
       }
     }
