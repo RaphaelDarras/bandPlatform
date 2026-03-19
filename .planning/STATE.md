@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-mobile-pos-core-02-08-PLAN.md
-last_updated: "2026-03-19T20:43:43.657Z"
+stopped_at: Completed 02-mobile-pos-core-02-09-PLAN.md
+last_updated: "2026-03-19T20:46:33.496Z"
 last_activity: 2026-03-18 — Post-Phase 2 production bug fixes and feature additions
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 77
 ---
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 77%
 | Phase 03-mobile-pos-optimization P02 | 4min | 2 tasks | 3 files |
 | Phase 03-mobile-pos-optimization P03 | 2 | 1 tasks | 4 files |
 | Phase 02-mobile-pos-core P08 | 2min | 2 tasks | 4 files |
+| Phase 02-mobile-pos-core P09 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -132,6 +133,8 @@ Recent decisions affecting current work:
 - [Phase 02-mobile-pos-core]: getLocalSales SELECT aliases all snake_case columns to camelCase at query level — removes need for runtime casts throughout the app
 - [Phase 02-mobile-pos-core]: voidSale/unvoidSale accept optional items array — callers with pre-loaded parsedItems pass them directly, avoiding salesByGroup lookup that is empty in standalone screens
 - [Phase 02-mobile-pos-core]: apiDeactivateProduct switched from PATCH to DELETE — server only exposes DELETE route for soft-delete deactivation
+- [Phase 02-mobile-pos-core]: partialize in syncStore excludes isOnline from MMKV — cold start always defaults to false
+- [Phase 02-mobile-pos-core]: consecutiveFailures threshold of 3 in NetInfo listener determines server reachability (no store subscription needed)
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -166,8 +169,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T20:43:43.654Z
-Stopped at: Completed 02-mobile-pos-core-02-08-PLAN.md
+Last session: 2026-03-19T20:46:33.491Z
+Stopped at: Completed 02-mobile-pos-core-02-09-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
