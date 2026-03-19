@@ -58,5 +58,16 @@
     "offline": "Hors ligne",
     "pending": "{{count}} en attente",
     "lastSync": "Dernière sync : {{time}}"
+  },
+  "settings": {
+    "language": "Langue / Language",
+    "french": "Francais",
+    "appearance": "Apparence",
+    "darkMode": "Mode sombre",
+    "security": "Securite",
+    "changePin": "Changer le PIN",
+    "about": "A propos",
+    "version": "Version",
+    "logoutConfirm": "Voulez-vous vraiment vous deconnecter ?"
   }
 }

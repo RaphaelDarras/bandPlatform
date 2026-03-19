@@ -54,7 +54,7 @@ export default function SettingsScreen() {
   function handleLogout() {
     Alert.alert(
       t('auth.logout'),
-      'Are you sure you want to log out?',
+      t('settings.logoutConfirm'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -76,9 +76,9 @@ export default function SettingsScreen() {
 
         {/* Language */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Language / Langue</Text>
+          <Text style={styles.sectionHeader}>{t('settings.language')}</Text>
           <SettingRow
-            label="Francais"
+            label={t('settings.french')}
             right={
               <Switch
                 value={isFrench}
@@ -92,9 +92,9 @@ export default function SettingsScreen() {
 
         {/* Theme */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Appearance</Text>
+          <Text style={styles.sectionHeader}>{t('settings.appearance')}</Text>
           <SettingRow
-            label="Dark mode"
+            label={t('settings.darkMode')}
             right={
               <Switch
                 value={isDark}
@@ -108,21 +108,21 @@ export default function SettingsScreen() {
 
         {/* Security */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>Security</Text>
+          <Text style={styles.sectionHeader}>{t('settings.security')}</Text>
           <Pressable
             style={({ pressed }) => [styles.row, styles.rowPressable, pressed && styles.rowPressed]}
             onPress={() => router.push('/change-pin' as never)}
           >
-            <Text style={styles.rowLabel}>Change PIN</Text>
+            <Text style={styles.rowLabel}>{t('settings.changePin')}</Text>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
         </View>
 
         {/* Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeader}>About</Text>
+          <Text style={styles.sectionHeader}>{t('settings.about')}</Text>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Version</Text>
+            <Text style={styles.rowLabel}>{t('settings.version')}</Text>
             <Text style={styles.rowValue}>{APP_VERSION}</Text>
           </View>
         </View>
