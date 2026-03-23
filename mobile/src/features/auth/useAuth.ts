@@ -22,6 +22,9 @@ export function useAuth() {
   async function login(pin: string): Promise<void> {
     setIsLoading(true);
     try {
+      // Reset stale sync timestamp from previous session
+      useSyncStore.getState().setLastSyncAt(Date.now());
+
       if (isOnline) {
         // Online login path
         try {

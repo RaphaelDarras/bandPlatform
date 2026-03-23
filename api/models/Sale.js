@@ -42,9 +42,13 @@ const SaleSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'etransfer', 'paypal', 'other'],
+    enum: ['cash', 'card', 'etransfer', 'paypal', 'split', 'other'],
     default: 'cash'
   },
+  paymentSplit: [{
+    method: { type: String, enum: ['cash', 'card', 'etransfer', 'paypal'] },
+    amount: { type: Number },
+  }],
   currency: {
     type: String,
     default: 'EUR'

@@ -55,7 +55,17 @@ export async function requestSync(
   try {
     const pendingRows = await getPendingOutboxRows(db);
     if (pendingRows.length === 0) {
-      useSyncStore.getState().setPendingCount(0);
+      // Outbox empty — ping server to verify reachability before claiming online
+      try {
+        await apiClient.get('concerts', { timeout: 5000 });
+        useSyncStore.getState().resetFailures();
+        useSyncStore.getState().setIsOnline(true);
+        useSyncStore.getState().setPendingCount(0);
+        useSyncStore.getState().setLastSyncAt(Date.now());
+      } catch {
+        useSyncStore.getState().incrementFailures();
+        useSyncStore.getState().setIsOnline(false);
+      }
       return;
     }
 
@@ -93,10 +103,27 @@ async function processSaleCreateBatch(
 
   const sales = rows.map((row) => {
     const payload = JSON.parse(row.payload);
+    // Resolve paymentMethod: handle split format "Card:10/Cash:15" from old outbox entries
+    let resolvedPM = payload.paymentMethod ?? 'cash';
+    if (resolvedPM.includes('/') && resolvedPM.includes(':')) {
+      // Split payment — extract individual methods for paymentSplit, set method to 'split'
+      if (!payload.paymentSplit) {
+        payload.paymentSplit = resolvedPM.split('/').map((part: string) => {
+          const colonIdx = part.indexOf(':');
+          const label = part.substring(0, colonIdx).trim();
+          const amount = parseFloat(part.substring(colonIdx + 1)) || 0;
+          return { method: PAYMENT_METHOD_MAP[label] ?? label.toLowerCase(), amount };
+        });
+      }
+      resolvedPM = 'split';
+    } else {
+      resolvedPM = PAYMENT_METHOD_MAP[resolvedPM] ?? resolvedPM.toLowerCase();
+    }
+
     const sale: Record<string, unknown> = {
       ...payload,
       idempotencyKey: row.idempotency_key,
-      paymentMethod: PAYMENT_METHOD_MAP[payload.paymentMethod] ?? payload.paymentMethod.toLowerCase(),
+      paymentMethod: resolvedPM,
     };
     // Drop empty concertId — backend expects a valid ObjectId or nothing
     if (!sale.concertId) {
@@ -114,6 +141,7 @@ async function processSaleCreateBatch(
       await markOutboxDone(db, row.id);
     }
     useSyncStore.getState().resetFailures();
+    useSyncStore.getState().setIsOnline(true);
     useSyncStore.getState().setLastSyncAt(Date.now());
   } catch (err: unknown) {
     const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
@@ -127,12 +155,15 @@ async function processSaleCreateBatch(
       const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
       await incrementAttempt(db, row.id, Date.now() + delay);
     }
-    useSyncStore.getState().incrementFailures();
 
-    const state = useSyncStore.getState();
-    if (state.consecutiveFailures >= CONSECUTIVE_FAILURE_THRESHOLD) {
-      // Alert threshold reached — UI layer listens to consecutiveFailures in the store
-      // No direct Alert call here — keeps SyncManager testable and UI-agnostic
+    // Distinguish network errors from server errors:
+    // - Server responded (4xx/5xx): server is reachable, data is bad → stay online
+    // - No response (timeout, network down): server unreachable → increment failures
+    if (axiosErr.response) {
+      // Server responded — it's online, the payload is just invalid
+      useSyncStore.getState().setIsOnline(true);
+    } else {
+      useSyncStore.getState().incrementFailures();
     }
   }
 }
@@ -159,11 +190,17 @@ async function processOtherRow(
 
     await markOutboxDone(db, row.id);
     useSyncStore.getState().resetFailures();
+    useSyncStore.getState().setIsOnline(true);
     useSyncStore.getState().setLastSyncAt(Date.now());
-  } catch {
+  } catch (err: unknown) {
     const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
     await incrementAttempt(db, row.id, Date.now() + delay);
-    useSyncStore.getState().incrementFailures();
+    const axiosErr = err as { response?: unknown };
+    if (axiosErr.response) {
+      useSyncStore.getState().setIsOnline(true);
+    } else {
+      useSyncStore.getState().incrementFailures();
+    }
   }
 }
 

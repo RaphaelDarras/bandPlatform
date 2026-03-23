@@ -130,7 +130,7 @@ export function useHistory() {
       }
     }
 
-    // 3. Add outbox entry for background API sync
+    // 3. Add outbox entry for background API sync (include items for stock delta computation)
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
     await db.runAsync(
@@ -140,7 +140,7 @@ export function useHistory() {
       [
         outboxId,
         'sale_void',
-        JSON.stringify({ saleId }),
+        JSON.stringify({ saleId, items: resolvedItems }),
         `sale_void:${saleId}`,
         now,
       ]
@@ -149,6 +149,8 @@ export function useHistory() {
     // 4. Try immediate API call (best effort — outbox handles retry if offline)
     try {
       await apiVoidSale(saleId);
+      // Success — mark outbox done so refreshStock won't double-count the delta
+      await db.runAsync(`UPDATE outbox SET status = 'done' WHERE id = ?`, [outboxId]);
     } catch {
       // Offline or API error — outbox will sync later
     }
@@ -192,7 +194,7 @@ export function useHistory() {
       }
     }
 
-    // 3. Add outbox entry for background API sync
+    // 3. Add outbox entry for background API sync (include items for stock delta computation)
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
     await db.runAsync(
@@ -202,7 +204,7 @@ export function useHistory() {
       [
         outboxId,
         'sale_unvoid',
-        JSON.stringify({ saleId }),
+        JSON.stringify({ saleId, items: resolvedItems }),
         `sale_unvoid:${saleId}`,
         now,
       ]
@@ -211,6 +213,8 @@ export function useHistory() {
     // 4. Try immediate API call (best effort)
     try {
       await apiUnvoidSale(saleId);
+      // Success — mark outbox done so refreshStock won't double-count the delta
+      await db.runAsync(`UPDATE outbox SET status = 'done' WHERE id = ?`, [outboxId]);
     } catch {
       // Offline or API error — outbox will sync later
     }

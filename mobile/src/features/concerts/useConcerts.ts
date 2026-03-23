@@ -106,18 +106,30 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
     return sum + items.reduce((iSum, item) => iSum + item.quantity, 0);
   }, 0);
 
-  // Compute variant breakdowns from non-voided
+  // Compute variant breakdowns from non-voided, distributing sale-level discount proportionally
   const variantMap = new Map<string, VariantSaleBreakdown>();
   for (const s of nonVoided) {
     const currency = s.currency || 'EUR';
     const items = JSON.parse(s.items_json ?? '[]') as LocalSaleItem[];
+
+    // Compute discount ratio for this sale
+    const subtotal = items.reduce((sum, i) => sum + i.priceAtSale * i.quantity, 0);
+    const rawDiscount = s.discount ?? 0;
+    const discountType = s.discountType ?? 'flat';
+    const discountAmount = subtotal > 0
+      ? (discountType === 'flat' ? rawDiscount : subtotal * (rawDiscount / 100))
+      : 0;
+    const discountRatio = subtotal > 0 ? discountAmount / subtotal : 0;
+
     for (const item of items) {
       const key = `${item.productId}:${item.variantSku}:${currency}`;
       const lookup = productMap.get(`${item.productId}:${item.variantSku}`);
+      const grossRevenue = item.priceAtSale * item.quantity;
+      const netRevenue = grossRevenue * (1 - discountRatio);
       const existing = variantMap.get(key);
       if (existing) {
         existing.quantitySold += item.quantity;
-        existing.revenue += item.priceAtSale * item.quantity;
+        existing.revenue += netRevenue;
       } else {
         variantMap.set(key, {
           productId: item.productId,
@@ -125,7 +137,7 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
           variantSku: item.variantSku,
           variantLabel: lookup?.variantLabel ?? item.variantSku,
           quantitySold: item.quantity,
-          revenue: item.priceAtSale * item.quantity,
+          revenue: netRevenue,
           currency,
         });
       }
@@ -136,13 +148,12 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
   );
 
   // Compute payment breakdowns from non-voided
+  // Split payments (e.g., "Card:10.00/Cash:15.00") are parsed and distributed to individual methods
   const paymentMap = new Map<string, PaymentMethodBreakdown>();
-  for (const s of nonVoided) {
-    const rawMethod = s.paymentMethod || (s as unknown as Record<string, string>)['payment_method'] || '';
-    const normalised = rawMethod.toLowerCase();
-    const currency = s.currency || 'EUR';
-    const key = `${normalised}:${currency}`;
-    const amount = (s as unknown as Record<string, number>)['total_amount'] ?? s.totalAmount ?? 0;
+
+  function addToPaymentMap(method: string, amount: number, saleCurrency: string) {
+    const normalised = method.toLowerCase();
+    const key = `${normalised}:${saleCurrency}`;
     const existing = paymentMap.get(key);
     if (existing) {
       existing.revenue += amount;
@@ -150,13 +161,37 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
     } else {
       paymentMap.set(key, {
         method: normalised,
-        displayLabel: toDisplayLabel(rawMethod),
+        displayLabel: toDisplayLabel(method),
         revenue: amount,
-        currency,
+        currency: saleCurrency,
         transactionCount: 1,
       });
     }
   }
+
+  for (const s of nonVoided) {
+    const rawMethod = s.paymentMethod || (s as unknown as Record<string, string>)['payment_method'] || '';
+    const currency = s.currency || 'EUR';
+    const amount = (s as unknown as Record<string, number>)['total_amount'] ?? s.totalAmount ?? 0;
+
+    // Check if this is a split payment (format: "Card:10.00/Cash:15.00")
+    if (rawMethod.includes('/') && rawMethod.includes(':')) {
+      const parts = rawMethod.split('/');
+      for (const part of parts) {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx > 0) {
+          const methodLabel = part.substring(0, colonIdx).trim();
+          const partAmount = parseFloat(part.substring(colonIdx + 1));
+          if (!isNaN(partAmount)) {
+            addToPaymentMap(methodLabel, partAmount, currency);
+          }
+        }
+      }
+    } else {
+      addToPaymentMap(rawMethod, amount, currency);
+    }
+  }
+
   const paymentBreakdowns = Array.from(paymentMap.values()).sort((a, b) => b.revenue - a.revenue);
 
   // Compute voided totals

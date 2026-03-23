@@ -25,6 +25,10 @@ const ConcertSchema = new mongoose.Schema({
     default: 'EUR',
     trim: true
   },
+  priceOverrides: [{
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    price: { type: Number, required: true },
+  }],
   active: {
     type: Boolean,
     default: true

@@ -1,7 +1,8 @@
 import { Redirect, Slot, Stack } from 'expo-router';
+import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import React from 'react';
 import { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { Appearance, AppState, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { SQLiteDatabase } from 'expo-sqlite';
@@ -14,8 +15,12 @@ import { startPeriodicSync, stopPeriodicSync, requestSync } from '@/features/syn
 import '@/i18n';
 import '@/global.css';
 
+// Default to dark mode — concert venues are dark
+Appearance.setColorScheme('dark');
+
 export default function RootLayout() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const colorScheme = useColorScheme();
   const [db, setDb] = useState<SQLiteDatabase | null>(null);
 
   useEffect(() => {
@@ -42,15 +47,23 @@ export default function RootLayout() {
 
   useConnectivitySync(db, apiClient);
 
+  const isDark = colorScheme === 'dark';
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        </Stack>
-        {!isAuthenticated && <Redirect href="/(auth)/pin" />}
-      </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: isDark ? '#121212' : '#f8f9fa' }}>
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <SafeAreaProvider>
+          {isAuthenticated ? (
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            </Stack>
+          ) : (
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            </Stack>
+          )}
+        </SafeAreaProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

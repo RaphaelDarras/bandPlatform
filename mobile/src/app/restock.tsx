@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useStock } from '@/features/stock/useStock';
+import { useTheme } from '@/hooks/use-theme';
 import { useSyncStore } from '@/stores/syncStore';
 import type { CachedProduct } from '@/db/products';
 import { stockColor } from '@/utils/stockColor';
@@ -24,6 +25,7 @@ import { stockColor } from '@/utils/stockColor';
 export default function RestockScreen() {
   const { products, loading, refreshStock, restock } = useStock();
   const { isOnline } = useSyncStore();
+  const c = useTheme();
 
   const [selectedProduct, setSelectedProduct] = useState<CachedProduct | null>(null);
   // quantities[sku] = current displayed quantity (starts at variant.stock)
@@ -75,18 +77,18 @@ export default function RestockScreen() {
 
   if (!isOnline) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Stock Adjustment</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Stock Adjustment</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.offlineState}>
           <Text style={styles.offlineIcon}>📵</Text>
-          <Text style={styles.offlineTitle}>Internet Required</Text>
-          <Text style={styles.offlineSubtext}>
+          <Text style={[styles.offlineTitle, { color: c.text }]}>Internet Required</Text>
+          <Text style={[styles.offlineSubtext, { color: c.textSecondary }]}>
             Stock adjustments require an internet connection. Please connect and try again.
           </Text>
         </View>
@@ -95,27 +97,28 @@ export default function RestockScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Stock Adjustment</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Stock Adjustment</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {/* Step 1: Select Product */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>1. Select Product</Text>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>1. Select Product</Text>
           {loading ? (
-            <Text style={styles.loadingText}>Loading products...</Text>
+            <Text style={[styles.loadingText, { color: c.textSecondary }]}>Loading products...</Text>
           ) : (
             products.map((product) => (
               <Pressable
                 key={product.id}
                 style={[
                   styles.selectItem,
+                  { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder },
                   selectedProduct?.id === product.id && styles.selectItemActive,
                 ]}
                 onPress={() => handleProductSelect(product)}
@@ -123,6 +126,7 @@ export default function RestockScreen() {
                 <Text
                   style={[
                     styles.selectItemText,
+                    { color: c.text },
                     selectedProduct?.id === product.id && styles.selectItemTextActive,
                   ]}
                 >
@@ -136,8 +140,8 @@ export default function RestockScreen() {
         {/* Step 2: Adjust variants inline */}
         {selectedProduct && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>2. Adjust Quantities</Text>
-            <View style={styles.variantsCard}>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>2. Adjust Quantities</Text>
+            <View style={[styles.variantsCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
               {selectedProduct.variants.map((variant, index) => {
                 const qty = quantities[variant.sku] ?? variant.stock;
                 const delta = qty - variant.stock;
@@ -145,10 +149,10 @@ export default function RestockScreen() {
                 return (
                   <View
                     key={variant.sku}
-                    style={[styles.variantRow, !isLast && styles.variantRowBorder]}
+                    style={[styles.variantRow, !isLast && styles.variantRowBorder, !isLast && { borderBottomColor: c.border }]}
                   >
                     <View style={styles.variantInfo}>
-                      <Text style={styles.variantLabel}>
+                      <Text style={[styles.variantLabel, { color: c.text }]}>
                         {variant.label}
                         <Text style={{ color: stockColor(variant.stock), fontSize: 12 }}> (stock: {variant.stock})</Text>
                       </Text>
@@ -163,25 +167,26 @@ export default function RestockScreen() {
                     </View>
                     <View style={styles.stepper}>
                       <Pressable
-                        style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
+                        style={({ pressed }) => [styles.stepBtn, { backgroundColor: c.backgroundElement }, pressed && styles.stepBtnPressed]}
                         onPress={() => adjust(variant.sku, -1)}
                         accessibilityLabel={`Decrease ${variant.label}`}
                       >
-                        <Text style={styles.stepBtnText}>−</Text>
+                        <Text style={[styles.stepBtnText, { color: c.text }]}>−</Text>
                       </Pressable>
                       <Text style={[
                         styles.stepQty,
+                        { color: c.text },
                         delta > 0 && styles.deltaPositive,
                         delta < 0 && styles.deltaNegative,
                       ]}>
                         {qty}
                       </Text>
                       <Pressable
-                        style={({ pressed }) => [styles.stepBtn, pressed && styles.stepBtnPressed]}
+                        style={({ pressed }) => [styles.stepBtn, { backgroundColor: c.backgroundElement }, pressed && styles.stepBtnPressed]}
                         onPress={() => adjust(variant.sku, 1)}
                         accessibilityLabel={`Increase ${variant.label}`}
                       >
-                        <Text style={styles.stepBtnText}>+</Text>
+                        <Text style={[styles.stepBtnText, { color: c.text }]}>+</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -194,12 +199,13 @@ export default function RestockScreen() {
         {/* Step 3: Optional Reason */}
         {hasChanges && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>3. Reason (optional)</Text>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>3. Reason (optional)</Text>
             <TextInput
-              style={[styles.input, styles.inputMultiline]}
+              style={[styles.input, styles.inputMultiline, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
               value={reason}
               onChangeText={setReason}
               placeholder="e.g. Concert restock, damaged goods, inventory correction..."
+              placeholderTextColor={c.textSecondary}
               multiline
               numberOfLines={3}
               accessibilityLabel="Adjustment reason"
@@ -210,7 +216,7 @@ export default function RestockScreen() {
         {/* Confirm */}
         {hasChanges && (
           <Pressable
-            style={[styles.confirmButton, submitting && styles.confirmButtonDisabled]}
+            style={[styles.confirmButton, { backgroundColor: c.accent }, submitting && { backgroundColor: c.backgroundElement }]}
             onPress={handleConfirm}
             disabled={submitting}
             accessibilityLabel="Confirm adjustment"

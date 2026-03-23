@@ -3,6 +3,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { useTheme } from '@/hooks/use-theme';
 import { useCartStore } from '@/stores/cartStore';
 
 /**
@@ -10,17 +11,21 @@ import { useCartStore } from '@/stores/cartStore';
  * Tab bar is hidden when a concert is active (selling mode).
  */
 export default function TabsLayout() {
+  const c = useTheme();
   const { t } = useTranslation();
   const concertId = useCartStore((state) => state.concertId);
-  const isSellingMode = concertId !== null;
+  const cartItems = useCartStore((state) => state.items);
+  const isSellingMode = concertId !== null && cartItems.length > 0;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: isSellingMode ? { display: 'none' } : undefined,
-        tabBarActiveTintColor: '#208AEF',
-        tabBarInactiveTintColor: '#888',
+        tabBarStyle: isSellingMode
+          ? { display: 'none' as const }
+          : { backgroundColor: c.headerBg, borderTopColor: c.border },
+        tabBarActiveTintColor: c.accent,
+        tabBarInactiveTintColor: c.textSecondary,
       }}
     >
       <Tabs.Screen

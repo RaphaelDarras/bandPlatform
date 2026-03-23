@@ -36,10 +36,15 @@ export function useSaleRecording() {
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
 
+    // Read concertId and currency directly from store at call time (not from closure)
+    // to avoid stale values from persist rehydration race
+    const currentConcertId = useCartStore.getState().concertId;
+    const currentCurrency = useCartStore.getState().currency;
+
     // Build LocalSale
     const sale: LocalSale = {
       id: saleId,
-      concertId: concertId ?? '',
+      concertId: currentConcertId ?? '',
       items: cartItems.map((item) => ({
         productId: item.productId,
         variantSku: item.variantSku,
@@ -48,7 +53,7 @@ export function useSaleRecording() {
       })),
       totalAmount: totalFn(),
       paymentMethod,
-      currency,
+      currency: currentCurrency,
       discount,
       discountType,
     };
@@ -61,17 +66,38 @@ export function useSaleRecording() {
       'PayPal': 'paypal',
     };
 
+    // Parse split payment format "Card:30.00/Cash:20.00" or single "Card"
+    const isSplit = paymentMethod.includes('/');
+    let resolvedMethod: string;
+    let paymentSplit: Array<{ method: string; amount: number }> | undefined;
+
+    if (isSplit) {
+      resolvedMethod = 'split';
+      paymentSplit = paymentMethod.split('/').map((part) => {
+        const [label, amountStr] = part.split(':');
+        return {
+          method: paymentMethodMap[label] ?? label.toLowerCase(),
+          amount: parseFloat(amountStr) || 0,
+        };
+      });
+    } else {
+      resolvedMethod = paymentMethodMap[paymentMethod] ?? paymentMethod.toLowerCase();
+    }
+
     // Build outbox payload (matches API batch format)
     const outboxPayload: Record<string, unknown> = {
       saleId,
       items: sale.items,
       totalAmount: sale.totalAmount,
-      paymentMethod: paymentMethodMap[paymentMethod] ?? paymentMethod.toLowerCase(),
-      currency,
+      paymentMethod: resolvedMethod,
+      currency: currentCurrency,
       discount,
       discountType,
       recordedAt: now,
     };
+    if (paymentSplit) {
+      outboxPayload.paymentSplit = paymentSplit;
+    }
     // Only include concertId when it's a valid ID (backend expects ObjectId)
     if (sale.concertId) {
       outboxPayload.concertId = sale.concertId;

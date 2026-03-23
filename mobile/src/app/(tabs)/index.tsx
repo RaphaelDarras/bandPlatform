@@ -15,6 +15,7 @@ import { apiClient } from '@/api/client';
 import { getDb } from '@/db';
 import { requestSync } from '@/features/sync/SyncManager';
 import { useStock } from '@/features/stock/useStock';
+import { useTheme } from '@/hooks/use-theme';
 import { useSyncStore } from '@/stores/syncStore';
 import { formatRelativeTime } from '@/utils/formatRelativeTime';
 
@@ -32,6 +33,7 @@ interface ActionCard {
 }
 
 function SyncIndicator() {
+  const c = useTheme();
   const { isOnline, pendingCount, lastSyncAt, consecutiveFailures } = useSyncStore();
   const [syncing, setSyncing] = useState(false);
 
@@ -39,7 +41,8 @@ function SyncIndicator() {
     : (pendingCount > 0 || consecutiveFailures > 0) ? '#f59e0b'
     : '#22c55e';
 
-  const statusLabel = !isOnline ? 'Offline' : pendingCount > 0 ? `${pendingCount} pending` : 'Online';
+  const { t } = useTranslation();
+  const statusLabel = !isOnline ? t('sync.offline') : pendingCount > 0 ? t('sync.pending', { count: pendingCount }) : 'Online';
   const lastSyncLabel = lastSyncAt ? formatRelativeTime(lastSyncAt) : '';
   const fullLabel = lastSyncLabel ? `${statusLabel} · ${lastSyncLabel}` : statusLabel;
 
@@ -57,7 +60,7 @@ function SyncIndicator() {
   return (
     <View style={styles.syncRow}>
       <View style={[styles.syncDot, { backgroundColor: color }]} />
-      <Text style={styles.syncLabel}>{fullLabel}</Text>
+      <Text style={[styles.syncLabel, { color: c.textSecondary }]}>{fullLabel}</Text>
       <Pressable
         onPress={handleSyncNow}
         disabled={syncing}
@@ -66,7 +69,7 @@ function SyncIndicator() {
       >
         {syncing
           ? <ActivityIndicator size="small" color="#888" />
-          : <Text style={styles.syncNowIcon}>{'↻'}</Text>
+          : <Text style={[styles.syncNowIcon, { color: c.textSecondary }]}>{'↻'}</Text>
         }
       </Pressable>
     </View>
@@ -74,13 +77,15 @@ function SyncIndicator() {
 }
 
 function ActionCardItem({ card }: { card: ActionCard }) {
+  const c = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.card,
+        { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder },
         card.primary && styles.cardPrimary,
         card.alert && styles.cardAlert,
-        card.disabled && styles.cardDisabled,
+        card.disabled && [styles.cardDisabled, { backgroundColor: c.backgroundElement }],
         pressed && !card.disabled && styles.cardPressed,
       ]}
       onPress={card.disabled ? undefined : card.onPress}
@@ -95,17 +100,18 @@ function ActionCardItem({ card }: { card: ActionCard }) {
           </View>
         )}
       </View>
-      <Text style={[styles.cardTitle, card.primary && styles.cardTitlePrimary]}>
+      <Text style={[styles.cardTitle, { color: c.text }, card.primary && styles.cardTitlePrimary]}>
         {card.title}
       </Text>
       {card.subtitle && (
-        <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+        <Text style={[styles.cardSubtitle, { color: c.textSecondary }]}>{card.subtitle}</Text>
       )}
     </Pressable>
   );
 }
 
 export default function DashboardScreen() {
+  const c = useTheme();
   const { t } = useTranslation();
   const { products, needsReproduction, refreshStock } = useStock();
 
@@ -120,10 +126,10 @@ export default function DashboardScreen() {
   const actionCards: ActionCard[] = [
     {
       id: 'selling',
-      title: 'Start Selling',
+      title: t('dashboard.startSelling'),
       subtitle: hasProducts
-        ? 'Open the selling screen'
-        : 'Connect to internet to load products first',
+        ? t('dashboard.startSellingSubtitle')
+        : t('dashboard.startSellingDisabled'),
       icon: '🎸',
       onPress: hasProducts ? () => router.push('/selling' as never) : () => {},
       primary: true,
@@ -131,29 +137,29 @@ export default function DashboardScreen() {
     },
     {
       id: 'concerts',
-      title: 'Concert Management',
-      subtitle: 'Manage active concerts',
+      title: t('dashboard.concertManagement'),
+      subtitle: t('dashboard.concertManagementSubtitle'),
       icon: '🎤',
       onPress: () => router.push('/concerts' as never),
     },
     {
       id: 'history',
-      title: 'Transaction History',
-      subtitle: 'View past sales',
+      title: t('dashboard.transactionHistory'),
+      subtitle: t('dashboard.transactionHistorySubtitle'),
       icon: '📋',
       onPress: () => router.push('/(tabs)/history' as never),
     },
     {
       id: 'stock',
-      title: 'Stock Overview',
-      subtitle: 'Check inventory levels',
+      title: t('dashboard.stockOverview'),
+      subtitle: t('dashboard.stockOverviewSubtitle'),
       icon: '📦',
       onPress: () => router.push('/(tabs)/stock' as never),
     },
     {
       id: 'deficit',
-      title: 'Needs Restock',
-      subtitle: 'Items with negative stock',
+      title: t('dashboard.needsRestock'),
+      subtitle: t('dashboard.needsRestockSubtitle'),
       icon: '⚠️',
       onPress: () => router.push('/deficit' as never),
       badge: needsReproduction.length,
@@ -162,24 +168,24 @@ export default function DashboardScreen() {
     },
     {
       id: 'restock',
-      title: 'Restock',
-      subtitle: 'Add inventory',
+      title: t('dashboard.restock'),
+      subtitle: t('dashboard.restockSubtitle'),
       icon: '📥',
       onPress: () => router.push('/restock' as never),
     },
     {
       id: 'products',
-      title: 'Manage Products',
-      subtitle: 'Edit catalog',
+      title: t('dashboard.manageProducts'),
+      subtitle: t('dashboard.manageProductsSubtitle'),
       icon: '🏷️',
       onPress: () => router.push('/products' as never),
     },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>BandPOS</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.headerRow, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
+        <Text style={[styles.headerTitle, { color: c.text }]}>BandPOS</Text>
         <SyncIndicator />
       </View>
 

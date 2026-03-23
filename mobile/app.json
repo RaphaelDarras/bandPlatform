@@ -41,9 +41,6 @@
       "expo-image",
       "expo-localization"
     ],
-    "extra": {
-      "apiUrl": "http://10.0.2.2:5000/api"
-    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

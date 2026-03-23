@@ -25,6 +25,54 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Running on Android Emulator
+
+There are two ways to run the app on an Android emulator. Make sure your emulator is running (via Android Studio) before launching.
+
+### `npx expo start --android`
+
+- Starts the **Metro bundler** and connects to **Expo Go** or a development client.
+- No native build step — only bundles JavaScript.
+- Faster to start, but relies on a pre-built native app.
+- Best for **day-to-day JS development** when the native layer hasn't changed.
+
+### `npx expo run:android` (aliased as `npm run android`)
+
+- Runs a **full native Android build** (Gradle), then installs the APK on the emulator.
+- Required when you change native code, add native modules, or modify files in the `android/` directory.
+- Slower, but produces a standalone native binary.
+
+**When to use which:**
+
+| Scenario | Command |
+|---|---|
+| Everyday JS/UI development | `npx expo start --android` |
+| Added a new native dependency | `npx expo run:android` |
+| Changed native config (`app.json` native fields, `android/` files) | `npx expo run:android` |
+| Just editing React components or screens | `npx expo start --android` |
+
+## Building an APK for a real device
+
+To build an installable APK using EAS (Expo Application Services):
+
+1. Update `EXPO_PUBLIC_API_URL` in `eas.json` with your production API URL.
+
+2. Build the APK:
+
+   ```bash
+   npx eas-cli build --platform android --profile preview
+   ```
+
+3. Once the build completes, download the APK from the link provided and install it on your phone.
+
+Available build profiles (configured in `eas.json`):
+
+| Profile | Purpose |
+|---|---|
+| `development` | Dev client for emulator (uses `10.0.2.2` localhost) |
+| `preview` | Installable APK for real devices |
+| `production` | AAB for Play Store distribution |
+
 ## Get a fresh project
 
 When you're ready, run:

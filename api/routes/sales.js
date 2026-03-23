@@ -27,7 +27,7 @@ router.post('/batch', async (req, res) => {
     const sales = [];
 
     for (const saleData of batch) {
-      const { concertId, items, totalAmount, paymentMethod, idempotencyKey, currency, discount, discountType } = saleData;
+      const { concertId, items, totalAmount, paymentMethod, paymentSplit, idempotencyKey, currency, discount, discountType } = saleData;
 
       // Check for duplicate idempotencyKey
       if (idempotencyKey) {
@@ -90,6 +90,7 @@ router.post('/batch', async (req, res) => {
       };
       // Only set concertId when it's a non-empty value (ObjectId field — empty string throws)
       if (concertId) createPayload.concertId = concertId;
+      if (paymentSplit && Array.isArray(paymentSplit)) createPayload.paymentSplit = paymentSplit;
 
       const saleDoc = await Sale.create(createPayload);
 
@@ -154,7 +155,11 @@ router.get('/', async (req, res) => {
  */
 router.post('/:id/void', async (req, res) => {
   try {
-    const sale = await Sale.findById(req.params.id);
+    // /:id may be a local UUID — try MongoDB _id first, then fall back to idempotencyKey lookup
+    let sale = await Sale.findById(req.params.id).catch(() => null);
+    if (!sale) {
+      sale = await Sale.findOne({ idempotencyKey: `sale_create:${req.params.id}` });
+    }
     if (!sale) {
       return res.status(404).json({ error: 'Sale not found' });
     }
@@ -188,7 +193,11 @@ router.post('/:id/void', async (req, res) => {
  */
 router.post('/:id/unvoid', async (req, res) => {
   try {
-    const sale = await Sale.findById(req.params.id);
+    // /:id may be a local UUID — try MongoDB _id first, then fall back to idempotencyKey lookup
+    let sale = await Sale.findById(req.params.id).catch(() => null);
+    if (!sale) {
+      sale = await Sale.findOne({ idempotencyKey: `sale_create:${req.params.id}` });
+    }
     if (!sale) {
       return res.status(404).json({ error: 'Sale not found' });
     }

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -16,20 +16,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/hooks/use-theme';
 import i18n from '@/i18n';
 
 const APP_VERSION = '1.0.0';
 
 function SettingRow({
   label,
+  labelColor,
   right,
 }: {
   label: string;
+  labelColor?: string;
   right: React.ReactNode;
 }) {
   return (
     <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowLabel, labelColor ? { color: labelColor } : undefined]}>{label}</Text>
       <View>{right}</View>
     </View>
   );
@@ -39,16 +42,19 @@ export default function SettingsScreen() {
   const { t } = useTranslation();
   const { logout } = useAuth();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const isFrench = i18n.language === 'fr';
+  const c = useTheme();
+  const [isDark, setIsDark] = useState(() => colorScheme === 'dark');
+  const [isFrench, setIsFrench] = useState(() => (i18n.language ?? 'en').startsWith('fr'));
 
   function handleLanguageToggle(value: boolean) {
-    i18n.changeLanguage(value ? 'fr' : 'en');
+    const lang = value ? 'fr' : 'en';
+    i18n.changeLanguage(lang);
+    setIsFrench(value);
   }
 
   function handleThemeToggle(value: boolean) {
-    // Toggle dark/light mode via Appearance API (system override)
     Appearance.setColorScheme(value ? 'dark' : 'light');
+    setIsDark(value);
   }
 
   function handleLogout() {
@@ -69,21 +75,28 @@ export default function SettingsScreen() {
     );
   }
 
+  const bg = isDark ? '#121212' : '#f8f9fa';
+
+  const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
+  const secondaryText = isDark ? '#999' : '#888';
+  const borderColor = isDark ? '#333' : '#eee';
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>{t('tabs.settings')}</Text>
+        <Text style={[styles.title, { color: textColor }]}>{t('tabs.settings')}</Text>
 
         {/* Language */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>{t('settings.language')}</Text>
+        <View style={[styles.section, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionHeader, { color: secondaryText }]}>{t('settings.language')}</Text>
           <SettingRow
             label={t('settings.french')}
+            labelColor={textColor}
             right={
               <Switch
                 value={isFrench}
                 onValueChange={handleLanguageToggle}
-                trackColor={{ true: '#208AEF', false: '#ccc' }}
+                trackColor={{ true: '#208AEF', false: isDark ? '#555' : '#ccc' }}
                 thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
               />
             }
@@ -91,15 +104,16 @@ export default function SettingsScreen() {
         </View>
 
         {/* Theme */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>{t('settings.appearance')}</Text>
+        <View style={[styles.section, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionHeader, { color: secondaryText }]}>{t('settings.appearance')}</Text>
           <SettingRow
             label={t('settings.darkMode')}
+            labelColor={textColor}
             right={
               <Switch
                 value={isDark}
                 onValueChange={handleThemeToggle}
-                trackColor={{ true: '#208AEF', false: '#ccc' }}
+                trackColor={{ true: '#208AEF', false: isDark ? '#555' : '#ccc' }}
                 thumbColor={Platform.OS === 'ios' ? undefined : '#fff'}
               />
             }
@@ -107,23 +121,23 @@ export default function SettingsScreen() {
         </View>
 
         {/* Security */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>{t('settings.security')}</Text>
+        <View style={[styles.section, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionHeader, { color: secondaryText }]}>{t('settings.security')}</Text>
           <Pressable
             style={({ pressed }) => [styles.row, styles.rowPressable, pressed && styles.rowPressed]}
             onPress={() => router.push('/change-pin' as never)}
           >
-            <Text style={styles.rowLabel}>{t('settings.changePin')}</Text>
+            <Text style={[styles.rowLabel, { color: textColor }]}>{t('settings.changePin')}</Text>
             <Text style={styles.chevron}>›</Text>
           </Pressable>
         </View>
 
         {/* Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>{t('settings.about')}</Text>
+        <View style={[styles.section, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionHeader, { color: secondaryText }]}>{t('settings.about')}</Text>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>{t('settings.version')}</Text>
-            <Text style={styles.rowValue}>{APP_VERSION}</Text>
+            <Text style={[styles.rowLabel, { color: textColor }]}>{t('settings.version')}</Text>
+            <Text style={[styles.rowValue, { color: secondaryText }]}>{APP_VERSION}</Text>
           </View>
         </View>
 

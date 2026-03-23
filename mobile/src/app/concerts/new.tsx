@@ -17,9 +17,23 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useConcerts } from '@/features/concerts/useConcerts';
+import { useTheme } from '@/hooks/use-theme';
 
 const ITEM_HEIGHT = 44;
 const VISIBLE_ITEMS = 5;
+
+const CONCERT_CURRENCIES = [
+  { code: 'EUR', label: 'Euro', symbol: '€' },
+  { code: 'GBP', label: 'British Pound', symbol: '£' },
+  { code: 'CHF', label: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'SEK', label: 'Swedish Krona', symbol: 'kr' },
+  { code: 'NOK', label: 'Norwegian Krone', symbol: 'kr' },
+  { code: 'DKK', label: 'Danish Krone', symbol: 'kr' },
+  { code: 'PLN', label: 'Polish Zloty', symbol: 'zł' },
+  { code: 'CZK', label: 'Czech Koruna', symbol: 'Kč' },
+  { code: 'HUF', label: 'Hungarian Forint', symbol: 'Ft' },
+  { code: 'RON', label: 'Romanian Leu', symbol: 'lei' },
+];
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -116,6 +130,7 @@ const col = StyleSheet.create({
  * Fields: venue, date, city, country — all required.
  */
 export default function NewConcertScreen() {
+  const c = useTheme();
   const { createConcert } = useConcerts();
 
   const today = new Date();
@@ -128,6 +143,7 @@ export default function NewConcertScreen() {
   const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
 
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1); // 1-12
@@ -190,17 +206,17 @@ export default function NewConcertScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
           <Pressable onPress={() => router.back()} accessibilityLabel="Go back">
-            <Text style={styles.backText}>Cancel</Text>
+            <Text style={[styles.backText, { color: c.accent }]}>Cancel</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>New Concert</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>New Concert</Text>
           <View style={{ width: 64 }} />
         </View>
 
@@ -211,12 +227,13 @@ export default function NewConcertScreen() {
         >
           {/* Venue */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Venue *</Text>
+            <Text style={[styles.label, { color: c.textSecondary }]}>Venue *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
               value={venue}
               onChangeText={setVenue}
               placeholder="e.g. The Fillmore"
+              placeholderTextColor={c.textSecondary}
               accessibilityLabel="Venue"
               returnKeyType="next"
             />
@@ -224,14 +241,14 @@ export default function NewConcertScreen() {
 
           {/* Date */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Date *</Text>
+            <Text style={[styles.label, { color: c.textSecondary }]}>Date *</Text>
             <Pressable
               style={styles.dateInputWrapper}
               onPress={() => setShowPicker(true)}
               accessibilityLabel="Select date"
             >
-              <View style={styles.dateInput}>
-                <Text style={styles.dateInputText}>{displayDate}</Text>
+              <View style={[styles.dateInput, { backgroundColor: c.inputBg, borderColor: c.inputBorder }]}>
+                <Text style={[styles.dateInputText, { color: c.text }]}>{displayDate}</Text>
                 <Text style={styles.dateInputIcon}>📅</Text>
               </View>
             </Pressable>
@@ -239,12 +256,13 @@ export default function NewConcertScreen() {
 
           {/* City */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>City *</Text>
+            <Text style={[styles.label, { color: c.textSecondary }]}>City *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
               value={city}
               onChangeText={setCity}
               placeholder="e.g. San Francisco"
+              placeholderTextColor={c.textSecondary}
               accessibilityLabel="City"
               returnKeyType="next"
             />
@@ -252,12 +270,13 @@ export default function NewConcertScreen() {
 
           {/* Country */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Country *</Text>
+            <Text style={[styles.label, { color: c.textSecondary }]}>Country *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
               value={country}
               onChangeText={setCountry}
               placeholder="e.g. United States"
+              placeholderTextColor={c.textSecondary}
               accessibilityLabel="Country"
               returnKeyType="done"
             />
@@ -265,24 +284,43 @@ export default function NewConcertScreen() {
 
           {/* Currency */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Currency</Text>
-            <View style={styles.chipRow}>
-              {(['EUR', 'GBP', 'USD', 'CAD'] as const).map((c) => (
-                <Pressable
-                  key={c}
-                  style={[styles.chip, currency === c && styles.chipSelected]}
-                  onPress={() => setCurrency(c)}
-                  accessibilityLabel={c}
-                >
-                  <Text style={[styles.chipText, currency === c && styles.chipTextSelected]}>{c}</Text>
-                </Pressable>
-              ))}
-            </View>
+            <Text style={[styles.label, { color: c.textSecondary }]}>Currency</Text>
+            <Pressable
+              style={[styles.currencyDropdownBtn, { backgroundColor: c.inputBg, borderColor: c.inputBorder }]}
+              onPress={() => setCurrencyOpen((v) => !v)}
+              accessibilityLabel="Select currency"
+            >
+              <Text style={[styles.currencyDropdownBtnText, { color: c.text }]}>
+                {`${CONCERT_CURRENCIES.find((cur) => cur.code === currency)?.symbol ?? currency}  ${currency}`}
+              </Text>
+              <Text style={{ fontSize: 12, color: c.textSecondary }}>{currencyOpen ? '▲' : '▼'}</Text>
+            </Pressable>
+            {currencyOpen && (
+              <View style={[styles.currencyDropdownList, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+                {CONCERT_CURRENCIES.map((cur) => (
+                  <Pressable
+                    key={cur.code}
+                    style={({ pressed }) => [
+                      styles.currencyDropdownOption,
+                      { borderBottomColor: c.border },
+                      currency === cur.code && { backgroundColor: c.backgroundSelected },
+                      pressed && { backgroundColor: c.rowPressed },
+                    ]}
+                    onPress={() => { setCurrency(cur.code); setCurrencyOpen(false); }}
+                    accessibilityLabel={`${cur.label} (${cur.code})`}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: c.textSecondary, width: 32 }}>{cur.symbol}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: c.text, width: 36 }}>{cur.code}</Text>
+                    <Text style={{ fontSize: 13, color: c.textSecondary, flex: 1 }}>{cur.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
 
         {/* Create button */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: c.background }]}>
           <Pressable
             style={styles.createBtnWrapper}
             onPress={handleCreate}
@@ -308,11 +346,11 @@ export default function NewConcertScreen() {
 
       {/* Date picker modal */}
       <Modal visible={showPicker} transparent animationType="slide">
-        <View style={styles.pickerOverlay}>
-          <View style={styles.pickerSheet}>
-            <View style={styles.pickerHeader}>
+        <View style={[styles.pickerOverlay, { backgroundColor: c.modalOverlay }]}>
+          <View style={[styles.pickerSheet, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+            <View style={[styles.pickerHeader, { borderBottomColor: c.border }]}>
               <Pressable onPress={() => setShowPicker(false)}>
-                <Text style={styles.pickerDone}>Done</Text>
+                <Text style={[styles.pickerDone, { color: c.accent }]}>Done</Text>
               </Pressable>
             </View>
             <View style={styles.pickerColumns}>
@@ -486,5 +524,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
+  },
+  currencyDropdownBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 48,
+  },
+  currencyDropdownBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  currencyDropdownList: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  currencyDropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 10,
   },
 });

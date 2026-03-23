@@ -24,6 +24,7 @@ import {
   type ApiProduct,
   type ApiProductVariant,
 } from '@/api/products';
+import { useTheme } from '@/hooks/use-theme';
 import { useSyncStore } from '@/stores/syncStore';
 
 interface VariantDraft {
@@ -49,6 +50,7 @@ function makeVariantDraft(): VariantDraft {
 }
 
 export default function EditProductScreen() {
+  const c = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isOnline } = useSyncStore();
 
@@ -145,18 +147,18 @@ export default function EditProductScreen() {
 
   if (!isOnline) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Edit Product</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Edit Product</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.offlineState}>
           <Text style={styles.offlineIcon}>📵</Text>
-          <Text style={styles.offlineTitle}>Internet Required</Text>
-          <Text style={styles.offlineSubtext}>Editing products requires an internet connection.</Text>
+          <Text style={[styles.offlineTitle, { color: c.text }]}>Internet Required</Text>
+          <Text style={[styles.offlineSubtext, { color: c.textSecondary }]}>Editing products requires an internet connection.</Text>
         </View>
       </SafeAreaView>
     );
@@ -164,16 +166,16 @@ export default function EditProductScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Edit Product</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Edit Product</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.loadingState}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: c.textSecondary }]}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -181,55 +183,58 @@ export default function EditProductScreen() {
 
   if (!product) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Edit Product</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Edit Product</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.loadingState}>
-          <Text style={styles.loadingText}>Product not found.</Text>
+          <Text style={[styles.loadingText, { color: c.textSecondary }]}>Product not found.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Cancel</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>← Cancel</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Edit Product</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Edit Product</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         {/* Product Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Info</Text>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Product Info</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
             value={name}
             onChangeText={setName}
             placeholder="Product name *"
+            placeholderTextColor={c.textSecondary}
             accessibilityLabel="Product name"
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
             value={price}
             onChangeText={setPrice}
             placeholder="Base price *"
+            placeholderTextColor={c.textSecondary}
             keyboardType="decimal-pad"
             accessibilityLabel="Product price"
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
             value={imageUrl}
             onChangeText={setImageUrl}
             placeholder="Image URL (optional)"
+            placeholderTextColor={c.textSecondary}
             keyboardType="url"
             autoCapitalize="none"
             accessibilityLabel="Product image URL"
@@ -239,50 +244,54 @@ export default function EditProductScreen() {
         {/* Variants */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Variants</Text>
+            <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Variants</Text>
             <Pressable onPress={addVariant} style={styles.addVariantButton}>
               <Text style={styles.addVariantText}>+ Add Variant</Text>
             </Pressable>
           </View>
 
           {variants.map((variant, idx) => (
-            <View key={variant.key} style={styles.variantCard}>
+            <View key={variant.key} style={[styles.variantCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
               <View style={styles.variantCardHeader}>
-                <Text style={styles.variantCardTitle}>Variant {idx + 1}</Text>
+                <Text style={[styles.variantCardTitle, { color: c.accent }]}>Variant {idx + 1}</Text>
                 {variants.length > 1 && (
                   <Pressable onPress={() => removeVariant(variant.key)}>
-                    <Text style={styles.removeText}>Remove</Text>
+                    <Text style={[styles.removeText, { color: c.danger }]}>Remove</Text>
                   </Pressable>
                 )}
               </View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
                 value={variant.sku}
                 onChangeText={(v) => updateVariant(variant.key, 'sku', v)}
                 placeholder="SKU *"
+                placeholderTextColor={c.textSecondary}
                 autoCapitalize="characters"
                 accessibilityLabel={`Variant ${idx + 1} SKU`}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
                 value={variant.label}
                 onChangeText={(v) => updateVariant(variant.key, 'label', v)}
                 placeholder="Display label"
+                placeholderTextColor={c.textSecondary}
                 accessibilityLabel={`Variant ${idx + 1} label`}
               />
               <View style={styles.row}>
                 <TextInput
-                  style={[styles.input, styles.halfInput]}
+                  style={[styles.input, styles.halfInput, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
                   value={variant.size}
                   onChangeText={(v) => updateVariant(variant.key, 'size', v)}
                   placeholder="Size"
+                  placeholderTextColor={c.textSecondary}
                   accessibilityLabel={`Variant ${idx + 1} size`}
                 />
                 <TextInput
-                  style={[styles.input, styles.halfInput]}
+                  style={[styles.input, styles.halfInput, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text }]}
                   value={variant.color}
                   onChangeText={(v) => updateVariant(variant.key, 'color', v)}
                   placeholder="Color"
+                  placeholderTextColor={c.textSecondary}
                   accessibilityLabel={`Variant ${idx + 1} color`}
                 />
               </View>
@@ -303,7 +312,7 @@ export default function EditProductScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.deactivateButton, submitting && styles.buttonDisabled]}
+          style={[styles.deactivateButton, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }, submitting && styles.buttonDisabled]}
           onPress={handleDeactivate}
           disabled={submitting}
           accessibilityLabel="Deactivate product"
@@ -311,7 +320,7 @@ export default function EditProductScreen() {
           <Text style={styles.deactivateButtonText}>Deactivate Product</Text>
         </Pressable>
 
-        <Text style={styles.deactivateNote}>
+        <Text style={[styles.deactivateNote, { color: c.textSecondary }]}>
           Deactivating hides the product from the sales grid but preserves it in transaction history.
         </Text>
       </ScrollView>

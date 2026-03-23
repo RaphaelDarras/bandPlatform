@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/features/auth/useAuth';
 import { getCachedToken } from '@/features/auth/pinAuth';
 import { useSyncStore } from '@/stores/syncStore';
@@ -26,6 +27,7 @@ const KEYPAD_KEYS = [
 ];
 
 export default function PinScreen() {
+  const c = useTheme();
   const { t } = useTranslation();
   const { login, isLoading } = useAuth();
   const { isOnline } = useSyncStore();
@@ -69,9 +71,9 @@ export default function PinScreen() {
 
   if (offlineNoCache) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
         <View style={styles.offlineContainer}>
-          <Text style={styles.offlineTitle}>{t('auth.needOnlineFirst')}</Text>
+          <Text style={[styles.offlineTitle, { color: c.textSecondary }]}>{t('auth.needOnlineFirst')}</Text>
           <Pressable
             style={styles.retryButtonWrapper}
             onPress={() => setOfflineNoCache(false)}
@@ -88,11 +90,11 @@ export default function PinScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.appName}>{t('appName')}</Text>
-        <Text style={styles.prompt}>{t('auth.enterPin')}</Text>
+        <Text style={[styles.appName, { color: c.text }]}>{t('appName')}</Text>
+        <Text style={[styles.prompt, { color: c.textSecondary }]}>{t('auth.enterPin')}</Text>
       </View>
 
       {/* PIN dots */}
@@ -102,7 +104,9 @@ export default function PinScreen() {
             key={i}
             style={[
               styles.dot,
-              i < pin.length ? styles.dotFilled : styles.dotEmpty,
+              i < pin.length
+                ? [styles.dotFilled, { backgroundColor: c.text, borderColor: c.text }]
+                : [styles.dotEmpty, { borderColor: c.border }],
             ]}
           />
         ))}
@@ -121,6 +125,7 @@ export default function PinScreen() {
                   key={colIdx}
                   style={({ pressed }) => [
                     styles.key,
+                    { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder },
                     pressed && styles.keyPressed,
                     isLoading && styles.keyDisabled,
                   ]}
@@ -128,7 +133,7 @@ export default function PinScreen() {
                   disabled={isLoading}
                   accessibilityLabel={key === 'DEL' ? 'Delete' : key}
                 >
-                  <Text style={styles.keyText}>{key === 'DEL' ? '\u232B' : key}</Text>
+                  <Text style={[styles.keyText, { color: c.text }]}>{key === 'DEL' ? '\u232B' : key}</Text>
                 </Pressable>
               );
             })}

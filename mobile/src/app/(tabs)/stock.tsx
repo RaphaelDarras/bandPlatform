@@ -19,35 +19,37 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useStock } from '@/features/stock/useStock';
+import { useTheme } from '@/hooks/use-theme';
 import type { CachedProduct } from '@/db/products';
 import { stockColor } from '@/utils/stockColor';
 
 function ProductRow({ product }: { product: CachedProduct }) {
   const [expanded, setExpanded] = useState(false);
+  const c = useTheme();
 
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
   const minStock = Math.min(...product.variants.map((v) => v.stock));
 
   return (
     <Pressable
-      style={styles.productRow}
+      style={[styles.productRow, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}
       onPress={() => setExpanded((prev) => !prev)}
       accessibilityLabel={`${product.name} ${totalStock} in stock`}
     >
       <View style={styles.productHeader}>
-        <Text style={styles.productName}>{product.name}</Text>
-        <View style={styles.stockBadge}>
+        <Text style={[styles.productName, { color: c.text }]}>{product.name}</Text>
+        <View style={[styles.stockBadge, { backgroundColor: c.badgeBg }]}>
           <Text style={[styles.stockBadgeText, { color: stockColor(minStock) }]}>{totalStock}</Text>
         </View>
       </View>
-      <Text style={styles.expandHint}>{expanded ? '▲ Hide variants' : '▼ Show variants'}</Text>
+      <Text style={[styles.expandHint, { color: c.textSecondary }]}>{expanded ? '▲ Hide variants' : '▼ Show variants'}</Text>
 
       {expanded && (
-        <View style={styles.variantList}>
+        <View style={[styles.variantList, { borderTopColor: c.border }]}>
           {product.variants.map((variant) => (
             <View key={variant.sku} style={styles.variantRow}>
-              <Text style={styles.variantSku}>{variant.sku}</Text>
-              <Text style={styles.variantLabel}>{variant.label}</Text>
+              <Text style={[styles.variantSku, { color: c.textSecondary }]}>{variant.sku}</Text>
+              <Text style={[styles.variantLabel, { color: c.text }]}>{variant.label}</Text>
               <Text style={[styles.variantStock, { color: stockColor(variant.stock) }]}>{variant.stock}</Text>
             </View>
           ))}
@@ -60,6 +62,7 @@ function ProductRow({ product }: { product: CachedProduct }) {
 export default function StockScreen() {
   const { t } = useTranslation();
   const { products, loading, refreshStock, needsReproduction } = useStock();
+  const c = useTheme();
 
   // Auto-refresh when screen gains focus
   useFocusEffect(
@@ -69,12 +72,12 @@ export default function StockScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('tabs.stock')}</Text>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
+        <Text style={[styles.headerTitle, { color: c.text }]}>{t('tabs.stock')}</Text>
         <Pressable
-          style={styles.restockButton}
+          style={[styles.restockButton, { backgroundColor: c.accent }]}
           onPress={() => router.push('/restock' as never)}
           accessibilityLabel="Restock products"
         >
@@ -91,20 +94,20 @@ export default function StockScreen() {
         }
         ListHeaderComponent={
           needsReproduction.length > 0 ? (
-            <View style={styles.deficitSection}>
+            <View style={[styles.deficitSection, { backgroundColor: 'rgba(255, 245, 245, 0.15)', borderColor: c.danger }]}>
               <View style={styles.deficitHeader}>
-                <Text style={styles.deficitTitle}>Needs Reproduction</Text>
-                <View style={styles.deficitBadge}>
+                <Text style={[styles.deficitTitle, { color: c.danger }]}>Needs Reproduction</Text>
+                <View style={[styles.deficitBadge, { backgroundColor: c.danger }]}>
                   <Text style={styles.deficitBadgeText}>{needsReproduction.length}</Text>
                 </View>
               </View>
               {needsReproduction.map((product) => {
-                const deficitVariants = product.variants.filter((v) => v.stock < 0);
+                const deficitVariants = product.variants.filter((v) => v.stock <= 0);
                 return (
                   <View key={product.id} style={styles.deficitItem}>
-                    <Text style={styles.deficitProductName}>{product.name}</Text>
+                    <Text style={[styles.deficitProductName, { color: c.text }]}>{product.name}</Text>
                     {deficitVariants.map((v) => (
-                      <Text key={v.sku} style={styles.deficitVariantText}>
+                      <Text key={v.sku} style={[styles.deficitVariantText, { color: c.danger }]}>
                         {v.sku} ({v.label}): {v.stock}
                       </Text>
                     ))}
@@ -117,8 +120,8 @@ export default function StockScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No products found</Text>
-              <Text style={styles.emptySubtext}>Pull to refresh or go online to sync</Text>
+              <Text style={[styles.emptyText, { color: c.textSecondary }]}>No products found</Text>
+              <Text style={[styles.emptySubtext, { color: c.textSecondary }]}>Pull to refresh or go online to sync</Text>
             </View>
           ) : null
         }

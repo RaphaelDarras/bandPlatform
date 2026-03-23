@@ -8,6 +8,7 @@ import {
 
 import type { ProductVariant, CachedProduct } from '@/db/products';
 import { useCartStore } from '@/stores/cartStore';
+import { useTheme } from '@/hooks/use-theme';
 import { stockColor } from '@/utils/stockColor';
 
 interface Props {
@@ -22,8 +23,10 @@ interface Props {
  */
 export function VariantPicker({ product, onClose }: Props) {
   const addItem = useCartStore((state) => state.addItem);
+  const c = useTheme();
 
   const handleVariantPress = (variant: ProductVariant) => {
+    const origPrice = (product as CachedProduct & { originalPrice?: number }).originalPrice ?? product.price;
     addItem({
       productId: product.id,
       variantSku: variant.sku,
@@ -31,25 +34,32 @@ export function VariantPicker({ product, onClose }: Props) {
       variantLabel: variant.label,
       quantity: 1,
       priceAtSale: product.price + variant.priceAdjustment,
+      originalPrice: origPrice + variant.priceAdjustment,
     });
     onClose();
   };
 
   return (
-    <View testID="variant-picker" style={styles.container}>
-      <Text style={styles.title}>{product.name}</Text>
-      {product.variants.map((variant) => (
-        <Pressable
-          key={variant.sku}
-          style={({ pressed }) => [styles.variantRow, pressed && styles.pressed]}
-          onPress={() => handleVariantPress(variant)}
-          accessibilityLabel={`${variant.label}, ${variant.stock} left`}
-        >
-          <Text style={styles.variantLabel}>{variant.label}</Text>
-          <Text style={[styles.stockLabel, { color: stockColor(variant.stock) }]}>
-            {variant.stock} left
-          </Text>
-        </Pressable>
+    <View testID="variant-picker" style={[styles.container, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+      <Text style={[styles.title, { color: c.text }]}>{product.name}</Text>
+      <View style={{ height: 1, backgroundColor: c.cardBorder, marginBottom: 4 }} />
+      {product.variants.map((variant, index) => (
+        <React.Fragment key={variant.sku}>
+          {index > 0 && <View style={{ height: 1, backgroundColor: c.cardBorder, marginHorizontal: 4 }} />}
+          <Pressable
+            style={({ pressed }) => [
+              styles.variantRow,
+              pressed && { backgroundColor: c.rowPressed },
+            ]}
+            onPress={() => handleVariantPress(variant)}
+            accessibilityLabel={`${variant.label}, ${variant.stock} left`}
+          >
+            <Text style={[styles.variantLabel, { color: c.text }]}>{variant.label}</Text>
+            <Text style={[styles.stockLabel, { color: stockColor(variant.stock) }]}>
+              {variant.stock} left
+            </Text>
+          </Pressable>
+        </React.Fragment>
       ))}
     </View>
   );
@@ -79,8 +89,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
     minHeight: 44,
   },
   pressed: {

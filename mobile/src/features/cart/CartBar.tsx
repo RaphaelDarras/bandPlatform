@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 
 import { useCartStore } from '@/stores/cartStore';
+import { currencySymbol } from '@/utils/currencySymbol';
 import { CartSheet, CartSheetHandle } from './CartSheet';
 
 /**
@@ -23,7 +24,7 @@ export function CartBar() {
   if (items.length === 0) return null;
 
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
-  const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+  const symbol = currencySymbol(currency);
 
   return (
     <>

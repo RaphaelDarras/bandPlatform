@@ -31,18 +31,41 @@ export function useStock() {
         apiGetProducts(),
       ]);
 
-      // Build a per-variant delta from pending (unsynced) sale_create outbox rows.
-      // These have been deducted locally but the backend hasn't received them yet.
+      // Build a per-variant delta from pending (unsynced) outbox rows.
+      // sale_create: deducted locally but backend doesn't know yet → subtract
+      // sale_void: reversed locally but backend doesn't know yet → add back
+      // sale_unvoid: re-deducted locally but backend doesn't know yet → subtract
       const pendingRows = await getPendingOutboxRows(db);
       const pendingDelta = new Map<string, number>();
       for (const row of pendingRows) {
-        if (row.type !== 'sale_create') continue;
-        const payload = JSON.parse(row.payload) as {
-          items: Array<{ productId: string; variantSku: string; quantity: number }>;
-        };
-        for (const item of payload.items) {
-          const key = `${item.productId}:${item.variantSku}`;
-          pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
+        if (row.type === 'sale_create') {
+          const payload = JSON.parse(row.payload) as {
+            items: Array<{ productId: string; variantSku: string; quantity: number }>;
+          };
+          for (const item of payload.items) {
+            const key = `${item.productId}:${item.variantSku}`;
+            pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
+          }
+        } else if (row.type === 'sale_void') {
+          const payload = JSON.parse(row.payload) as {
+            items?: Array<{ productId: string; variantSku: string; quantity: number }>;
+          };
+          if (payload.items) {
+            for (const item of payload.items) {
+              const key = `${item.productId}:${item.variantSku}`;
+              pendingDelta.set(key, (pendingDelta.get(key) ?? 0) - item.quantity);
+            }
+          }
+        } else if (row.type === 'sale_unvoid') {
+          const payload = JSON.parse(row.payload) as {
+            items?: Array<{ productId: string; variantSku: string; quantity: number }>;
+          };
+          if (payload.items) {
+            for (const item of payload.items) {
+              const key = `${item.productId}:${item.variantSku}`;
+              pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
+            }
+          }
         }
       }
 
@@ -105,7 +128,7 @@ export function useStock() {
    * These need to be reproduced/reordered.
    */
   const needsReproduction = products.filter((product) =>
-    product.variants.some((v) => v.stock < 0)
+    product.variants.some((v) => v.stock <= 0)
   );
 
   return {

@@ -16,6 +16,7 @@ export interface CartItem {
   variantLabel: string;
   quantity: number;
   priceAtSale: number;
+  originalPrice: number;
 }
 
 interface CartStore {
@@ -25,8 +26,8 @@ interface CartStore {
   discount: number;
   discountType: 'flat' | 'percent';
   addItem: (item: CartItem) => void;
-  removeItem: (sku: string) => void;
-  updateQuantity: (sku: string, quantity: number) => void;
+  removeItem: (productId: string, sku: string) => void;
+  updateQuantity: (productId: string, sku: string, quantity: number) => void;
   clearCart: () => void;
   setConcertId: (id: string | null) => void;
   setCurrency: (currency: string) => void;
@@ -45,11 +46,12 @@ export const useCartStore = create<CartStore>()(
 
       addItem: (item) =>
         set((s) => {
-          const existing = s.items.find((i) => i.variantSku === item.variantSku);
+          const key = `${item.productId}:${item.variantSku}`;
+          const existing = s.items.find((i) => `${i.productId}:${i.variantSku}` === key);
           if (existing) {
             return {
               items: s.items.map((i) =>
-                i.variantSku === item.variantSku
+                `${i.productId}:${i.variantSku}` === key
                   ? { ...i, quantity: i.quantity + item.quantity }
                   : i
               ),
@@ -58,17 +60,17 @@ export const useCartStore = create<CartStore>()(
           return { items: [...s.items, item] };
         }),
 
-      removeItem: (sku) =>
-        set((s) => ({ items: s.items.filter((i) => i.variantSku !== sku) })),
+      removeItem: (productId, sku) =>
+        set((s) => ({ items: s.items.filter((i) => !(i.productId === productId && i.variantSku === sku)) })),
 
-      updateQuantity: (sku, quantity) =>
+      updateQuantity: (productId, sku, quantity) =>
         set((s) => ({
           items: s.items.map((i) =>
-            i.variantSku === sku ? { ...i, quantity } : i
+            i.productId === productId && i.variantSku === sku ? { ...i, quantity } : i
           ),
         })),
 
-      clearCart: () => set({ items: [], discount: 0, discountType: 'flat', currency: 'EUR' }),
+      clearCart: () => set({ items: [], discount: 0, discountType: 'flat' }),
 
       setConcertId: (id) => set({ concertId: id }),
 
@@ -94,7 +96,8 @@ export const useCartStore = create<CartStore>()(
         const state = persisted as Partial<CartStore>;
         const rawItems: CartItem[] = state.items ?? [];
         const deduped = rawItems.reduce<CartItem[]>((acc, item) => {
-          const existing = acc.find((i) => i.variantSku === item.variantSku);
+          const key = `${item.productId}:${item.variantSku}`;
+          const existing = acc.find((i) => `${i.productId}:${i.variantSku}` === key);
           if (existing) {
             existing.quantity += item.quantity;
             return acc;

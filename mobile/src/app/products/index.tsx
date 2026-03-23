@@ -15,19 +15,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/hooks/use-theme';
 import { apiGetProducts, type ApiProduct } from '@/api/products';
 import { useSyncStore } from '@/stores/syncStore';
 
 function ProductItem({ product, onPress }: { product: ApiProduct; onPress: () => void }) {
+  const c = useTheme();
   return (
     <Pressable
-      style={({ pressed }) => [styles.productItem, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [styles.productItem, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }, pressed && { opacity: 0.8 }]}
       onPress={onPress}
       accessibilityLabel={`Edit ${product.name}`}
     >
       <View style={styles.productInfo}>
-        <Text style={styles.productName}>{product.name}</Text>
-        <Text style={styles.productMeta}>
+        <Text style={[styles.productName, { color: c.text }]}>{product.name}</Text>
+        <Text style={[styles.productMeta, { color: c.textSecondary }]}>
           €{product.price.toFixed(2)} · {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
         </Text>
       </View>
@@ -37,13 +39,14 @@ function ProductItem({ product, onPress }: { product: ApiProduct; onPress: () =>
             <Text style={styles.inactiveBadgeText}>Inactive</Text>
           </View>
         )}
-        <Text style={styles.chevron}>›</Text>
+        <Text style={[styles.chevron, { color: c.border }]}>›</Text>
       </View>
     </Pressable>
   );
 }
 
 export default function ProductsIndexScreen() {
+  const c = useTheme();
   const { isOnline } = useSyncStore();
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -69,18 +72,18 @@ export default function ProductsIndexScreen() {
 
   if (!isOnline) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Products</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Products</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.offlineState}>
           <Text style={styles.offlineIcon}>📵</Text>
-          <Text style={styles.offlineTitle}>Internet Required</Text>
-          <Text style={styles.offlineSubtext}>
+          <Text style={[styles.offlineTitle, { color: c.text }]}>Internet Required</Text>
+          <Text style={[styles.offlineSubtext, { color: c.textSecondary }]}>
             Product management requires an internet connection.
           </Text>
         </View>
@@ -89,12 +92,12 @@ export default function ProductsIndexScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Products</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Products</Text>
         <Pressable
           onPress={() => router.push('/products/new' as never)}
           style={styles.addButtonWrapper}
@@ -117,18 +120,19 @@ export default function ProductsIndexScreen() {
             onPress={() => router.push(`/products/${item.id}` as never)}
           />
         )}
+        ItemSeparatorComponent={() => <View style={{ height: 2, backgroundColor: c.border, marginVertical: 4 }} />}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={loadProducts} />
         }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No products yet</Text>
+              <Text style={[styles.emptyText, { color: c.textSecondary }]}>No products yet</Text>
               <Pressable
                 style={styles.createFirstButton}
                 onPress={() => router.push('/products/new' as never)}
               >
-                <Text style={styles.createFirstText}>Create your first product</Text>
+                <Text style={[styles.createFirstText, { color: c.accent }]}>Create your first product</Text>
               </Pressable>
             </View>
           ) : null

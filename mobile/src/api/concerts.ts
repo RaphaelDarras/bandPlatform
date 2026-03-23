@@ -1,5 +1,10 @@
 import { apiClient } from './client';
 
+export interface ConcertPriceOverrideApi {
+  productId: string;
+  price: number;
+}
+
 export interface Concert {
   id: string;
   venue: string;
@@ -7,6 +12,7 @@ export interface Concert {
   country: string;
   city: string;
   currency: string;
+  priceOverrides?: ConcertPriceOverrideApi[];
   active: boolean;
   createdAt?: string;
   updatedAt?: string;

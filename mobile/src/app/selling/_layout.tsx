@@ -15,8 +15,13 @@ export default function SellingLayout() {
   const segments = useSegments();
   const isOnReview = segments[segments.length - 1] === 'review';
 
+  const clearCart = useCartStore((state) => state.clearCart);
+  const setCurrency = useCartStore((state) => state.setCurrency);
+
   const handleExit = () => {
+    clearCart();
     setConcertId(null);
+    setCurrency('EUR');
     router.back();
   };
 

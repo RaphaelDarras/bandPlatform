@@ -10,6 +10,8 @@ import {
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
 import { useCartStore } from '@/stores/cartStore';
+import { currencySymbol } from '@/utils/currencySymbol';
+import { useTheme } from '@/hooks/use-theme';
 
 export interface CartSheetHandle {
   open: () => void;
@@ -27,13 +29,14 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
   const total = useCartStore((state) => state.total());
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
+  const c = useTheme();
 
   useImperativeHandle(ref, () => ({
     open: () => sheetRef.current?.snapToIndex(0),
     close: () => sheetRef.current?.close(),
   }));
 
-  const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+  const symbol = currencySymbol(currency);
 
   return (
     <BottomSheet
@@ -41,51 +44,53 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
       index={-1}
       snapPoints={['60%', '90%']}
       enablePanDownToClose
+      backgroundStyle={{ backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }}
+      handleIndicatorStyle={{ backgroundColor: c.textSecondary }}
     >
-      <BottomSheetView style={styles.container}>
-        <Text style={styles.title}>Cart</Text>
+      <BottomSheetView style={[styles.container, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+        <Text style={[styles.title, { color: c.text }]}>Cart</Text>
 
         <ScrollView style={styles.itemList} showsVerticalScrollIndicator={false}>
           {items.map((item) => (
-            <View key={item.variantSku} style={styles.itemRow} testID="cart-item">
+            <View key={`${item.productId}:${item.variantSku}`} style={[styles.itemRow, { borderBottomColor: c.border }]} testID="cart-item">
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={1}>
+                <Text style={[styles.itemName, { color: c.text }]} numberOfLines={1}>
                   {item.productName}
                 </Text>
-                <Text style={styles.itemVariant}>{item.variantLabel}</Text>
+                <Text style={[styles.itemVariant, { color: c.textSecondary }]}>{item.variantLabel}</Text>
               </View>
 
               <View style={styles.qtyControls}>
                 <Pressable
-                  style={styles.qtyBtn}
+                  style={[styles.qtyBtn, { backgroundColor: c.backgroundElement }]}
                   onPress={() =>
                     item.quantity > 1
-                      ? updateQuantity(item.variantSku, item.quantity - 1)
-                      : removeItem(item.variantSku)
+                      ? updateQuantity(item.productId, item.variantSku, item.quantity - 1)
+                      : removeItem(item.productId, item.variantSku)
                   }
                   accessibilityLabel={`Decrease ${item.productName}`}
                 >
-                  <Text style={styles.qtyBtnText}>{'−'}</Text>
+                  <Text style={[styles.qtyBtnText, { color: c.text }]}>{'−'}</Text>
                 </Pressable>
 
-                <Text style={styles.qtyText}>{item.quantity}</Text>
+                <Text style={[styles.qtyText, { color: c.text }]}>{item.quantity}</Text>
 
                 <Pressable
-                  style={styles.qtyBtn}
-                  onPress={() => updateQuantity(item.variantSku, item.quantity + 1)}
+                  style={[styles.qtyBtn, { backgroundColor: c.backgroundElement }]}
+                  onPress={() => updateQuantity(item.productId, item.variantSku, item.quantity + 1)}
                   accessibilityLabel={`Increase ${item.productName}`}
                 >
-                  <Text style={styles.qtyBtnText}>{'+'}</Text>
+                  <Text style={[styles.qtyBtnText, { color: c.text }]}>{'+'}</Text>
                 </Pressable>
               </View>
 
-              <Text style={styles.lineTotal}>
+              <Text style={[styles.lineTotal, { color: c.text }]}>
                 {`${symbol}${(item.priceAtSale * item.quantity).toFixed(2)}`}
               </Text>
 
               <Pressable
                 style={styles.removeBtn}
-                onPress={() => removeItem(item.variantSku)}
+                onPress={() => removeItem(item.productId, item.variantSku)}
                 accessibilityLabel={`Remove ${item.productName}`}
               >
                 <Text style={styles.removeBtnText}>{'✕'}</Text>
@@ -96,8 +101,8 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
 
         <View style={styles.footer}>
           <View style={styles.subtotalRow}>
-            <Text style={styles.subtotalLabel}>Total</Text>
-            <Text style={styles.subtotalValue}>
+            <Text style={[styles.subtotalLabel, { color: c.textSecondary }]}>Total</Text>
+            <Text style={[styles.subtotalValue, { color: c.text }]}>
               {`${symbol}${total.toFixed(2)}`}
             </Text>
           </View>
@@ -111,7 +116,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
             }}
           >
             {({ pressed }) => (
-              <View style={[styles.reviewBtn, pressed && styles.reviewBtnPressed]}>
+              <View style={[styles.reviewBtn, { backgroundColor: c.accent }, pressed && styles.reviewBtnPressed]}>
                 <Text style={styles.reviewBtnText}>Review Sale</Text>
               </View>
             )}

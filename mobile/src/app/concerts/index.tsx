@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { CachedConcert } from '@/db/concerts';
 import { useConcerts } from '@/features/concerts/useConcerts';
+import { useTheme } from '@/hooks/use-theme';
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, {
@@ -23,24 +24,25 @@ function formatDate(timestamp: number): string {
 }
 
 function ConcertRow({ concert }: { concert: CachedConcert }) {
+  const c = useTheme();
   const isActive = concert.active === 1;
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [styles.row, { backgroundColor: c.card, borderWidth: 1.5, borderColor: c.border }, pressed && styles.rowPressed]}
       onPress={() => router.push(`/concerts/${concert.id}` as never)}
       accessibilityLabel={[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ') || 'Concert'}
     >
       <View style={styles.rowInfo}>
-        <Text style={styles.rowName}>
+        <Text style={[styles.rowName, { color: c.text }]}>
           {[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ')}
         </Text>
-        <Text style={styles.rowMeta}>
+        <Text style={[styles.rowMeta, { color: c.textSecondary }]}>
           {concert.city ?? ''}
         </Text>
-        <Text style={styles.rowDate}>{formatDate(concert.date)}</Text>
+        <Text style={[styles.rowDate, { color: c.textSecondary }]}>{formatDate(concert.date)}</Text>
       </View>
       <View
-        style={[styles.badge, isActive ? styles.badgeActive : styles.badgeClosed]}
+        style={[styles.badge, isActive ? styles.badgeActive : [styles.badgeClosed, { backgroundColor: c.backgroundElement }]]}
       >
         <Text style={[styles.badgeText, isActive ? styles.badgeTextActive : styles.badgeTextClosed]}>
           {isActive ? 'Active' : 'Closed'}
@@ -51,6 +53,7 @@ function ConcertRow({ concert }: { concert: CachedConcert }) {
 }
 
 export default function ConcertListScreen() {
+  const c = useTheme();
   const { concerts, loading, loadConcerts } = useConcerts();
   const isFocused = useIsFocused();
 
@@ -66,22 +69,22 @@ export default function ConcertListScreen() {
 
   if (loading && concerts.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#208AEF" />
+          <ActivityIndicator size="large" color={c.accent} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Concerts</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Concerts</Text>
         <Pressable
           style={styles.addButton}
           onPress={() => router.push('/concerts/new' as never)}
@@ -94,8 +97,8 @@ export default function ConcertListScreen() {
       {concerts.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>{'🎤'}</Text>
-          <Text style={styles.emptyTitle}>No concerts yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>No concerts yet</Text>
+          <Text style={[styles.emptySubtitle, { color: c.textSecondary }]}>
             Tap "+ New" to create your first concert.
           </Text>
         </View>
@@ -108,7 +111,7 @@ export default function ConcertListScreen() {
           refreshControl={
             <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
           }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={() => <View style={{ height: 3, backgroundColor: c.textSecondary, marginVertical: 10, borderRadius: 1.5 }} />}
         />
       )}
     </SafeAreaView>

@@ -12,6 +12,7 @@ i18n.use(initReactI18next).init({
   lng: Localization.getLocales()[0]?.languageCode ?? 'en',
   fallbackLng: 'en',
   interpolation: { escapeValue: false },
+  react: { useSuspense: false },
 });
 
 export default i18n;

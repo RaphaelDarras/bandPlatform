@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useHistory } from '@/features/history/useHistory';
+import { useTheme } from '@/hooks/use-theme';
 
 function formatTimestamp(ts: number): string {
   const d = new Date(ts);
@@ -55,6 +56,7 @@ interface SaleRowItem {
 }
 
 function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) {
+  const c = useTheme();
   const raw = sale as unknown as { total_amount?: number; payment_method?: string };
   const itemCount = sale.parsedItems.reduce((sum, i) => sum + i.quantity, 0);
   const total = raw.total_amount ?? sale.totalAmount;
@@ -65,6 +67,7 @@ function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) 
     <Pressable
       style={({ pressed }) => [
         styles.saleRow,
+        { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder },
         pressed && styles.saleRowPressed,
         isVoided && styles.saleRowVoided,
       ]}
@@ -72,10 +75,10 @@ function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) 
       accessibilityLabel={`Sale from ${formatTimestamp(sale.created_at)}`}
     >
       <View style={styles.saleInfo}>
-        <Text style={[styles.saleTime, isVoided && styles.saleTextVoided]}>
+        <Text style={[styles.saleTime, { color: c.text }, isVoided && styles.saleTextVoided]}>
           {formatTimestamp(sale.created_at)}
         </Text>
-        <Text style={[styles.saleMeta, isVoided && styles.saleTextVoided]}>
+        <Text style={[styles.saleMeta, { color: c.textSecondary }, isVoided && styles.saleTextVoided]}>
           {`${itemCount} item${itemCount !== 1 ? 's' : ''} · ${paymentMethod}`}
         </Text>
       </View>
@@ -85,7 +88,7 @@ function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) 
             <Text style={styles.voidedBadgeText}>VOIDED</Text>
           </View>
         )}
-        <Text style={[styles.saleTotal, isVoided && styles.saleTextVoided]}>
+        <Text style={[styles.saleTotal, { color: c.text }, isVoided && styles.saleTextVoided]}>
           {`${sale.currency} ${(total ?? 0).toFixed(2)}`}
         </Text>
       </View>
@@ -101,13 +104,22 @@ interface ConcertSection {
 }
 
 export default function HistoryScreen() {
+  const c = useTheme();
   const { salesByGroup, concertNames, allConcertIds, loading, loadHistory } = useHistory();
   const [filter, setFilter] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
+  // Reload on filter change
   useEffect(() => {
     loadHistory(filter ?? undefined);
   }, [loadHistory, filter]);
+
+  // Reload when screen gains focus (e.g., after making a new sale)
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory(filter ?? undefined);
+    }, [loadHistory, filter])
+  );
 
   const handleRefresh = useCallback(async () => {
     await loadHistory(filter ?? undefined);
@@ -135,23 +147,23 @@ export default function HistoryScreen() {
   }));
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Transaction History</Text>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Transaction History</Text>
       </View>
 
       {/* Concert filter */}
-      <View style={styles.filterBar}>
+      <View style={[styles.filterBar, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable
-          style={styles.filterBtn}
+          style={[styles.filterBtn, { backgroundColor: c.inputBg, borderColor: c.inputBorder }]}
           onPress={() => setFilterOpen((v) => !v)}
           accessibilityLabel="Filter by concert"
         >
-          <Text style={styles.filterBtnText}>
+          <Text style={[styles.filterBtnText, { color: c.text }]}>
             {filter !== null ? (concertNames[filter] ?? (filter || 'No concert')) : 'All Concerts'}
           </Text>
-          <Text style={styles.filterBtnChevron}>{filterOpen ? '▲' : '▼'}</Text>
+          <Text style={[styles.filterBtnChevron, { color: c.textSecondary }]}>{filterOpen ? '▲' : '▼'}</Text>
         </Pressable>
         {filter !== null && (
           <Pressable
@@ -159,20 +171,20 @@ export default function HistoryScreen() {
             style={styles.clearFilterBtn}
             accessibilityLabel="Clear filter"
           >
-            <Text style={styles.clearFilterText}>Clear</Text>
+            <Text style={[styles.clearFilterText, { color: c.accent }]}>Clear</Text>
           </Pressable>
         )}
       </View>
 
       {/* Filter dropdown */}
       {filterOpen && (
-        <View style={styles.filterDropdown}>
+        <View style={[styles.filterDropdown, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder, borderBottomColor: c.border }]}>
           <Pressable
             style={[styles.filterOption, filter === null && styles.filterOptionSelected]}
             onPress={() => { setFilter(null); setFilterOpen(false); }}
             accessibilityLabel="All Concerts"
           >
-            <Text style={[styles.filterOptionText, filter === null && styles.filterOptionTextSelected]}>
+            <Text style={[styles.filterOptionText, { color: c.text }, filter === null && styles.filterOptionTextSelected]}>
               All Concerts
             </Text>
           </Pressable>
@@ -186,6 +198,7 @@ export default function HistoryScreen() {
               <Text
                 style={[
                   styles.filterOptionText,
+                  { color: c.text },
                   filter === opt.id && styles.filterOptionTextSelected,
                 ]}
               >
@@ -198,13 +211,13 @@ export default function HistoryScreen() {
 
       {loading && sections.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#208AEF" />
+          <ActivityIndicator size="large" color={c.accent} />
         </View>
       ) : sections.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>{'📋'}</Text>
-          <Text style={styles.emptyTitle}>No transactions yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>No transactions yet</Text>
+          <Text style={[styles.emptySubtitle, { color: c.textSecondary }]}>
             Completed sales will appear here.
           </Text>
         </View>
@@ -220,19 +233,22 @@ export default function HistoryScreen() {
           )}
           renderSectionHeader={({ section }) => (
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionHeaderTitle}>{section.concertName}</Text>
-              {section.data[0]?.created_at && (
-                <Text style={styles.sectionHeaderDate}>
-                  {formatConcertDate(section.data[0].created_at)}
-                </Text>
-              )}
+              <View style={{ height: 3, backgroundColor: c.textSecondary, borderRadius: 1.5, marginBottom: 10 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text style={[styles.sectionHeaderTitle, { color: c.text }]}>{section.concertName}</Text>
+                {section.data[0]?.created_at && (
+                  <Text style={[styles.sectionHeaderDate, { color: c.textSecondary }]}>
+                    {formatConcertDate(section.data[0].created_at)}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
           }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: c.border, marginVertical: 4, marginHorizontal: 4 }} />}
           stickySectionHeadersEnabled={false}
         />
       )}
@@ -307,10 +323,8 @@ const styles = StyleSheet.create({
   listContent: { padding: 12, paddingBottom: 24 },
   sectionHeader: {
     paddingHorizontal: 4,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   sectionHeaderTitle: {
     fontSize: 15,

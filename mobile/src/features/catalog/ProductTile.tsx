@@ -8,6 +8,8 @@ import {
 
 import type { CachedProduct } from '@/db/products';
 import { useCartStore } from '@/stores/cartStore';
+import { useTheme } from '@/hooks/use-theme';
+import { currencySymbol } from '@/utils/currencySymbol';
 import { stockColor } from '@/utils/stockColor';
 import { VariantPicker } from './VariantPicker';
 
@@ -24,10 +26,12 @@ interface Props {
 export function ProductTile({ product }: Props) {
   const [showPicker, setShowPicker] = useState(false);
   const addItem = useCartStore((state) => state.addItem);
+  const c = useTheme();
 
   const handlePress = () => {
     if (product.variants.length === 1) {
       const variant = product.variants[0];
+      const origPrice = (product as CachedProduct & { originalPrice?: number }).originalPrice ?? product.price;
       addItem({
         productId: product.id,
         variantSku: variant.sku,
@@ -35,6 +39,7 @@ export function ProductTile({ product }: Props) {
         variantLabel: variant.label,
         quantity: 1,
         priceAtSale: product.price + variant.priceAdjustment,
+        originalPrice: origPrice + variant.priceAdjustment,
       });
     } else {
       setShowPicker((v) => !v);
@@ -51,21 +56,21 @@ export function ProductTile({ product }: Props) {
     <View style={styles.wrapper}>
       <Pressable
         testID="product-tile"
-        style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }, pressed && { opacity: 0.85, backgroundColor: c.rowPressed }]}
         onPress={handlePress}
         accessibilityLabel={product.name}
       >
         {/* Placeholder image icon (no offline image storage per user decision) */}
-        <View style={styles.imagePlaceholder}>
+        <View style={[styles.imagePlaceholder, { backgroundColor: c.backgroundElement }]}>
           <Text style={styles.imageIcon}>{'🏷️'}</Text>
         </View>
 
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={[styles.name, { color: c.text }]} numberOfLines={2}>
           {product.name}
         </Text>
 
-        <Text style={styles.price}>
-          {`€${product.price.toFixed(2)}`}
+        <Text style={[styles.price, { color: c.accent }]}>
+          {`${currencySymbol(useCartStore.getState().currency)} ${product.price.toFixed(2)}`}
         </Text>
 
         <Text style={[styles.stock, { color: stockColor(minStock) }]} numberOfLines={1}>

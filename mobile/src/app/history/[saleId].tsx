@@ -20,6 +20,7 @@ import * as Crypto from 'expo-crypto';
 import { requestSync } from '@/features/sync/SyncManager';
 import { apiClient } from '@/api/client';
 import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
+import { useTheme } from '@/hooks/use-theme';
 
 function concertLabel(c: CachedConcert): string {
   const location = [c.venue || c.city, c.country].filter(Boolean).join(', ');
@@ -52,6 +53,7 @@ function formatTimestamp(ts: number): string {
 }
 
 export default function SaleDetailScreen() {
+  const c = useTheme();
   const { saleId } = useLocalSearchParams<{ saleId: string }>();
   const { voidSale, unvoidSale } = useHistory();
 
@@ -183,9 +185,9 @@ export default function SaleDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#208AEF" />
+          <ActivityIndicator size="large" color={c.accent} />
         </View>
       </SafeAreaView>
     );
@@ -193,9 +195,9 @@ export default function SaleDetailScreen() {
 
   if (!sale) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>Sale not found.</Text>
+          <Text style={[styles.errorText, { color: c.textSecondary }]}>Sale not found.</Text>
         </View>
       </SafeAreaView>
     );
@@ -216,13 +218,13 @@ export default function SaleDetailScreen() {
       : subtotal * (sale.discount / 100);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} accessibilityLabel="Go back">
-          <Text style={styles.backText}>Back</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Sale Detail</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Sale Detail</Text>
         {isVoided ? (
           <View style={styles.voidedHeaderBadge}>
             <Text style={styles.voidedHeaderBadgeText}>VOIDED</Text>
@@ -234,35 +236,35 @@ export default function SaleDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Metadata */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Concert</Text>
+            <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Concert</Text>
             <View style={styles.metaValueRow}>
-              <Text style={styles.metaValue}>{concertName}</Text>
+              <Text style={[styles.metaValue, { color: c.text }]}>{concertName}</Text>
               <Pressable
                 onPress={() => setShowConcertPicker(true)}
                 accessibilityLabel="Change concert"
                 style={styles.changeBtn}
               >
-                <Text style={styles.changeBtnText}>Change</Text>
+                <Text style={[styles.changeBtnText, { color: c.accent }]}>Change</Text>
               </Pressable>
             </View>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Date & Time</Text>
-            <Text style={styles.metaValue}>{formatTimestamp(sale.created_at)}</Text>
+            <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Date & Time</Text>
+            <Text style={[styles.metaValue, { color: c.text }]}>{formatTimestamp(sale.created_at)}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Payment</Text>
-            <Text style={styles.metaValue}>{sale.paymentMethod}</Text>
+            <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Payment</Text>
+            <Text style={[styles.metaValue, { color: c.text }]}>{sale.paymentMethod}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Currency</Text>
-            <Text style={styles.metaValue}>{sale.currency}</Text>
+            <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Currency</Text>
+            <Text style={[styles.metaValue, { color: c.text }]}>{sale.currency}</Text>
           </View>
           {isVoided && sale.voided_at && (
             <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Voided At</Text>
+              <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Voided At</Text>
               <Text style={[styles.metaValue, styles.voidedText]}>
                 {formatTimestamp(sale.voided_at)}
               </Text>
@@ -271,17 +273,17 @@ export default function SaleDetailScreen() {
         </View>
 
         {/* Items */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Items</Text>
+        <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Items</Text>
           {sale.parsedItems.map((item, index) => (
-            <View key={`${item.productId}-${item.variantSku}-${index}`} style={styles.itemRow}>
+            <View key={`${item.productId}-${item.variantSku}-${index}`} style={[styles.itemRow, { borderTopColor: c.border }]}>
               <View style={styles.itemInfo}>
-                <Text style={styles.itemSku}>{item.variantSku}</Text>
-                <Text style={styles.itemQty}>{`× ${item.quantity}`}</Text>
+                <Text style={[styles.itemSku, { color: c.text }]}>{item.variantSku}</Text>
+                <Text style={[styles.itemQty, { color: c.textSecondary }]}>{`× ${item.quantity}`}</Text>
               </View>
               <View style={styles.itemPriceCol}>
-                <Text style={styles.itemUnitPrice}>{`${sale.currency} ${item.priceAtSale.toFixed(2)}`}</Text>
-                <Text style={styles.itemLineTotal}>
+                <Text style={[styles.itemUnitPrice, { color: c.textSecondary }]}>{`${sale.currency} ${item.priceAtSale.toFixed(2)}`}</Text>
+                <Text style={[styles.itemLineTotal, { color: c.text }]}>
                   {`${sale.currency} ${(item.priceAtSale * item.quantity).toFixed(2)}`}
                 </Text>
               </View>
@@ -290,15 +292,15 @@ export default function SaleDetailScreen() {
         </View>
 
         {/* Totals */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Summary</Text>
+        <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Summary</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>{`${sale.currency} ${subtotal.toFixed(2)}`}</Text>
+            <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>Subtotal</Text>
+            <Text style={[styles.summaryValue, { color: c.text }]}>{`${sale.currency} ${subtotal.toFixed(2)}`}</Text>
           </View>
           {sale.discount > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>
+              <Text style={[styles.summaryLabel, { color: c.textSecondary }]}>
                 {`Discount (${sale.discountType === 'flat' ? `${sale.currency} flat` : `${sale.discount}%`})`}
               </Text>
               <Text style={[styles.summaryValue, styles.discountValue]}>
@@ -306,16 +308,16 @@ export default function SaleDetailScreen() {
               </Text>
             </View>
           )}
-          <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>
+          <View style={[styles.summaryRow, styles.totalRow, { borderTopColor: c.border }]}>
+            <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total</Text>
+            <Text style={[styles.totalValue, { color: c.text }]}>
               {`${sale.currency} ${totalAmount.toFixed(2)}`}
             </Text>
           </View>
         </View>
 
         {/* Void / Unvoid action */}
-        <View style={styles.actionsCard}>
+        <View style={[styles.actionsCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           {!isVoided ? (
             <Pressable
               style={styles.actionBtnWrapper}
@@ -353,9 +355,9 @@ export default function SaleDetailScreen() {
                   actionLoading && styles.actionBtnDisabled,
                 ]}>
                   {actionLoading ? (
-                    <ActivityIndicator color="#208AEF" />
+                    <ActivityIndicator color={c.accent} />
                   ) : (
-                    <Text style={styles.unvoidBtnText}>Unvoid Sale</Text>
+                    <Text style={[styles.unvoidBtnText, { color: c.accent }]}>Unvoid Sale</Text>
                   )}
                 </View>
               )}
@@ -371,27 +373,27 @@ export default function SaleDetailScreen() {
         animationType="slide"
         onRequestClose={() => setShowConcertPicker(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowConcertPicker(false)}>
-          <View style={styles.pickerSheet}>
-            <Text style={styles.pickerTitle}>Assign Concert</Text>
+        <Pressable style={[styles.modalOverlay, { backgroundColor: c.modalOverlay }]} onPress={() => setShowConcertPicker(false)}>
+          <View style={[styles.pickerSheet, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+            <Text style={[styles.pickerTitle, { color: c.text }]}>Assign Concert</Text>
 
             <Pressable
               style={[styles.pickerOption, !concertId && styles.pickerOptionSelected]}
               onPress={() => handleAssignConcert('')}
             >
-              <Text style={[styles.pickerOptionText, !concertId && styles.pickerOptionTextSelected]}>
+              <Text style={[styles.pickerOptionText, { color: c.text }, !concertId && styles.pickerOptionTextSelected]}>
                 No concert
               </Text>
             </Pressable>
 
-            {concerts.map((c) => (
+            {concerts.map((concert) => (
               <Pressable
-                key={c.id}
-                style={[styles.pickerOption, concertId === c.id && styles.pickerOptionSelected]}
-                onPress={() => handleAssignConcert(c.id)}
+                key={concert.id}
+                style={[styles.pickerOption, concertId === concert.id && styles.pickerOptionSelected]}
+                onPress={() => handleAssignConcert(concert.id)}
               >
-                <Text style={[styles.pickerOptionText, concertId === c.id && styles.pickerOptionTextSelected]}>
-                  {concertLabel(c)}
+                <Text style={[styles.pickerOptionText, { color: c.text }, concertId === concert.id && styles.pickerOptionTextSelected]}>
+                  {concertLabel(concert)}
                 </Text>
               </Pressable>
             ))}

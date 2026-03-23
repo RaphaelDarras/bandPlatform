@@ -59,6 +59,23 @@
     "pending": "{{count}} pending",
     "lastSync": "Last sync: {{time}}"
   },
+  "dashboard": {
+    "startSelling": "Start Selling",
+    "startSellingSubtitle": "Open the selling screen",
+    "startSellingDisabled": "Connect to internet to load products first",
+    "concertManagement": "Concert Management",
+    "concertManagementSubtitle": "Manage active concerts",
+    "transactionHistory": "Transaction History",
+    "transactionHistorySubtitle": "View past sales",
+    "stockOverview": "Stock Overview",
+    "stockOverviewSubtitle": "Check inventory levels",
+    "needsRestock": "Needs Restock",
+    "needsRestockSubtitle": "Items with negative stock",
+    "restock": "Restock",
+    "restockSubtitle": "Add inventory",
+    "manageProducts": "Manage Products",
+    "manageProductsSubtitle": "Edit catalog"
+  },
   "settings": {
     "language": "Language / Langue",
     "french": "Francais",

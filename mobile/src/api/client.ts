@@ -3,19 +3,9 @@ import { useAuthStore } from '@/stores/authStore';
 
 /**
  * Axios instance with base URL and JWT interceptors.
- * Base URL is read from Expo Constants (app.json extra.apiUrl) or defaults to localhost.
+ * Base URL is read from EXPO_PUBLIC_API_URL env variable or defaults to localhost.
  */
-let apiUrl = 'http://localhost:3000/api';
-try {
-  // expo-constants may not be available in all environments (e.g., tests)
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Constants = require('expo-constants').default;
-  if (Constants?.expoConfig?.extra?.apiUrl) {
-    apiUrl = Constants.expoConfig.extra.apiUrl;
-  }
-} catch {
-  // Fall back to default in test/non-Expo environments
-}
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
 export const apiClient = axios.create({
   baseURL: apiUrl,

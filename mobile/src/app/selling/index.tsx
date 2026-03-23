@@ -7,11 +7,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/hooks/use-theme';
 import { getDb } from '@/db';
 import { getCachedProducts, upsertProducts } from '@/db/products';
+import { getConcertPriceOverrides } from '@/db/concerts';
 import { getPendingOutboxRows } from '@/db/outbox';
 import type { CachedProduct } from '@/db/products';
 import { apiGetProducts } from '@/api/products';
+import { useCartStore } from '@/stores/cartStore';
 import { ProductGrid } from '@/features/catalog/ProductGrid';
 
 /**
@@ -21,6 +24,7 @@ import { ProductGrid } from '@/features/catalog/ProductGrid';
  * - Pull-to-refresh reloads from cache (API sync driven by separate background job)
  */
 export default function SellingScreen() {
+  const c = useTheme();
   const [products, setProducts] = useState<CachedProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,7 +73,23 @@ export default function SellingScreen() {
         // Network unavailable — fall through to cache
       }
 
-      const cached = await getCachedProducts(db);
+      let cached = await getCachedProducts(db);
+
+      // Apply concert price overrides if selling for a specific concert
+      const concertId = useCartStore.getState().concertId;
+      if (concertId) {
+        const overrides = await getConcertPriceOverrides(db, concertId);
+        if (overrides.length > 0) {
+          const overrideMap = new Map(overrides.map((ov) => [ov.product_id, ov.price]));
+          cached = cached.map((p) => {
+            const overridePrice = overrideMap.get(p.id);
+            return overridePrice !== undefined
+              ? { ...p, price: overridePrice, originalPrice: p.price }
+              : { ...p, originalPrice: p.price };
+          });
+        }
+      }
+
       setProducts(cached);
       setIsOffline(!fetchedFromApi && cached.length === 0);
     } catch (err) {
@@ -92,19 +112,19 @@ export default function SellingScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.loadingText}>Loading products...</Text>
+      <View style={[styles.centered, { backgroundColor: c.background }]}>
+        <Text style={[styles.loadingText, { color: c.textSecondary }]}>Loading products...</Text>
       </View>
     );
   }
 
   if (products.length === 0 && isOffline) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]} edges={['bottom']}>
         <View style={styles.centered}>
           <Text style={styles.offlineIcon}>{'📵'}</Text>
-          <Text style={styles.offlineTitle}>No products cached</Text>
-          <Text style={styles.offlineMessage}>
+          <Text style={[styles.offlineTitle, { color: c.text }]}>No products cached</Text>
+          <Text style={[styles.offlineMessage, { color: c.textSecondary }]}>
             Connect to the internet to load the product catalog.
           </Text>
         </View>
@@ -113,7 +133,7 @@ export default function SellingScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]} edges={['bottom']}>
       <ProductGrid
         products={products}
         onRefresh={handleRefresh}

@@ -24,7 +24,7 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { date, country, city, venue } = req.body;
+    const { date, country, city, venue, currency } = req.body;
 
     if (!date || !country || !city) {
       return res.status(400).json({ error: 'date, country, and city are required' });
@@ -35,6 +35,7 @@ router.post('/', authenticateToken, async (req, res) => {
       country,
       city,
       venue,
+      currency,
     });
 
     return res.status(201).json(concert);
@@ -67,7 +68,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
  */
 router.patch('/:id', authenticateToken, async (req, res) => {
   try {
-    const allowedFields = ['venue', 'date', 'country', 'city', 'active'];
+    const allowedFields = ['venue', 'date', 'country', 'city', 'active', 'currency', 'priceOverrides'];
     const updates = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {

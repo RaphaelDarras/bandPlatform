@@ -1,7 +1,7 @@
 import { useCartStore } from '@/stores/cartStore';
 
-const item1 = { productId: 'p1', variantSku: 'p1-m', productName: 'T-Shirt', variantLabel: 'M', quantity: 1, priceAtSale: 20 };
-const item2 = { productId: 'p2', variantSku: 'p2-l', productName: 'Cap', variantLabel: 'L', quantity: 2, priceAtSale: 10 };
+const item1 = { productId: 'p1', variantSku: 'p1-m', productName: 'T-Shirt', variantLabel: 'M', quantity: 1, priceAtSale: 20, originalPrice: 20 };
+const item2 = { productId: 'p2', variantSku: 'p2-l', productName: 'Cap', variantLabel: 'L', quantity: 2, priceAtSale: 10, originalPrice: 10 };
 
 beforeEach(() => {
   useCartStore.getState().clearCart();
@@ -26,7 +26,7 @@ describe('cartStore - removeItem', () => {
   it('removes item by variantSku', () => {
     useCartStore.getState().addItem(item1);
     useCartStore.getState().addItem(item2);
-    useCartStore.getState().removeItem('p1-m');
+    useCartStore.getState().removeItem('p1', 'p1-m');
     expect(useCartStore.getState().items).toHaveLength(1);
     expect(useCartStore.getState().items[0].variantSku).toBe('p2-l');
   });
@@ -35,7 +35,7 @@ describe('cartStore - removeItem', () => {
 describe('cartStore - updateQuantity', () => {
   it('updates quantity for specific item', () => {
     useCartStore.getState().addItem(item1);
-    useCartStore.getState().updateQuantity('p1-m', 3);
+    useCartStore.getState().updateQuantity('p1', 'p1-m', 3);
     expect(useCartStore.getState().items[0].quantity).toBe(3);
   });
 });

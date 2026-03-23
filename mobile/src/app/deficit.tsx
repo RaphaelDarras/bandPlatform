@@ -15,21 +15,23 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useStock } from '@/features/stock/useStock';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function DeficitScreen() {
   const { needsReproduction, loading, refreshStock } = useStock();
+  const c = useTheme();
 
   useEffect(() => {
     refreshStock();
   }, [refreshStock]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Needs Restock</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Needs Restock</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -41,25 +43,25 @@ export default function DeficitScreen() {
         {needsReproduction.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>{'✅'}</Text>
-            <Text style={styles.emptyTitle}>All good</Text>
-            <Text style={styles.emptySubtitle}>No items have negative stock.</Text>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>All good</Text>
+            <Text style={[styles.emptySubtitle, { color: c.textSecondary }]}>No items have negative stock.</Text>
           </View>
         ) : (
           needsReproduction.map((product) => {
-            const negativeVariants = product.variants.filter((v) => v.stock < 0);
+            const negativeVariants = product.variants.filter((v) => v.stock <= 0);
             return (
-              <View key={product.id} style={styles.card}>
-                <Text style={styles.productName}>{product.name}</Text>
+              <View key={product.id} style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+                <Text style={[styles.productName, { color: c.text }]}>{product.name}</Text>
                 {negativeVariants.map((v) => (
-                  <View key={v.sku} style={styles.variantRow}>
+                  <View key={v.sku} style={[styles.variantRow, { borderTopColor: c.border }]}>
                     <View style={styles.variantInfo}>
-                      <Text style={styles.variantLabel}>{v.label}</Text>
-                      <Text style={styles.variantSku}>{v.sku}</Text>
+                      <Text style={[styles.variantLabel, { color: c.text }]}>{v.label}</Text>
+                      <Text style={[styles.variantSku, { color: c.textSecondary }]}>{v.sku}</Text>
                     </View>
                     <View style={styles.variantNumbers}>
                       <Text style={styles.currentStock}>{v.stock}</Text>
                       <Text style={styles.toReproduce}>
-                        {`Reproduce ${Math.abs(v.stock)}`}
+                        {v.stock < 0 ? `Reproduce ${Math.abs(v.stock)}` : 'Out of stock'}
                       </Text>
                     </View>
                   </View>

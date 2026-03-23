@@ -58,6 +58,7 @@ beforeEach(() => {
         variantLabel: 'S',
         quantity: 2,
         priceAtSale: 25.0,
+        originalPrice: 25.0,
       },
       {
         productId: 'prod-2',
@@ -66,6 +67,7 @@ beforeEach(() => {
         variantLabel: 'Default',
         quantity: 1,
         priceAtSale: 5.0,
+        originalPrice: 5.0,
       },
     ],
     concertId: 'concert-abc',

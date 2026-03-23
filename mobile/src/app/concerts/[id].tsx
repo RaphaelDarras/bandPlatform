@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,8 +19,11 @@ import { getConcertById, getConcertPriceOverrides, upsertPriceOverride, deletePr
 import type { ConcertPriceOverride } from '@/db/concerts';
 import { getCachedProducts } from '@/db/products';
 import type { CachedProduct } from '@/db/products';
+import { apiPatchConcert } from '@/api/concerts';
 import { useConcerts, getConcertReport } from '@/features/concerts/useConcerts';
 import type { ConcertReport } from '@/features/concerts/useConcerts';
+import { useTheme } from '@/hooks/use-theme';
+import { currencySymbol } from '@/utils/currencySymbol';
 import { useCartStore } from '@/stores/cartStore';
 
 function formatDate(timestamp: number): string {
@@ -43,33 +46,34 @@ function TotalsModal({
   concertName: string;
   onClose: () => void;
 }) {
+  const c = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>{concertName}</Text>
-          <Text style={styles.modalSubtitle}>Concert Closed</Text>
+      <View style={[styles.modalOverlay, { backgroundColor: c.modalOverlay }]}>
+        <View style={[styles.modalCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+          <Text style={[styles.modalTitle, { color: c.text }]}>{concertName}</Text>
+          <Text style={[styles.modalSubtitle, { color: c.textSecondary }]}>Concert Closed</Text>
 
           {totals && (
             <View style={styles.totalsGrid}>
               <View style={styles.totalItem}>
                 {Object.entries(totals.revenuesByCurrency).map(([currency, amount]) => (
-                  <Text key={currency} style={styles.totalValue}>
+                  <Text key={currency} style={[styles.totalValue, { color: c.text }]}>
                     {`${currency} ${amount.toFixed(2)}`}
                   </Text>
                 ))}
                 {Object.keys(totals.revenuesByCurrency).length === 0 && (
-                  <Text style={styles.totalValue}>—</Text>
+                  <Text style={[styles.totalValue, { color: c.text }]}>—</Text>
                 )}
-                <Text style={styles.totalLabel}>Total Revenue</Text>
+                <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Total Revenue</Text>
               </View>
               <View style={styles.totalItem}>
-                <Text style={styles.totalValue}>{totals.transactionCount}</Text>
-                <Text style={styles.totalLabel}>Transactions</Text>
+                <Text style={[styles.totalValue, { color: c.text }]}>{totals.transactionCount}</Text>
+                <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Transactions</Text>
               </View>
               <View style={styles.totalItem}>
-                <Text style={styles.totalValue}>{totals.itemsSold}</Text>
-                <Text style={styles.totalLabel}>Items Sold</Text>
+                <Text style={[styles.totalValue, { color: c.text }]}>{totals.itemsSold}</Text>
+                <Text style={[styles.totalLabel, { color: c.textSecondary }]}>Items Sold</Text>
               </View>
             </View>
           )}
@@ -90,18 +94,21 @@ function TotalsModal({
 function PriceOverrideRow({
   override,
   products,
+  currencySymbol: sym,
   onDelete,
 }: {
   override: ConcertPriceOverride;
   products: CachedProduct[];
+  currencySymbol: string;
   onDelete: () => void;
 }) {
+  const c = useTheme();
   const product = products.find((p) => p.id === override.product_id);
   return (
     <View style={styles.overrideRow}>
       <View style={styles.overrideInfo}>
-        <Text style={styles.overrideName}>{product?.name ?? override.product_id}</Text>
-        <Text style={styles.overridePrice}>{`€${override.price.toFixed(2)}`}</Text>
+        <Text style={[styles.overrideName, { color: c.text }]}>{product?.name ?? override.product_id}</Text>
+        <Text style={[styles.overridePrice, { color: c.textSecondary }]}>{`${sym} ${override.price.toFixed(2)}`}</Text>
       </View>
       <Pressable
         onPress={onDelete}
@@ -115,6 +122,7 @@ function PriceOverrideRow({
 }
 
 export default function ConcertDetailScreen() {
+  const c = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { closeConcert, reopenConcert } = useConcerts();
   const setConcertId = useCartStore((state) => state.setConcertId);
@@ -136,9 +144,23 @@ export default function ConcertDetailScreen() {
     setLoading(true);
     try {
       const db = await getDb();
-      const c = await getConcertById(db, id);
-      setConcert(c);
-      if (c) {
+      const concertData = await getConcertById(db, id);
+      setConcert(concertData);
+      if (concertData) {
+        // Try to sync overrides from API
+        try {
+          const { apiGetConcert } = await import('@/api/concerts');
+          const apiConcert = await apiGetConcert(id);
+          if (apiConcert.priceOverrides && apiConcert.priceOverrides.length > 0) {
+            // Sync API overrides to local SQLite
+            for (const ov of apiConcert.priceOverrides) {
+              await upsertPriceOverride(db, id, ov.productId, ov.price);
+            }
+          }
+        } catch {
+          // Offline — use local overrides
+        }
+
         const [ov, prods] = await Promise.all([
           getConcertPriceOverrides(db, id),
           getCachedProducts(db),
@@ -159,6 +181,13 @@ export default function ConcertDetailScreen() {
   useEffect(() => {
     loadConcert();
   }, [loadConcert]);
+
+  // Reload when screen gains focus (e.g., after making a sale)
+  useFocusEffect(
+    useCallback(() => {
+      loadConcert();
+    }, [loadConcert])
+  );
 
   const handleStartSelling = () => {
     if (!concert) return;
@@ -223,8 +252,26 @@ export default function ConcertDetailScreen() {
     );
   };
 
+  const syncOverridesToApi = async (concertId: string, updatedOverrides: ConcertPriceOverride[]) => {
+    try {
+      await apiPatchConcert(concertId, {
+        priceOverrides: updatedOverrides.map((ov) => ({ productId: ov.product_id, price: ov.price })),
+      } as never);
+    } catch {
+      // Offline — local overrides still apply, will sync next time concert is loaded
+    }
+  };
+
   const handleAddOverride = async () => {
-    if (!concert || !editProductId || !editPrice) return;
+    if (!concert) return;
+    if (!editProductId) {
+      Alert.alert('Select a product', 'Tap a product first, then set the price.');
+      return;
+    }
+    if (!editPrice) {
+      Alert.alert('Enter a price', 'Type a price for the selected product.');
+      return;
+    }
     const price = parseFloat(editPrice);
     if (isNaN(price) || price < 0) {
       Alert.alert('Invalid price', 'Enter a valid price.');
@@ -236,6 +283,7 @@ export default function ConcertDetailScreen() {
     setEditPrice('');
     const updated = await getConcertPriceOverrides(db, concert.id);
     setOverrides(updated);
+    syncOverridesToApi(concert.id, updated);
   };
 
   const handleDeleteOverride = async (productId: string) => {
@@ -244,13 +292,14 @@ export default function ConcertDetailScreen() {
     await deletePriceOverride(db, concert.id, productId);
     const updated = await getConcertPriceOverrides(db, concert.id);
     setOverrides(updated);
+    syncOverridesToApi(concert.id, updated);
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#208AEF" />
+          <ActivityIndicator size="large" color={c.accent} />
         </View>
       </SafeAreaView>
     );
@@ -258,9 +307,9 @@ export default function ConcertDetailScreen() {
 
   if (!concert) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>Concert not found.</Text>
+          <Text style={[styles.errorText, { color: c.textSecondary }]}>Concert not found.</Text>
         </View>
       </SafeAreaView>
     );
@@ -269,13 +318,13 @@ export default function ConcertDetailScreen() {
   const isActive = concert.active === 1;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
         <Pressable onPress={() => router.back()} accessibilityLabel="Go back">
-          <Text style={styles.backText}>Back</Text>
+          <Text style={[styles.backText, { color: c.accent }]}>Back</Text>
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: c.text }]} numberOfLines={1}>
           {[concert.venue, concert.city, concert.country].filter(Boolean).join(' · ')}
         </Text>
         <View style={{ width: 48 }} />
@@ -283,9 +332,9 @@ export default function ConcertDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Concert info card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           <View style={styles.cardRow}>
-            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={[styles.infoLabel, { color: c.textSecondary }]}>Status</Text>
             <View style={[styles.statusBadge, isActive ? styles.badgeActive : styles.badgeClosed]}>
               <Text style={[styles.statusBadgeText, isActive ? styles.badgeTextActive : styles.badgeTextClosed]}>
                 {isActive ? 'Active' : 'Closed'}
@@ -293,50 +342,50 @@ export default function ConcertDetailScreen() {
             </View>
           </View>
           <View style={styles.cardRow}>
-            <Text style={styles.infoLabel}>Date</Text>
-            <Text style={styles.infoValue}>{formatDate(concert.date)}</Text>
+            <Text style={[styles.infoLabel, { color: c.textSecondary }]}>Date</Text>
+            <Text style={[styles.infoValue, { color: c.text }]}>{formatDate(concert.date)}</Text>
           </View>
           <View style={styles.cardRow}>
-            <Text style={styles.infoLabel}>Currency</Text>
-            <Text style={styles.infoValue}>{concert.currency ?? 'EUR'}</Text>
+            <Text style={[styles.infoLabel, { color: c.textSecondary }]}>Currency</Text>
+            <Text style={[styles.infoValue, { color: c.text }]}>{concert.currency ?? 'EUR'}</Text>
           </View>
           {concert.venue && (
             <View style={styles.cardRow}>
-              <Text style={styles.infoLabel}>Venue</Text>
-              <Text style={styles.infoValue}>{concert.venue}</Text>
+              <Text style={[styles.infoLabel, { color: c.textSecondary }]}>Venue</Text>
+              <Text style={[styles.infoValue, { color: c.text }]}>{concert.venue}</Text>
             </View>
           )}
           {concert.city && (
             <View style={styles.cardRow}>
-              <Text style={styles.infoLabel}>City</Text>
-              <Text style={styles.infoValue}>{concert.city}</Text>
+              <Text style={[styles.infoLabel, { color: c.textSecondary }]}>City</Text>
+              <Text style={[styles.infoValue, { color: c.text }]}>{concert.city}</Text>
             </View>
           )}
         </View>
 
         {/* Totals summary (always visible for active and closed concerts) */}
         {totals && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Sales Summary</Text>
+          <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Sales Summary</Text>
             <View style={styles.totalsRow}>
               <View style={styles.totalCell}>
                 {Object.entries(totals.revenuesByCurrency).map(([currency, amount]) => (
-                  <Text key={currency} style={styles.totalCellValue}>
+                  <Text key={currency} style={[styles.totalCellValue, { color: c.text }]}>
                     {`${currency} ${amount.toFixed(2)}`}
                   </Text>
                 ))}
                 {Object.keys(totals.revenuesByCurrency).length === 0 && (
-                  <Text style={styles.totalCellValue}>—</Text>
+                  <Text style={[styles.totalCellValue, { color: c.text }]}>—</Text>
                 )}
-                <Text style={styles.totalCellLabel}>Revenue</Text>
+                <Text style={[styles.totalCellLabel, { color: c.textSecondary }]}>Revenue</Text>
               </View>
               <View style={styles.totalCell}>
-                <Text style={styles.totalCellValue}>{totals.transactionCount}</Text>
-                <Text style={styles.totalCellLabel}>Transactions</Text>
+                <Text style={[styles.totalCellValue, { color: c.text }]}>{totals.transactionCount}</Text>
+                <Text style={[styles.totalCellLabel, { color: c.textSecondary }]}>Transactions</Text>
               </View>
               <View style={styles.totalCell}>
-                <Text style={styles.totalCellValue}>{totals.itemsSold}</Text>
-                <Text style={styles.totalCellLabel}>Items Sold</Text>
+                <Text style={[styles.totalCellValue, { color: c.text }]}>{totals.itemsSold}</Text>
+                <Text style={[styles.totalCellLabel, { color: c.textSecondary }]}>Items Sold</Text>
               </View>
             </View>
           </View>
@@ -344,10 +393,10 @@ export default function ConcertDetailScreen() {
 
         {/* Product Breakdown */}
         {totals && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Product Breakdown</Text>
+          <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Product Breakdown</Text>
             {totals.variantBreakdowns.length === 0 ? (
-              <Text style={styles.reportEmpty}>No sales recorded</Text>
+              <Text style={[styles.reportEmpty, { color: c.textSecondary }]}>No sales recorded</Text>
             ) : (
               (() => {
                 // Group variantBreakdowns by productName
@@ -359,12 +408,12 @@ export default function ConcertDetailScreen() {
                 }
                 return Array.from(groups.entries()).map(([productName, variants]) => (
                   <View key={productName} style={styles.productGroup}>
-                    <Text style={styles.productGroupName}>{productName}</Text>
+                    <Text style={[styles.productGroupName, { color: c.text }]}>{productName}</Text>
                     {variants.map((vb) => (
                       <View key={`${vb.variantSku}:${vb.currency}`} style={styles.variantRow}>
-                        <Text style={styles.variantLabel}>{vb.variantLabel}</Text>
-                        <Text style={styles.variantQty}>{`×${vb.quantitySold}`}</Text>
-                        <Text style={styles.variantRevenue}>{`${vb.currency} ${vb.revenue.toFixed(2)}`}</Text>
+                        <Text style={[styles.variantLabel, { color: c.textSecondary }]}>{vb.variantLabel}</Text>
+                        <Text style={[styles.variantQty, { color: c.textSecondary }]}>{`×${vb.quantitySold}`}</Text>
+                        <Text style={[styles.variantRevenue, { color: c.text }]}>{`${vb.currency} ${vb.revenue.toFixed(2)}`}</Text>
                       </View>
                     ))}
                   </View>
@@ -376,21 +425,21 @@ export default function ConcertDetailScreen() {
 
         {/* Payment Methods */}
         {totals && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Payment Methods</Text>
+          <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Payment Methods</Text>
             {totals.paymentBreakdowns.length === 0 ? (
-              <Text style={styles.reportEmpty}>No sales recorded</Text>
+              <Text style={[styles.reportEmpty, { color: c.textSecondary }]}>No sales recorded</Text>
             ) : (
               totals.paymentBreakdowns.map((pb) => (
                 <View key={`${pb.method}:${pb.currency}`} style={styles.paymentRow}>
-                  <Text style={styles.paymentLabel}>{pb.displayLabel}</Text>
-                  <Text style={styles.paymentTxns}>{`${pb.transactionCount} txn${pb.transactionCount !== 1 ? 's' : ''}`}</Text>
-                  <Text style={styles.paymentRevenue}>{`${pb.currency} ${pb.revenue.toFixed(2)}`}</Text>
+                  <Text style={[styles.paymentLabel, { color: c.text }]}>{pb.displayLabel}</Text>
+                  <Text style={[styles.paymentTxns, { color: c.textSecondary }]}>{`${pb.transactionCount} txn${pb.transactionCount !== 1 ? 's' : ''}`}</Text>
+                  <Text style={[styles.paymentRevenue, { color: c.text }]}>{`${pb.currency} ${pb.revenue.toFixed(2)}`}</Text>
                 </View>
               ))
             )}
             {totals.voidedCount > 0 && (
-              <Text style={styles.voidedNote}>
+              <Text style={[styles.voidedNote, { color: c.textSecondary }]}>
                 {`${totals.voidedCount} voided sale${totals.voidedCount !== 1 ? 's' : ''} (${totals.voidedRevenue.toFixed(2)} voided)`}
               </Text>
             )}
@@ -398,7 +447,7 @@ export default function ConcertDetailScreen() {
         )}
 
         {/* Actions */}
-        <View style={styles.actionsCard}>
+        <View style={[styles.actionsCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           {isActive ? (
             <>
               <Pressable
@@ -466,21 +515,21 @@ export default function ConcertDetailScreen() {
         </View>
 
         {/* Per-concert price overrides */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           <View style={styles.overrideHeader}>
-            <Text style={styles.sectionTitle}>Price Overrides</Text>
+            <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Price Overrides</Text>
             <Pressable
               onPress={() => setShowEditPrices((v) => !v)}
               accessibilityLabel="Edit Prices"
             >
-              <Text style={styles.editPricesBtn}>
+              <Text style={[styles.editPricesBtn, { color: c.accent }]}>
                 {showEditPrices ? 'Done' : 'Edit Prices'}
               </Text>
             </Pressable>
           </View>
 
           {overrides.length === 0 && !showEditPrices && (
-            <Text style={styles.overrideEmpty}>No price overrides set for this concert.</Text>
+            <Text style={[styles.overrideEmpty, { color: c.textSecondary }]}>No price overrides set for this concert.</Text>
           )}
 
           {overrides.map((ov) => (
@@ -488,22 +537,27 @@ export default function ConcertDetailScreen() {
               key={ov.product_id}
               override={ov}
               products={products}
+              currencySymbol={currencySymbol(concert?.currency ?? 'EUR')}
               onDelete={() => handleDeleteOverride(ov.product_id)}
             />
           ))}
 
-          {showEditPrices && (
+          {showEditPrices && (() => {
+            const overrideIds = new Set(overrides.map((ov) => ov.product_id));
+            const availableProducts = products.filter((p) => !overrideIds.has(p.id));
+            return (
             <View style={styles.addOverrideForm}>
-              <Text style={styles.addOverrideLabel}>Add / Update Override</Text>
-              {products.length > 0 ? (
-                <View style={styles.overrideFormRow}>
-                  <View style={{ flex: 2 }}>
-                    {products.map((p) => (
+              {availableProducts.length > 0 ? (
+                <>
+                  <Text style={[styles.addOverrideLabel, { color: c.textSecondary }]}>1. Select product</Text>
+                  <View style={styles.chipRow}>
+                    {availableProducts.map((p) => (
                       <Pressable
                         key={p.id}
                         style={[
                           styles.productChip,
-                          editProductId === p.id && styles.productChipSelected,
+                          { backgroundColor: c.backgroundElement },
+                          editProductId === p.id && [styles.productChipSelected, { borderColor: c.accent }],
                         ]}
                         onPress={() => setEditProductId(p.id)}
                         accessibilityLabel={`Select product ${p.name}`}
@@ -511,7 +565,8 @@ export default function ConcertDetailScreen() {
                         <Text
                           style={[
                             styles.productChipText,
-                            editProductId === p.id && styles.productChipTextSelected,
+                            { color: c.textSecondary },
+                            editProductId === p.id && [styles.productChipTextSelected, { color: c.accent }],
                           ]}
                           numberOfLines={1}
                         >
@@ -520,33 +575,47 @@ export default function ConcertDetailScreen() {
                       </Pressable>
                     ))}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <TextInput
-                      style={styles.priceInput}
-                      value={editPrice}
-                      onChangeText={setEditPrice}
-                      placeholder="Price"
-                      keyboardType="decimal-pad"
-                      accessibilityLabel="Override price"
-                    />
-                    <Pressable
-                      style={styles.addOverrideBtnWrapper}
-                      onPress={handleAddOverride}
-                      accessibilityLabel="Add price override"
-                    >
-                      {({ pressed }) => (
-                        <View style={[styles.addOverrideBtn, pressed && { opacity: 0.85 }]}>
-                          <Text style={styles.addOverrideBtnText}>Add</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  </View>
-                </View>
+
+                  {editProductId ? (
+                    <>
+                      <Text style={[styles.addOverrideLabel, { color: c.textSecondary, marginTop: 12 }]}>
+                        2. Set price for {products.find((p) => p.id === editProductId)?.name}
+                      </Text>
+                      <View style={styles.priceRow}>
+                        <TextInput
+                          style={[styles.priceInput, { backgroundColor: c.inputBg, borderColor: c.inputBorder, color: c.text, flex: 1 }]}
+                          value={editPrice}
+                          onChangeText={setEditPrice}
+                          placeholder="Enter price"
+                          placeholderTextColor={c.textSecondary}
+                          keyboardType="decimal-pad"
+                          accessibilityLabel="Override price"
+                        />
+                        <Pressable
+                          style={styles.addOverrideBtnWrapper}
+                          onPress={handleAddOverride}
+                          accessibilityLabel="Save price override"
+                        >
+                          {({ pressed }) => (
+                            <View style={[styles.addOverrideBtn, { backgroundColor: c.accent }, pressed && { opacity: 0.85 }]}>
+                              <Text style={styles.addOverrideBtnText}>Save</Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={[styles.overrideEmpty, { color: c.textSecondary, marginTop: 8 }]}>Tap a product above to set its price for this concert.</Text>
+                  )}
+                </>
               ) : (
-                <Text style={styles.overrideEmpty}>No products in catalog.</Text>
+                <Text style={[styles.overrideEmpty, { color: c.textSecondary }]}>
+                  {products.length === 0 ? 'No products in catalog.' : 'All products have overrides.'}
+                </Text>
               )}
             </View>
-          )}
+            );
+          })()}
         </View>
       </ScrollView>
 
@@ -663,6 +732,8 @@ const styles = StyleSheet.create({
   addOverrideForm: { gap: 8, paddingTop: 8 },
   addOverrideLabel: { fontSize: 12, color: '#888', fontWeight: '600', textTransform: 'uppercase' },
   overrideFormRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  priceRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   productChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
