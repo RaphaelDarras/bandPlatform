@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hurakan — Stock</title>
+  <style>
+    @font-face {
+      font-family: 'Hewalk';
+      src: url('../fonts/Hewalk - PERSONAL USE ONLY.otf') format('opentype');
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+    h1 {
+      font-family: 'Hewalk', sans-serif;
+      text-align: center;
+      font-size: 2rem;
+      padding: 2rem 0 1rem;
+    }
+
+    /* Login */
+    #login {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 1rem;
+    }
+    #login h1 { padding: 0 0 1rem; }
+    #login input {
+      background: #111;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      width: 260px;
+    }
+    #login button {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #login button:hover { opacity: 0.85; }
+    #login-error {
+      color: #ef4444;
+      font-size: 0.875rem;
+      min-height: 1.25rem;
+    }
+
+    /* Stock table */
+    #stock { display: none; }
+    .grand-total {
+      text-align: center;
+      color: #888;
+      font-size: 0.9rem;
+      padding-bottom: 1.5rem;
+    }
+    .product-group {
+      margin: 0 auto 2rem;
+      max-width: 700px;
+      padding: 0 1rem;
+    }
+    .product-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+    }
+    .product-total { color: #888; font-weight: 400; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.25rem;
+    }
+    th {
+      text-align: left;
+      color: #666;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      padding: 0.5rem 0.5rem;
+    }
+    td {
+      padding: 0.4rem 0.5rem;
+      border-top: 1px solid #1a1a1a;
+      font-size: 0.9rem;
+    }
+    .stock-zero { color: #ef4444; }
+    .stock-low { color: #f59e0b; }
+    .stock-ok { color: #22c55e; }
+  </style>
+</head>
+<body>
+
+  <div id="login">
+    <h1>Hurakan</h1>
+    <input type="text" id="username" placeholder="Username" autocomplete="username">
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+    <button onclick="login()">Login</button>
+    <div id="login-error"></div>
+  </div>
+
+  <div id="stock">
+    <h1>Stock</h1>
+    <div class="grand-total" id="grand-total"></div>
+    <div id="stock-content"></div>
+  </div>
+
+  <script>
+    const API = 'https://hurakan-band-platform.onrender.com';
+    let token = sessionStorage.getItem('token');
+
+    if (token) {
+      loadStock();
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('login-error');
+      errorEl.textContent = '';
+
+      try {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+        token = data.token;
+        sessionStorage.setItem('token', token);
+        loadStock();
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    }
+
+    async function loadStock() {
+      try {
+        const res = await fetch(`${API}/api/inventory/stock`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.status === 401 || res.status === 403) {
+          sessionStorage.removeItem('token');
+          token = null;
+          document.getElementById('login').style.display = 'flex';
+          document.getElementById('stock').style.display = 'none';
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('stock').style.display = 'block';
+        renderStock(data);
+      } catch (err) {
+        document.getElementById('stock-content').innerHTML =
+          `<p style="text-align:center;color:#ef4444">Failed to load stock</p>`;
+      }
+    }
+
+    function renderStock(data) {
+      document.getElementById('grand-total').textContent =
+        `${data.grandTotal} units across ${data.productCount} products`;
+
+      const html = data.products.map(p => {
+        const rows = p.variants.map(v => {
+          const cls = v.stock === 0 ? 'stock-zero' : v.stock <= 5 ? 'stock-low' : 'stock-ok';
+          return `<tr>
+            <td>${v.sku}</td>
+            <td>${v.size || '—'}</td>
+            <td>${v.color || '—'}</td>
+            <td class="${cls}">${v.stock}</td>
+          </tr>`;
+        }).join('');
+
+        return `<div class="product-group">
+          <div class="product-name">
+            ${p.name}
+            <span class="product-total">${p.productTotal} units</span>
+          </div>
+          <table>
+            <thead><tr><th>SKU</th><th>Size</th><th>Color</th><th>Stock</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      }).join('');
+
+      document.getElementById('stock-content').innerHTML = html;
+    }
+  </script>
+</body>
+</html>
