@@ -24,7 +24,7 @@ interface SyncStore {
 export const useSyncStore = create<SyncStore>()(
   persist(
     (set, get) => ({
-      isOnline: false,
+      isOnline: true,
       pendingCount: 0,
       lastSyncAt: null,
       consecutiveFailures: 0,

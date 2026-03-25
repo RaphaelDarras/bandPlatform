@@ -18,7 +18,8 @@ export function useConnectivitySync(
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const deviceOnline = !!(state.isConnected && state.isInternetReachable);
+      // isInternetReachable can be null on Android initially — treat null as reachable
+      const deviceOnline = !!(state.isConnected && state.isInternetReachable !== false);
       const { consecutiveFailures } = useSyncStore.getState();
 
       // Device has network BUT server is unreachable (3+ consecutive sync failures)

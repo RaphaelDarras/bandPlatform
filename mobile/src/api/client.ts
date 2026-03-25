@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
  * Axios instance with base URL and JWT interceptors.
  * Base URL is read from EXPO_PUBLIC_API_URL env variable or defaults to localhost.
  */
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:5000/api';
 
 export const apiClient = axios.create({
   baseURL: apiUrl,

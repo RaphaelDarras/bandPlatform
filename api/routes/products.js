@@ -251,22 +251,52 @@ router.put('/:id', authenticateToken, async (req, res) => {
       );
     }
 
-    // Apply variant metadata updates (matched by SKU, positional operator)
+    // Apply variant updates: update existing by SKU, add new ones
     if (hasVariants) {
+      const product = await Product.findById(req.params.id);
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      const existingSkus = new Set(product.variants.map((v) => v.sku));
+
+      // Remove variants not present in the payload
+      const incomingSkus = new Set(req.body.variants.map((v) => v.sku).filter(Boolean));
+      const skusToRemove = [...existingSkus].filter((sku) => !incomingSkus.has(sku));
+      if (skusToRemove.length > 0) {
+        await Product.updateOne(
+          { _id: req.params.id },
+          { $pull: { variants: { sku: { $in: skusToRemove } } } }
+        );
+      }
+
       for (const variant of req.body.variants) {
         if (!variant.sku) continue;
 
-        const variantUpdate = {};
-        for (const field of allowedVariantFields) {
-          if (variant[field] !== undefined) {
-            variantUpdate[`variants.$.${field}`] = variant[field];
+        if (existingSkus.has(variant.sku)) {
+          // Update existing variant metadata (stock/version protected)
+          const variantUpdate = {};
+          for (const field of allowedVariantFields) {
+            if (variant[field] !== undefined) {
+              variantUpdate[`variants.$.${field}`] = variant[field];
+            }
           }
-        }
-
-        if (Object.keys(variantUpdate).length > 0) {
+          if (Object.keys(variantUpdate).length > 0) {
+            await Product.updateOne(
+              { _id: req.params.id, 'variants.sku': variant.sku },
+              { $set: variantUpdate }
+            );
+          }
+        } else {
+          // Add new variant with stock defaulting to 0
+          const newVariant = { sku: variant.sku, stock: 0 };
+          for (const field of [...allowedVariantFields, 'label']) {
+            if (variant[field] !== undefined) {
+              newVariant[field] = variant[field];
+            }
+          }
           await Product.updateOne(
-            { _id: req.params.id, 'variants.sku': variant.sku },
-            { $set: variantUpdate }
+            { _id: req.params.id },
+            { $push: { variants: newVariant } }
           );
         }
       }
