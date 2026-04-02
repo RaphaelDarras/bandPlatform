@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Hurakan — Crowned</title>
+
+  <meta property="og:title" content="Hurakan — Crowned">
+  <meta property="og:description" content="Listen to Crowned — out April 4, 2026">
+  <meta property="og:image" content="https://hurakanband.fr/images/crownedArtwork.jpg">
+  <meta property="og:url" content="https://hurakanband.fr/crowned">
+  <meta property="og:type" content="music.song">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Meta Pixel Code -->
+  <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '462106368687515');
+    fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=462106368687515&ev=PageView&noscript=1"
+  /></noscript>
+  <!-- End Meta Pixel Code -->
+
+  <style>
+    :root {
+      --accent: #960200;
+      --light: #cacaca;
+      --dark: #262324;
+    }
+
+    @font-face {
+      font-family: 'Hewalk';
+      src: url('../fonts/Hewalk - PERSONAL USE ONLY.ttf') format('truetype'),
+           url('../fonts/Hewalk - PERSONAL USE ONLY.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+      font-synthesis: none;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background-color: var(--dark);
+      background-image: url('../images/crownedArtwork.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 2rem;
+      min-height: 100dvh;
+      position: relative;
+    }
+
+    /* Dark overlay for readability */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(38, 35, 36, 0.55) 0%,
+        rgba(38, 35, 36, 0.30) 35%,
+        rgba(38, 35, 36, 0.65) 70%,
+        rgba(38, 35, 36, 0.90) 100%
+      );
+      z-index: 0;
+    }
+
+    .top {
+      width: 100%;
+      text-align: center;
+    }
+
+    .band-name {
+      font-family: 'Hewalk', sans-serif;
+      font-size: clamp(1.95rem, 10.4vw, 3.9rem);
+      font-weight: normal;
+      font-synthesis: none;
+      letter-spacing: 0.35em;
+      line-height: 1;
+      color: #fff;
+      text-transform: lowercase;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,1);
+    }
+
+    .header-group {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding-top: 1.5rem;
+    }
+
+    .middle {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 0 1.5rem;
+    }
+
+    .song-title {
+      font-family: 'Hewalk', sans-serif;
+      font-size: clamp(5.25rem, 27vw, 10.5rem);
+      font-weight: normal;
+      font-synthesis: none;
+      letter-spacing: 0.08em;
+      color: #fff;
+      text-transform: lowercase;
+      line-height: 1;
+      text-shadow:
+        0 2px 6px rgba(0,0,0,1),
+        0 6px 24px rgba(0,0,0,1),
+        0 12px 48px rgba(0,0,0,1),
+        0 0 60px rgba(150, 2, 0, 1),
+        0 0 120px rgba(150, 2, 0, 0.8),
+        0 0 200px rgba(150, 2, 0, 0.6),
+        0 0 300px rgba(150, 2, 0, 0.3);
+    }
+
+    .release-date {
+      font-size: clamp(1.05rem, 5.6vw, 2.1rem);
+      letter-spacing: 0.4em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-top: 0.75rem;
+      font-weight: 700;
+      text-shadow: 0 0 16px rgba(150, 2, 0, 0.7);
+    }
+
+    .bottom {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      padding: 1rem 1.5rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .platform-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.65rem;
+      width: 100%;
+      padding: 1rem 1.5rem;
+      border-radius: 3px;
+      text-decoration: none;
+      font-size: clamp(0.85rem, 3.5vw, 1rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .platform-btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-spotify {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      color: #fff;
+    }
+
+    .btn-spotify:hover {
+      background: #b30300;
+      border-color: #b30300;
+    }
+
+    .btn-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .coming-soon {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--light);
+      text-align: center;
+      opacity: 0.4;
+      text-transform: uppercase;
+      padding-top: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-group">
+    <div class="top">
+      <p class="band-name">Hurakan</p>
+    </div>
+      <h1 class="song-title">crowned</h1>
+      <p class="release-date">OUT NOW</p>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <a
+      class="platform-btn btn-spotify"
+      href="https://open.spotify.com/track/30EBMmwhPG0fLU9XQbhigB"
+      target="_blank"
+      rel="noopener"
+      onclick="trackClick('spotify')"
+    >
+      <!-- Spotify icon -->
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.318a.75.75 0 01-1.032.25c-2.828-1.728-6.39-2.118-10.586-1.16a.75.75 0 01-.336-1.462c4.592-1.05 8.532-.598 11.704 1.34a.75.75 0 01.25 1.032zm1.472-3.275a.938.938 0 01-1.29.308c-3.234-1.988-8.167-2.564-11.99-1.404a.937.937 0 01-.543-1.793c4.37-1.327 9.8-.684 13.515 1.599a.938.938 0 01.308 1.29zm.127-3.41C15.37 8.39 9.396 8.187 5.91 9.244a1.124 1.124 0 11-.652-2.15c4.051-1.23 10.784-1 14.99 1.438a1.125 1.125 0 01-1.133 1.102z"/>
+      </svg>
+      Listen on Spotify
+    </a>
+
+    <p class="coming-soon">More platforms coming soon</p>
+  </div>
+
+  <script>
+    function trackClick(platform) {
+      if (typeof fbq !== 'undefined') {
+        fbq('trackCustom', 'StreamingClick', { platform: platform });
+      }
+    }
+  </script>
+
+</body>
+</html>
