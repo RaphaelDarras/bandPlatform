@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { LocalSale } from './outbox';
+import type { ApiSale } from '@/api/sales';
 
 export interface LocalSaleRow extends Omit<LocalSale, 'items'> {
   items_json: string;
@@ -83,4 +84,91 @@ export async function unvoidLocalSale(
     `UPDATE sales SET voided = 0, voided_at = NULL WHERE id = ?`,
     [id]
   );
+}
+
+/**
+ * Extracts the local UUID from an idempotencyKey like "sale_create:<uuid>".
+ * Returns null if the key doesn't match the POS pattern.
+ */
+function localIdFromKey(key?: string | null): string | null {
+  if (!key) return null;
+  const prefix = 'sale_create:';
+  return key.startsWith(prefix) ? key.slice(prefix.length) : null;
+}
+
+/**
+ * Reconciles local sales with server state:
+ * 1. Upserts all server sales into SQLite (server wins for synced data)
+ * 2. Deletes local sales that no longer exist on the server,
+ *    EXCEPT sales still pending in the outbox (not yet synced).
+ */
+export async function reconcileSalesFromServer(
+  db: SQLite.SQLiteDatabase,
+  serverSales: ApiSale[]
+): Promise<void> {
+  // Build set of local IDs that the server knows about
+  const serverLocalIds = new Set<string>();
+
+  await db.execAsync('BEGIN');
+  try {
+    for (const sale of serverSales) {
+      const localId = localIdFromKey(sale.idempotencyKey) ?? sale.id;
+      serverLocalIds.add(localId);
+
+      const voided = sale.voidedAt ? 1 : 0;
+      const voidedAt = sale.voidedAt ? new Date(sale.voidedAt).getTime() : null;
+      const createdAt = new Date(sale.createdAt).getTime();
+      const itemsJson = JSON.stringify(
+        sale.items.map((i) => ({
+          productId: i.productId,
+          variantSku: i.variantSku,
+          quantity: i.quantity,
+          priceAtSale: i.priceAtSale,
+        }))
+      );
+
+      await db.runAsync(
+        `INSERT OR REPLACE INTO sales
+         (id, concert_id, items_json, total_amount, payment_method,
+          currency, discount, discount_type, voided, voided_at, synced, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        [
+          localId,
+          sale.concertId ?? '',
+          itemsJson,
+          sale.totalAmount,
+          sale.paymentMethod,
+          sale.currency,
+          sale.discount ?? 0,
+          sale.discountType ?? 'flat',
+          voided,
+          voidedAt,
+          createdAt,
+        ]
+      );
+    }
+
+    // Get IDs of sales still pending in outbox (not yet confirmed by server)
+    const pendingRows = await db.getAllAsync<{ idempotency_key: string }>(
+      `SELECT idempotency_key FROM outbox WHERE type = 'sale_create' AND status = 'pending'`
+    );
+    const pendingIds = new Set<string>();
+    for (const row of pendingRows) {
+      const id = localIdFromKey(row.idempotency_key);
+      if (id) pendingIds.add(id);
+    }
+
+    // Delete local sales not on server and not pending sync
+    const allLocal = await db.getAllAsync<{ id: string }>(`SELECT id FROM sales`);
+    for (const row of allLocal) {
+      if (!serverLocalIds.has(row.id) && !pendingIds.has(row.id)) {
+        await db.runAsync(`DELETE FROM sales WHERE id = ?`, [row.id]);
+      }
+    }
+
+    await db.execAsync('COMMIT');
+  } catch (e) {
+    await db.execAsync('ROLLBACK');
+    throw e;
+  }
 }

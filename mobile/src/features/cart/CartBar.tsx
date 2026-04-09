@@ -5,6 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCartStore } from '@/stores/cartStore';
 import { currencySymbol } from '@/utils/currencySymbol';
@@ -20,6 +21,7 @@ export function CartBar() {
   const total = useCartStore((state) => state.total());
   const currency = useCartStore((state) => state.currency);
   const sheetRef = useRef<CartSheetHandle>(null);
+  const insets = useSafeAreaInsets();
 
   if (items.length === 0) return null;
 
@@ -35,7 +37,7 @@ export function CartBar() {
         accessibilityLabel={`Cart: ${itemCount} items, ${symbol}${total.toFixed(2)}`}
       >
         {({ pressed }) => (
-          <View style={[styles.bar, pressed && styles.pressed]}>
+          <View style={[styles.bar, pressed && styles.pressed, { paddingBottom: 14 + insets.bottom }]}>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{itemCount}</Text>
             </View>

@@ -1,0 +1,7 @@
+node_modules/
+.git/
+android/.gradle/
+android/app/build/
+__tests__/
+*.test.ts
+*.test.tsx

@@ -16,12 +16,12 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://hurakan-band-platform.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://hurakan-band-platform.onrender.com/api"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://hurakan-band-platform.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://hurakan-band-platform.onrender.com/api"
       }
     }
   }

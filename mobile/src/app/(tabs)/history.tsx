@@ -105,7 +105,7 @@ interface ConcertSection {
 
 export default function HistoryScreen() {
   const c = useTheme();
-  const { salesByGroup, concertNames, allConcertIds, loading, loadHistory } = useHistory();
+  const { salesByGroup, concertNames, allConcertIds, loading, loadHistory, pullFromServer } = useHistory();
   const [filter, setFilter] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -122,8 +122,9 @@ export default function HistoryScreen() {
   );
 
   const handleRefresh = useCallback(async () => {
+    await pullFromServer();
     await loadHistory(filter ?? undefined);
-  }, [loadHistory, filter]);
+  }, [pullFromServer, loadHistory, filter]);
 
   // Build sections for SectionList
   const sections: ConcertSection[] = Object.entries(salesByGroup).map(([concertId, sales]) => ({

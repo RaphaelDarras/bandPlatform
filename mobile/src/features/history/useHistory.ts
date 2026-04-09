@@ -3,10 +3,10 @@ import * as Crypto from 'expo-crypto';
 
 import { getDb } from '@/db';
 import type { LocalSaleRow } from '@/db/sales';
-import { getLocalSales, voidLocalSale, unvoidLocalSale } from '@/db/sales';
+import { getLocalSales, voidLocalSale, unvoidLocalSale, reconcileSalesFromServer } from '@/db/sales';
 import { updateLocalStock } from '@/db/products';
 import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
-import { apiVoidSale, apiUnvoidSale } from '@/api/sales';
+import { apiGetSales, apiVoidSale, apiUnvoidSale } from '@/api/sales';
 
 function concertLabel(c: CachedConcert): string {
   const location = [c.venue || c.city, c.country].filter(Boolean).join(', ');
@@ -39,6 +39,20 @@ export function useHistory() {
   const [concertNames, setConcertNames] = useState<Record<string, string>>({});
   const [allConcertIds, setAllConcertIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  /**
+   * Pulls sales from the server and reconciles with local SQLite.
+   * Best-effort: silently falls back to local cache on failure.
+   */
+  const pullFromServer = useCallback(async () => {
+    try {
+      const db = await getDb();
+      const serverSales = await apiGetSales();
+      await reconcileSalesFromServer(db, serverSales);
+    } catch {
+      // Offline or API error — local cache is still valid
+    }
+  }, []);
 
   /**
    * Loads transaction history from SQLite.
@@ -229,6 +243,7 @@ export function useHistory() {
     allConcertIds,
     loading,
     loadHistory,
+    pullFromServer,
     voidSale,
     unvoidSale,
   };

@@ -9,7 +9,9 @@ export interface ApiSale {
   discount: number;
   discountType: 'flat' | 'percent';
   voided: boolean;
+  voidedAt?: string | null;
   createdAt: string;
+  idempotencyKey?: string | null;
   items: Array<{
     productId: string;
     variantSku: string;

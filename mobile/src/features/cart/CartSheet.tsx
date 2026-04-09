@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useCartStore } from '@/stores/cartStore';
 import { currencySymbol } from '@/utils/currencySymbol';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,6 +32,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
   const c = useTheme();
+  const insets = useSafeAreaInsets();
 
   useImperativeHandle(ref, () => ({
     open: () => sheetRef.current?.snapToIndex(0),
@@ -99,7 +102,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
           ))}
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
           <View style={styles.subtotalRow}>
             <Text style={[styles.subtotalLabel, { color: c.textSecondary }]}>Total</Text>
             <Text style={[styles.subtotalValue, { color: c.text }]}>
