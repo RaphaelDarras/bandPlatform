@@ -32,6 +32,7 @@
       font-weight: normal;
       font-style: normal;
       font-synthesis: none;
+      font-display: swap;
     }
 
     *, *::before, *::after {
@@ -116,28 +117,6 @@
         0 0 200px rgba(150, 2, 0, 0.5);
     }
 
-    .release-date {
-      font-size: clamp(0.85rem, 4vw, 1.2rem);
-      letter-spacing: 0.4em;
-      color: var(--accent);
-      text-transform: uppercase;
-      font-weight: 700;
-      text-shadow: 0 0 16px rgba(150, 2, 0, 0.7);
-      text-align: center;
-      margin-top: 0.5rem;
-    }
-
-    .cta-text {
-      font-size: clamp(0.9rem, 3.8vw, 1.1rem);
-      letter-spacing: 0.3em;
-      color: #fff;
-      text-transform: uppercase;
-      font-weight: 600;
-      text-align: center;
-      margin-top: 1.5rem;
-      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
-    }
-
     .buttons {
       width: 100%;
       display: flex;
@@ -205,6 +184,16 @@
       width: 18px;
       height: 18px;
     }
+
+    .out-now {
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--light);
+      margin-top: 0.5rem;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    }
   </style>
 
   <!-- Meta Pixel Code -->
@@ -231,16 +220,13 @@
   <div class="container">
     <p class="band-name">Hurakan</p>
     <h1 class="song-title">crowned</h1>
-    <p class="release-date">OUT NOW</p>
-
-    <p class="cta-text">Stream now</p>
-
+    <p class="out-now">Out Now</p>
     <div class="buttons" id="buttons">
       <a
         class="platform-btn primary btn-spotify"
         data-platform="spotify"
         href="https://open.spotify.com/track/0tyZM3OawPGQc0heX67clL"
-        rel="noopener"
+        target="_blank" rel="noopener"
         onclick="trackClick('spotify')"
       >
         <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -250,10 +236,10 @@
       </a>
 
       <a
-        class="platform-btn primary btn-apple"
+        class="platform-btn btn-apple"
         data-platform="apple_music"
         href="https://music.apple.com/fr/album/crowned-single/1882024423"
-        rel="noopener"
+        target="_blank" rel="noopener"
         onclick="trackClick('apple_music')"
       >
         <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -267,7 +253,7 @@
           class="platform-btn btn-youtube"
           data-platform="youtube_music"
           href="https://music.youtube.com/watch?v=W9nIkv6OQaQ&si=QezFjoZuy5yXCtjb"
-          rel="noopener"
+          target="_blank" rel="noopener"
           onclick="trackClick('youtube_music')"
         >
           <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -280,7 +266,7 @@
           class="platform-btn btn-deezer"
           data-platform="deezer"
           href="https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6"
-          rel="noopener"
+          target="_blank" rel="noopener"
           onclick="trackClick('deezer')"
         >
           <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -298,24 +284,75 @@
       fbq('track', 'ViewContent', { content_name: 'Crowned', content_type: 'music' });
     }
 
-    // Auto-detect Apple device and move Apple Music to top
-    (function() {
-      var ua = navigator.userAgent || '';
-      var isApple = /iPhone|iPad|iPod|Macintosh/.test(ua);
-      if (isApple) {
-        var buttons = document.getElementById('buttons');
-        var appleBtn = buttons.querySelector('[data-platform="apple_music"]');
-        if (appleBtn) {
-          buttons.insertBefore(appleBtn, buttons.firstChild);
-        }
-      }
-    })();
-
     function trackClick(platform) {
       if (typeof fbq !== 'undefined') {
         fbq('trackCustom', 'StreamingClick', { platform: platform });
+        fbq('track', 'Lead', { content_name: 'Crowned', content_category: platform });
       }
     }
+
+    // Deep-link handling for in-app browsers (Instagram, Facebook, etc.)
+    (function () {
+      var ua = navigator.userAgent || '';
+      var isInAppBrowser = /FBAN|FBAV|Instagram|Line|Twitter|Snapchat/i.test(ua);
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      var isAndroid = /Android/i.test(ua);
+      var isMobile = isIOS || isAndroid;
+
+      if (!isMobile) return;
+
+      var deepLinks = {
+        spotify: {
+          ios: 'spotify:track:0tyZM3OawPGQc0heX67clL',
+          android: 'intent://track/0tyZM3OawPGQc0heX67clL#Intent;scheme=spotify;package=com.spotify.music;S.browser_fallback_url=https%3A%2F%2Fopen.spotify.com%2Ftrack%2F0tyZM3OawPGQc0heX67clL;end',
+          web: 'https://open.spotify.com/track/0tyZM3OawPGQc0heX67clL'
+        },
+        apple_music: {
+          ios: 'music://music.apple.com/fr/album/crowned-single/1882024423',
+          android: 'https://music.apple.com/fr/album/crowned-single/1882024423',
+          web: 'https://music.apple.com/fr/album/crowned-single/1882024423'
+        },
+        youtube_music: {
+          ios: 'vnd.youtube.music://music.youtube.com/watch?v=W9nIkv6OQaQ',
+          android: 'intent://music.youtube.com/watch?v=W9nIkv6OQaQ#Intent;scheme=https;package=com.google.android.apps.youtube.music;S.browser_fallback_url=https%3A%2F%2Fmusic.youtube.com%2Fwatch%3Fv%3DW9nIkv6OQaQ;end',
+          web: 'https://music.youtube.com/watch?v=W9nIkv6OQaQ'
+        },
+        deezer: {
+          ios: 'deezer://',
+          android: 'https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6',
+          web: 'https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6'
+        }
+      };
+
+      document.getElementById('buttons').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-platform]');
+        if (!btn) return;
+
+        var platform = btn.getAttribute('data-platform');
+        var links = deepLinks[platform];
+        if (!links) return;
+
+        // Only intercept in in-app browsers or for Spotify on any mobile browser
+        if (!isInAppBrowser && platform !== 'spotify') return;
+
+        e.preventDefault();
+
+        var appUrl = isIOS ? links.ios : links.android;
+        var webUrl = links.web;
+
+        // On Android, intent URLs handle fallback natively
+        if (isAndroid && appUrl.indexOf('intent://') === 0) {
+          window.location.href = appUrl;
+          return;
+        }
+
+        // On iOS, try app URI then fall back to web
+        window.location.href = appUrl;
+        setTimeout(function () {
+          window.location.href = webUrl;
+        }, 1500);
+      });
+    })();
   </script>
 
 </body>
