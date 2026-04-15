@@ -13,8 +13,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1a1a1a",
-        "foregroundImage": "./assets/images/hurakan_slam_white_transparent.png",
-        "monochromeImage": "./assets/images/hurakan_slam_white_transparent.png"
+        "foregroundImage": "./assets/images/hurakan_icon_padded.png",
+        "monochromeImage": "./assets/images/hurakan_icon_padded.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.bandpos"

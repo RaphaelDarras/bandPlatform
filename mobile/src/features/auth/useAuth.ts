@@ -16,7 +16,6 @@ import i18n from '@/i18n';
  */
 export function useAuth() {
   const { isAuthenticated, user, setToken, clearAuth } = useAuthStore();
-  const { isOnline } = useSyncStore();
   const [isLoading, setIsLoading] = useState(false);
 
   async function login(pin: string): Promise<void> {
@@ -25,42 +24,57 @@ export function useAuth() {
       // Reset stale sync timestamp from previous session
       useSyncStore.getState().setLastSyncAt(Date.now());
 
-      if (isOnline) {
-        // Online login path
-        try {
-          const { token, user: apiUser } = await apiPinLogin(pin);
-          await setupPinLocally(pin, token);
-          setToken(token, apiUser);
-          clearExpiryWarning();
-          scheduleExpiryWarning(token, () => {
-            Alert.alert(
-              i18n.t('auth.sessionExpiring'),
-              i18n.t('auth.sessionExpiringMessage'),
-              [{ text: i18n.t('common.ok') }]
-            );
-          });
-          return;
-        } catch (networkError: unknown) {
-          // If it's a network error, fall through to offline path
-          const err = networkError as { code?: string; message?: string };
-          const isNetworkError =
-            err.code === 'ECONNABORTED' ||
-            err.code === 'ERR_NETWORK' ||
-            err.message?.toLowerCase().includes('network');
-          if (!isNetworkError) {
-            throw networkError;
+      // Always try online first — isOnline flag only gates background sync,
+      // not login. A stale isOnline=false from persisted state must not
+      // prevent the user from logging in when the server is actually reachable.
+      let serverUnreachable = false;
+      {
+        // Online login path — retry once on timeout (Render free tier cold start)
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const { token, user: apiUser } = await apiPinLogin(pin);
+            await setupPinLocally(pin, token);
+            setToken(token, apiUser);
+            useSyncStore.getState().resetFailures();
+            useSyncStore.getState().setIsOnline(true);
+            clearExpiryWarning();
+            scheduleExpiryWarning(token, () => {
+              Alert.alert(
+                i18n.t('auth.sessionExpiring'),
+                i18n.t('auth.sessionExpiringMessage'),
+                [{ text: i18n.t('common.ok') }]
+              );
+            });
+            return;
+          } catch (networkError: unknown) {
+            const err = networkError as { code?: string; message?: string };
+            const isNetworkError =
+              err.code === 'ECONNABORTED' ||
+              err.code === 'ERR_NETWORK' ||
+              err.message?.toLowerCase().includes('network') ||
+              err.message?.toLowerCase().includes('timeout');
+            if (!isNetworkError) {
+              throw networkError;
+            }
+            // On first attempt timeout, retry; on second, fall through to offline
+            if (attempt === 1) serverUnreachable = true;
           }
-          // Fall through to offline path
         }
       }
 
       // Offline login path (or online failed with network error)
       const isValid = await verifyPinOffline(pin);
       if (!isValid) {
+        if (serverUnreachable) {
+          throw new Error(i18n.t('auth.serverUnreachable'));
+        }
         throw new Error(i18n.t('auth.loginFailed'));
       }
       const cachedToken = await getCachedToken();
       if (!cachedToken) {
+        if (serverUnreachable) {
+          throw new Error(i18n.t('auth.serverUnreachable'));
+        }
         throw new Error(i18n.t('auth.needOnlineFirst'));
       }
       // Use cached token — user object isn't cached separately; use auth store's last known user

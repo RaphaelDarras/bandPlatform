@@ -55,16 +55,22 @@ export async function requestSync(
   try {
     const pendingRows = await getPendingOutboxRows(db);
     if (pendingRows.length === 0) {
-      // Outbox empty — ping server to verify reachability before claiming online
-      try {
-        await apiClient.get('concerts', { timeout: 5000 });
-        useSyncStore.getState().resetFailures();
-        useSyncStore.getState().setIsOnline(true);
-        useSyncStore.getState().setPendingCount(0);
-        useSyncStore.getState().setLastSyncAt(Date.now());
-      } catch {
-        useSyncStore.getState().incrementFailures();
-        useSyncStore.getState().setIsOnline(false);
+      // Outbox empty — ping server to verify reachability before claiming online.
+      // Retry once with longer timeout to handle Render free-tier cold starts.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          await apiClient.get('concerts', { timeout: attempt === 0 ? 15000 : 60000 });
+          useSyncStore.getState().resetFailures();
+          useSyncStore.getState().setIsOnline(true);
+          useSyncStore.getState().setPendingCount(0);
+          useSyncStore.getState().setLastSyncAt(Date.now());
+          break;
+        } catch {
+          if (attempt === 1) {
+            useSyncStore.getState().incrementFailures();
+            useSyncStore.getState().setIsOnline(false);
+          }
+        }
       }
       return;
     }

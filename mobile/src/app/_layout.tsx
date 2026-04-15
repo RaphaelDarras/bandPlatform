@@ -1,5 +1,6 @@
 import { Redirect, Slot, Stack } from 'expo-router';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { Appearance, AppState, useColorScheme } from 'react-native';
@@ -17,6 +18,15 @@ import '@/global.css';
 
 // Default to dark mode — concert venues are dark
 Appearance.setColorScheme('dark');
+
+// Configure NetInfo to use our own API for reachability checks instead of Google's.
+// e/OS (de-Googled Android) blocks Google servers, causing NetInfo to report offline.
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:5000/api';
+NetInfo.configure({
+  reachabilityUrl: `${apiUrl.replace(/\/api$/, '')}/health`,
+  reachabilityTest: async (response) => response.status === 200,
+  reachabilityRequestTimeout: 10000,
+});
 
 export default function RootLayout() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);

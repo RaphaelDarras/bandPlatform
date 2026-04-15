@@ -19,7 +19,7 @@ export interface VerifyTokenResponse {
  * POST /auth/pin-login — authenticate with PIN, receive JWT and user info.
  */
 export async function apiPinLogin(pin: string): Promise<PinLoginResponse> {
-  const { data } = await apiClient.post<PinLoginResponse>('/auth/pin-login', { pin });
+  const { data } = await apiClient.post<PinLoginResponse>('/auth/pin-login', { pin }, { timeout: 60000 });
   return data;
 }
 

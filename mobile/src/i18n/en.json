@@ -1,5 +1,5 @@
 {
-  "appName": "BandPOS",
+  "appName": "Hurakan Merch",
   "tabs": {
     "dashboard": "Dashboard",
     "history": "History",
@@ -21,6 +21,7 @@
     "enterPin": "Enter PIN",
     "pinRequired": "PIN required",
     "loginFailed": "Login failed",
+    "serverUnreachable": "Server is unreachable. It may be starting up — please try again in a minute.",
     "logout": "Log out",
     "needOnlineFirst": "Connect to internet once to set up your PIN",
     "sessionExpiring": "Session Expiring",

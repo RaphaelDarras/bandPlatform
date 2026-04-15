@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiClient } from '@/api/client';
 import { getDb } from '@/db';
 import { requestSync } from '@/features/sync/SyncManager';
+import { useConcerts } from '@/features/concerts/useConcerts';
+import { useHistory } from '@/features/history/useHistory';
 import { useStock } from '@/features/stock/useStock';
 import { useTheme } from '@/hooks/use-theme';
 import { useSyncStore } from '@/stores/syncStore';
@@ -32,7 +34,7 @@ interface ActionCard {
   disabled?: boolean;
 }
 
-function SyncIndicator() {
+function SyncIndicator({ onSync }: { onSync: () => Promise<void> }) {
   const c = useTheme();
   const { isOnline, pendingCount, lastSyncAt, consecutiveFailures } = useSyncStore();
   const [syncing, setSyncing] = useState(false);
@@ -50,12 +52,11 @@ function SyncIndicator() {
     if (syncing) return;
     setSyncing(true);
     try {
-      const db = await getDb();
-      await requestSync(db, apiClient);
+      await onSync();
     } finally {
       setSyncing(false);
     }
-  }, [syncing]);
+  }, [syncing, onSync]);
 
   return (
     <View style={styles.syncRow}>
@@ -114,12 +115,24 @@ export default function DashboardScreen() {
   const c = useTheme();
   const { t } = useTranslation();
   const { products, needsReproduction, refreshStock } = useStock();
+  const { loadConcerts } = useConcerts();
+  const { pullFromServer } = useHistory();
 
   useFocusEffect(
     useCallback(() => {
       refreshStock();
     }, [refreshStock])
   );
+
+  const handleFullSync = useCallback(async () => {
+    const db = await getDb();
+    await Promise.all([
+      requestSync(db, apiClient),
+      refreshStock(),
+      loadConcerts(),
+      pullFromServer(),
+    ]);
+  }, [refreshStock, loadConcerts, pullFromServer]);
 
   const hasProducts = products.length > 0;
 
@@ -185,8 +198,8 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       <View style={[styles.headerRow, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
-        <Text style={[styles.headerTitle, { color: c.text }]}>BandPOS</Text>
-        <SyncIndicator />
+        <Text style={[styles.headerTitle, { color: c.text }]}>Hurakan Merch</Text>
+        <SyncIndicator onSync={handleFullSync} />
       </View>
 
       <ScrollView
