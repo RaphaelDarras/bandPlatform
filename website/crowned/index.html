@@ -3,196 +3,152 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Hurakan — Crowned</title>
+  <title>Crowned — Hurakan</title>
 
-  <meta property="og:title" content="Hurakan — Crowned">
-  <meta property="og:description" content="Listen to Crowned — out now">
+  <meta property="og:title" content="Crowned — Hurakan">
+  <meta property="og:description" content="New single. Out now on all platforms.">
   <meta property="og:image" content="https://hurakanband.fr/images/crownedArtwork.jpg">
-  <meta property="og:url" content="https://hurakanband.fr/crowned">
+  <meta property="og:image:width" content="640">
+  <meta property="og:image:height" content="640">
+  <meta property="og:url" content="https://hurakanband.fr/crowned/">
   <meta property="og:type" content="music.song">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Crowned — Hurakan">
+  <meta name="twitter:image" content="https://hurakanband.fr/images/crownedArtwork.jpg">
 
   <link rel="preload" as="image" href="../images/crownedArtwork.jpg">
 
   <style>
-    :root {
-      --spotify: #1DB954;
-      --apple: #fc3c44;
-      --youtube: #FF0000;
-      --deezer: #A238FF;
-      --accent: #960200;
-      --light: #cacaca;
-      --dark: #262324;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    @font-face {
-      font-family: 'Hewalk';
-      src: url('../fonts/Hewalk - PERSONAL USE ONLY.ttf') format('truetype'),
-           url('../fonts/Hewalk - PERSONAL USE ONLY.otf') format('opentype');
-      font-weight: normal;
-      font-style: normal;
-      font-synthesis: none;
-      font-display: swap;
-    }
+    html, body { height: 100%; width: 100%; background: #000; }
 
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    html, body {
-      height: 100%;
-      width: 100%;
-    }
-
-    body {
-      background-color: var(--dark);
-      background-image: url('../images/crownedArtwork.jpg');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      font-family: system-ui, -apple-system, sans-serif;
+    .crowned-page {
+      position: relative;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100dvh;
-      position: relative;
+      padding: 2rem 1rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
     }
 
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(
-        to bottom,
-        rgba(38, 35, 36, 0.55) 0%,
-        rgba(38, 35, 36, 0.30) 35%,
-        rgba(38, 35, 36, 0.65) 70%,
-        rgba(38, 35, 36, 0.90) 100%
-      );
+    .crowned-bg {
+      position: absolute;
+      inset: -10%;
+      background-image: url('../images/crownedArtwork.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: blur(28px) brightness(0.35) saturate(1.4);
       z-index: 0;
+      transform: scale(1.1);
     }
 
-    .container {
+    .crowned-card {
       position: relative;
       z-index: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       width: 100%;
-      max-width: 480px;
-      padding: 1.5rem 1.5rem 2rem;
+      max-width: 420px;
     }
 
-    .band-name {
-      font-family: 'Hewalk', sans-serif;
-      font-size: clamp(1.5rem, 8vw, 2.5rem);
-      font-weight: normal;
-      font-synthesis: none;
-      letter-spacing: 0.35em;
-      line-height: 1;
+    .crowned-cover {
+      width: 180px;
+      height: 180px;
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+      object-fit: cover;
+      margin-bottom: 20px;
+    }
+
+    .crowned-artist {
+      margin: 0 0 4px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+    }
+
+    .crowned-title {
+      margin: 0 0 6px;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
       color: #fff;
-      text-transform: lowercase;
-      text-shadow: 0 1px 12px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,1);
-      text-align: center;
+      text-transform: uppercase;
     }
 
-    .song-title {
-      font-family: 'Hewalk', sans-serif;
-      font-size: clamp(3.5rem, 18vw, 7rem);
-      font-weight: normal;
-      font-synthesis: none;
-      letter-spacing: 0.08em;
-      color: #fff;
-      text-transform: lowercase;
-      line-height: 1;
-      text-align: center;
-      margin-top: 0.15rem;
-      text-shadow:
-        0 2px 6px rgba(0,0,0,1),
-        0 6px 24px rgba(0,0,0,1),
-        0 0 60px rgba(150, 2, 0, 1),
-        0 0 120px rgba(150, 2, 0, 0.8),
-        0 0 200px rgba(150, 2, 0, 0.5);
+    .crowned-meta {
+      margin: 0 0 20px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
 
-    .buttons {
+    .crowned-preview {
       width: 100%;
+      border: 0;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      background: transparent;
+      display: block;
+    }
+
+    .crowned-links {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      margin-top: 0.75rem;
+      gap: 10px;
+      width: 100%;
     }
 
-    .platform-btn {
+    .crowned-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.65rem;
+      gap: 10px;
       width: 100%;
-      padding: 1.1rem 1.5rem;
-      border-radius: 6px;
-      text-decoration: none;
-      font-size: clamp(0.9rem, 3.8vw, 1.05rem);
+      padding: 14px 20px;
+      border-radius: 50px;
+      font-size: 15px;
       font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #fff;
-      border: none;
-      transition: filter 0.15s, transform 0.1s;
+      text-decoration: none;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
 
-    .platform-btn.primary {
-      padding: 1.3rem 1.5rem;
-      font-size: clamp(1rem, 4.2vw, 1.15rem);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    }
+    .crowned-btn:hover { transform: scale(1.02); opacity: 0.92; }
+    .crowned-btn:active { transform: scale(0.98); }
 
-    .platform-btn:active {
-      transform: scale(0.97);
-    }
-
-    .platform-btn:hover {
-      filter: brightness(1.15);
-    }
-
-    .btn-spotify { background: var(--spotify); }
-    .btn-apple { background: var(--apple); }
-    .btn-youtube { background: var(--youtube); }
-    .btn-deezer { background: var(--deezer); }
-
-    .secondary-buttons {
-      display: flex;
-      gap: 0.5rem;
-      width: 100%;
-    }
-
-    .secondary-buttons .platform-btn {
-      padding: 0.85rem 1rem;
-      font-size: clamp(0.75rem, 3vw, 0.85rem);
-    }
-
-    .btn-icon {
-      width: 22px;
-      height: 22px;
+    .crowned-btn__icon {
+      width: 20px;
+      height: 20px;
       flex-shrink: 0;
     }
 
-    .secondary-buttons .btn-icon {
-      width: 18px;
-      height: 18px;
+    .crowned-btn--primary {
+      background: #1DB954;
+      color: #000;
+      font-size: 16px;
+      padding: 16px 20px;
     }
 
-    .out-now {
-      font-size: 0.85rem;
-      font-weight: 600;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--light);
-      margin-top: 0.5rem;
-      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    .crowned-btn--secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    @media (max-width: 380px) {
+      .crowned-cover { width: 140px; height: 140px; }
+      .crowned-title { font-size: 26px; }
     }
   </style>
 
@@ -217,143 +173,144 @@
 </head>
 <body>
 
-  <div class="container">
-    <p class="band-name">Hurakan</p>
-    <h1 class="song-title">crowned</h1>
-    <p class="out-now">Out Now</p>
-    <div class="buttons" id="buttons">
-      <a
-        class="platform-btn primary btn-spotify"
-        data-platform="spotify"
-        href="https://open.spotify.com/track/0tyZM3OawPGQc0heX67clL"
-        target="_blank" rel="noopener"
-        onclick="trackClick('spotify')"
-      >
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.318a.75.75 0 01-1.032.25c-2.828-1.728-6.39-2.118-10.586-1.16a.75.75 0 01-.336-1.462c4.592-1.05 8.532-.598 11.704 1.34a.75.75 0 01.25 1.032zm1.472-3.275a.938.938 0 01-1.29.308c-3.234-1.988-8.167-2.564-11.99-1.404a.937.937 0 01-.543-1.793c4.37-1.327 9.8-.684 13.515 1.599a.938.938 0 01.308 1.29zm.127-3.41C15.37 8.39 9.396 8.187 5.91 9.244a1.124 1.124 0 11-.652-2.15c4.051-1.23 10.784-1 14.99 1.438a1.125 1.125 0 01-1.133 1.102z"/>
-        </svg>
+<div class="crowned-page">
+
+  <div class="crowned-bg" aria-hidden="true"></div>
+
+  <main class="crowned-card">
+
+    <img class="crowned-cover" src="../images/crownedArtwork.jpg" alt="Hurakan – Crowned single cover" width="220" height="220">
+
+    <p class="crowned-artist">Hurakan</p>
+    <h1 class="crowned-title">Crowned</h1>
+    <p class="crowned-meta">Single · Out Now</p>
+
+    <iframe
+      class="crowned-preview"
+      src="https://open.spotify.com/embed/track/0tyZM3OawPGQc0heX67clL?utm_source=generator&theme=0"
+      width="100%"
+      height="152"
+      frameborder="0"
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      loading="lazy">
+    </iframe>
+
+    <nav class="crowned-links" id="buttons" aria-label="Listen on streaming platforms">
+
+      <a class="crowned-btn crowned-btn--primary"
+         data-platform="spotify"
+         href="https://open.spotify.com/track/0tyZM3OawPGQc0heX67clL"
+         target="_blank" rel="noopener"
+         onclick="trackClick('spotify')">
+        <svg class="crowned-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
         Listen on Spotify
       </a>
 
-      <a
-        class="platform-btn btn-apple"
-        data-platform="apple_music"
-        href="https://music.apple.com/fr/album/crowned-single/1882024423"
-        target="_blank" rel="noopener"
-        onclick="trackClick('apple_music')"
-      >
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-          <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726a10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03a12.5 12.5 0 001.57-.1c.822-.106 1.596-.35 2.295-.81a5.046 5.046 0 001.88-2.207c.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.045-1.773-.6-1.943-1.536a1.88 1.88 0 011.038-2.022c.323-.16.67-.25 1.018-.324.378-.082.758-.153 1.134-.24.274-.063.457-.23.51-.516a.904.904 0 00.02-.193c0-1.815 0-3.63-.002-5.443a.725.725 0 00-.026-.185c-.04-.15-.15-.243-.304-.234-.16.01-.318.035-.475.066-.76.15-1.52.303-2.28.456l-2.325.47-1.374.278c-.016.003-.032.01-.048.013-.277.077-.377.203-.39.49-.002.042 0 .086 0 .13-.002 2.602 0 5.204-.003 7.805 0 .42-.047.836-.215 1.227-.278.64-.77 1.04-1.434 1.233-.35.1-.71.16-1.075.172-.96.036-1.755-.6-1.92-1.544-.14-.812.23-1.685 1.154-2.075.357-.15.73-.232 1.108-.31.287-.06.575-.116.86-.177.383-.083.583-.323.6-.714v-.15c0-2.96 0-5.922.002-8.882 0-.123.013-.25.042-.37.07-.285.273-.448.546-.518.255-.066.515-.112.774-.165.733-.15 1.466-.296 2.2-.444l2.27-.46c.67-.134 1.34-.27 2.01-.403.22-.043.442-.088.663-.106.31-.025.523.17.554.482.008.073.012.148.012.223.002 1.91.002 3.822 0 5.732z"/>
-        </svg>
-        Listen on Apple Music
+      <a class="crowned-btn crowned-btn--secondary"
+         data-platform="apple_music"
+         href="https://music.apple.com/fr/album/crowned-single/1882024423"
+         target="_blank" rel="noopener"
+         onclick="trackClick('apple_music')">
+        <svg class="crowned-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026C4.786.07 4.043.15 3.34.428 2.004.958 1.04 1.88.475 3.208A5.494 5.494 0 00.05 4.822C.02 5.11 0 5.4 0 5.69V18.31c.01.135.017.27.027.405.07.845.228 1.666.6 2.43.6 1.22 1.535 2.063 2.83 2.51.697.238 1.42.318 2.155.35.232.01.466.01.7.01h12.39c.337-.01.675-.02 1.01-.05.83-.07 1.63-.24 2.38-.65 1.154-.63 1.99-1.57 2.43-2.84.25-.72.33-1.47.36-2.23.01-.27.01-.54.01-.81V6.504c0-.127-.003-.253-.007-.38zm-6.423 5.62l-5.273 3.042a.93.93 0 01-.467.125.93.93 0 01-.467-.125L6.1 11.744a.934.934 0 010-1.617l5.264-3.038a.934.934 0 01.934 0l5.273 3.038a.934.934 0 010 1.617z"/></svg>
+        Apple Music
       </a>
 
-      <div class="secondary-buttons">
-        <a
-          class="platform-btn btn-youtube"
-          data-platform="youtube_music"
-          href="https://music.youtube.com/watch?v=W9nIkv6OQaQ&si=QezFjoZuy5yXCtjb"
-          target="_blank" rel="noopener"
-          onclick="trackClick('youtube_music')"
-        >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228s6.228-2.796 6.228-6.228S15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z"/>
-          </svg>
-          YouTube
-        </a>
+      <a class="crowned-btn crowned-btn--secondary"
+         data-platform="youtube_music"
+         href="https://music.youtube.com/watch?v=W9nIkv6OQaQ&si=QezFjoZuy5yXCtjb"
+         target="_blank" rel="noopener"
+         onclick="trackClick('youtube_music')">
+        <svg class="crowned-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.495 6.205a3.007 3.007 0 00-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 00.527 6.205a31.247 31.247 0 00-.522 5.805 31.247 31.247 0 00.522 5.783 3.007 3.007 0 002.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 002.088-2.088 31.247 31.247 0 00.5-5.783 31.247 31.247 0 00-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+        YouTube Music
+      </a>
 
-        <a
-          class="platform-btn btn-deezer"
-          data-platform="deezer"
-          href="https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6"
-          target="_blank" rel="noopener"
-          onclick="trackClick('deezer')"
-        >
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M.693 10.024c.381 0 .693-1.256.693-2.807 0-1.55-.312-2.807-.693-2.807C.312 4.41 0 5.666 0 7.217s.312 2.808.693 2.808ZM21.038 1.56c-.364 0-.684.805-.91 2.096C19.765 1.446 19.184 0 18.526 0c-.78 0-1.464 2.036-1.784 5-.312-2.158-.788-3.536-1.325-3.536-.745 0-1.386 2.704-1.62 6.472-.442-1.932-1.083-3.145-1.793-3.145s-1.35 1.213-1.793 3.145c-.242-3.76-.874-6.463-1.628-6.463-.537 0-1.013 1.378-1.325 3.535C6.938 2.036 6.262 0 5.474 0c-.658 0-1.247 1.447-1.602 3.665-.217-1.291-.546-2.105-.91-2.105-.675 0-1.221 2.807-1.221 6.272 0 3.466.546 6.273 1.221 6.273.277 0 .537-.476.736-1.273.32 2.928.996 4.938 1.776 4.938.606 0 1.143-1.204 1.507-3.11.251 3.622.875 6.195 1.602 6.195.46 0 .875-1.023 1.187-2.677C10.142 21.6 11 24 12.004 24c1.005 0 1.863-2.4 2.235-5.822.312 1.654.727 2.677 1.186 2.677.728 0 1.352-2.573 1.603-6.195.364 1.906.9 3.11 1.507 3.11.78 0 1.455-2.01 1.775-4.938.208.797.46 1.273.737 1.273.675 0 1.22-2.807 1.22-6.273-.008-3.457-.553-6.272-1.23-6.272ZM23.307 10.024c.381 0 .693-1.256.693-2.807 0-1.55-.312-2.807-.693-2.807-.381 0-.693 1.256-.693 2.807s.312 2.808.693 2.808Z"/>
-          </svg>
-          Deezer
-        </a>
-      </div>
-    </div>
-  </div>
+      <a class="crowned-btn crowned-btn--secondary"
+         data-platform="deezer"
+         href="https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6"
+         target="_blank" rel="noopener"
+         onclick="trackClick('deezer')">
+        <svg class="crowned-btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.81 11.583h4.944v2.324H18.81zm0-3.496h4.944v2.324H18.81zm0 6.992h4.944v2.323H18.81zM.246 18.403h4.944v2.323H.246zm6.19 0h4.945v2.323H6.437zm6.19 0h4.943v2.323H12.62zM6.437 14.907h4.945v2.323H6.437zm6.19 0h4.943v2.323H12.62zm6.19 0h4.944v2.323H18.81zM12.62 11.583h4.943v2.324H12.62zm-6.183 0h4.945v2.324H6.437zM12.62 8.087h4.943v2.324H12.62z"/></svg>
+        Deezer
+      </a>
 
-  <script>
-    // Fire ViewContent to properly track mid-funnel
+    </nav>
+
+  </main>
+
+</div>
+
+<script>
+  if (typeof fbq !== 'undefined') {
+    fbq('track', 'ViewContent', { content_name: 'Crowned', content_type: 'music' });
+  }
+
+  function trackClick(platform) {
     if (typeof fbq !== 'undefined') {
-      fbq('track', 'ViewContent', { content_name: 'Crowned', content_type: 'music' });
+      fbq('trackCustom', 'StreamingClick', { platform: platform });
+      fbq('track', 'Lead', { content_name: 'Crowned', content_category: platform });
     }
+  }
 
-    function trackClick(platform) {
-      if (typeof fbq !== 'undefined') {
-        fbq('trackCustom', 'StreamingClick', { platform: platform });
-        fbq('track', 'Lead', { content_name: 'Crowned', content_category: platform });
+  // Deep-link handling for in-app browsers (Instagram, Facebook, etc.)
+  (function () {
+    var ua = navigator.userAgent || '';
+    var isInAppBrowser = /FBAN|FBAV|Instagram|Line|Twitter|Snapchat/i.test(ua);
+    var isIOS = /iPhone|iPad|iPod/i.test(ua);
+    var isAndroid = /Android/i.test(ua);
+    var isMobile = isIOS || isAndroid;
+
+    if (!isMobile) return;
+
+    var deepLinks = {
+      spotify: {
+        ios: 'spotify:track:0tyZM3OawPGQc0heX67clL',
+        android: 'intent://track/0tyZM3OawPGQc0heX67clL#Intent;scheme=spotify;package=com.spotify.music;S.browser_fallback_url=https%3A%2F%2Fopen.spotify.com%2Ftrack%2F0tyZM3OawPGQc0heX67clL;end',
+        web: 'https://open.spotify.com/track/0tyZM3OawPGQc0heX67clL'
+      },
+      apple_music: {
+        ios: 'music://music.apple.com/fr/album/crowned-single/1882024423',
+        android: 'https://music.apple.com/fr/album/crowned-single/1882024423',
+        web: 'https://music.apple.com/fr/album/crowned-single/1882024423'
+      },
+      youtube_music: {
+        ios: 'vnd.youtube.music://music.youtube.com/watch?v=W9nIkv6OQaQ',
+        android: 'intent://music.youtube.com/watch?v=W9nIkv6OQaQ#Intent;scheme=https;package=com.google.android.apps.youtube.music;S.browser_fallback_url=https%3A%2F%2Fmusic.youtube.com%2Fwatch%3Fv%3DW9nIkv6OQaQ;end',
+        web: 'https://music.youtube.com/watch?v=W9nIkv6OQaQ'
+      },
+      deezer: {
+        ios: 'deezer://',
+        android: 'https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6',
+        web: 'https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6'
       }
-    }
+    };
 
-    // Deep-link handling for in-app browsers (Instagram, Facebook, etc.)
-    (function () {
-      var ua = navigator.userAgent || '';
-      var isInAppBrowser = /FBAN|FBAV|Instagram|Line|Twitter|Snapchat/i.test(ua);
-      var isIOS = /iPhone|iPad|iPod/i.test(ua);
-      var isAndroid = /Android/i.test(ua);
-      var isMobile = isIOS || isAndroid;
+    document.getElementById('buttons').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-platform]');
+      if (!btn) return;
 
-      if (!isMobile) return;
+      var platform = btn.getAttribute('data-platform');
+      var links = deepLinks[platform];
+      if (!links) return;
 
-      var deepLinks = {
-        spotify: {
-          ios: 'spotify:track:0tyZM3OawPGQc0heX67clL',
-          android: 'intent://track/0tyZM3OawPGQc0heX67clL#Intent;scheme=spotify;package=com.spotify.music;S.browser_fallback_url=https%3A%2F%2Fopen.spotify.com%2Ftrack%2F0tyZM3OawPGQc0heX67clL;end',
-          web: 'https://open.spotify.com/track/0tyZM3OawPGQc0heX67clL'
-        },
-        apple_music: {
-          ios: 'music://music.apple.com/fr/album/crowned-single/1882024423',
-          android: 'https://music.apple.com/fr/album/crowned-single/1882024423',
-          web: 'https://music.apple.com/fr/album/crowned-single/1882024423'
-        },
-        youtube_music: {
-          ios: 'vnd.youtube.music://music.youtube.com/watch?v=W9nIkv6OQaQ',
-          android: 'intent://music.youtube.com/watch?v=W9nIkv6OQaQ#Intent;scheme=https;package=com.google.android.apps.youtube.music;S.browser_fallback_url=https%3A%2F%2Fmusic.youtube.com%2Fwatch%3Fv%3DW9nIkv6OQaQ;end',
-          web: 'https://music.youtube.com/watch?v=W9nIkv6OQaQ'
-        },
-        deezer: {
-          ios: 'deezer://',
-          android: 'https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6',
-          web: 'https://link.deezer.com/s/32Tc1Uol1QcblmXQNZ3b6'
-        }
-      };
+      if (!isInAppBrowser && platform !== 'spotify') return;
 
-      document.getElementById('buttons').addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-platform]');
-        if (!btn) return;
+      e.preventDefault();
 
-        var platform = btn.getAttribute('data-platform');
-        var links = deepLinks[platform];
-        if (!links) return;
+      var appUrl = isIOS ? links.ios : links.android;
+      var webUrl = links.web;
 
-        // Only intercept in in-app browsers or for Spotify on any mobile browser
-        if (!isInAppBrowser && platform !== 'spotify') return;
-
-        e.preventDefault();
-
-        var appUrl = isIOS ? links.ios : links.android;
-        var webUrl = links.web;
-
-        // On Android, intent URLs handle fallback natively
-        if (isAndroid && appUrl.indexOf('intent://') === 0) {
-          window.location.href = appUrl;
-          return;
-        }
-
-        // On iOS, try app URI then fall back to web
+      if (isAndroid && appUrl.indexOf('intent://') === 0) {
         window.location.href = appUrl;
-        setTimeout(function () {
-          window.location.href = webUrl;
-        }, 1500);
-      });
-    })();
-  </script>
+        return;
+      }
+
+      window.location.href = appUrl;
+      setTimeout(function () {
+        window.location.href = webUrl;
+      }, 1500);
+    });
+  })();
+</script>
 
 </body>
 </html>
