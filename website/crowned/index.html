@@ -299,15 +299,20 @@
       var appUrl = isIOS ? links.ios : links.android;
       var webUrl = links.web;
 
-      if (isAndroid && appUrl.indexOf('intent://') === 0) {
-        window.location.href = appUrl;
-        return;
-      }
-
-      window.location.href = appUrl;
+      // Delay navigation by ~250ms so the Meta pixel beacon (queued by the
+      // inline trackClick onclick) has time to send before the browser
+      // unloads the page. Without this, StreamingClick / Lead events get
+      // cancelled in-flight and never reach Meta.
       setTimeout(function () {
-        window.location.href = webUrl;
-      }, 1500);
+        if (isAndroid && appUrl.indexOf('intent://') === 0) {
+          window.location.href = appUrl;
+          return;
+        }
+        window.location.href = appUrl;
+        setTimeout(function () {
+          window.location.href = webUrl;
+        }, 1500);
+      }, 250);
     });
   })();
 </script>
