@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 Phase: 2 of 7 complete. Phase 3 not yet planned.
 Status: Ready to plan Phase 3
-Last activity: 2026-03-18 — Post-Phase 2 production bug fixes and feature additions
+Last activity: 2026-04-19 — Completed quick task 260419-1hc: Remove duplicate History and Stock cards from dashboard
 
 Progress: [████████░░] 77%
 
@@ -61,6 +61,10 @@ Progress: [████████░░] 77%
 | Phase 02-mobile-pos-core P09 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- 2026-04-18: Phase 8 added: Immutable sale line snapshots (snapshot product name + variant label on sale items; one-time migration for historical sales). Driven by user report that removing a variant caused concert breakdowns to render raw SKU strings.
 
 ### Decisions
 
@@ -166,6 +170,14 @@ None yet.
 **Timeline:**
 - Concert sales tool must be operational by early April (Phase 3 critical path)
 - 8-12 hours per week development time available
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260418-001 | Hide SKU from app UI except product edit forms | 2026-04-18 | 200102a | [260418-001-hide-sku-display](./quick/260418-001-hide-sku-display/) |
+| 260419-15b | Move Start Selling button to top of concert detail | 2026-04-19 | 4a3dc9c | [260419-15b-move-start-selling-button-to-top-of-conc](./quick/260419-15b-move-start-selling-button-to-top-of-conc/) |
+| 260419-1hc | Remove duplicate History and Stock cards from dashboard | 2026-04-19 | 02e4a8e | [260419-1hc-remove-duplicate-history-and-stock-cards](./quick/260419-1hc-remove-duplicate-history-and-stock-cards/) |
 
 ## Session Continuity
 

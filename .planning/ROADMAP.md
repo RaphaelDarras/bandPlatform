@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout
 - [ ] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations
 - [ ] **Phase 7: Shop Enhancements** - Shipping, bundles, pre-orders, and customer features
+- [ ] **Phase 8: Immutable sale line snapshots** - Snapshot product name + variant label on sale items so history survives product/variant deletion
 
 ## Phase Details
 
@@ -145,6 +146,23 @@ Plans:
 Plans:
 - [ ] TBD during phase planning
 
+### Phase 8: Immutable sale line snapshots
+**Goal**: Sale history becomes immutable — deleting a product or variant never changes what a past concert breakdown or sale detail shows. Names and labels are snapshotted on the sale item at sale time and rendered from storage, not resolved from live product data.
+**Depends on**: Phase 3 (mobile POS write path) and Phase 1 (backend Sale model)
+**Requirements**: New (driven by observed bug — concert breakdown showed raw SKU after a variant was deleted)
+**Success Criteria** (what must be TRUE):
+  1. Every new sale line item persists `productName` and `variantLabel` alongside `productId` and `variantSku` — both locally (SQLite `items_json`) and server-side (MongoDB `SaleItemSchema`).
+  2. The write path (`useSaleRecording.ts` → `recordSaleLocally` → outbox payload → backend `POST /sales`) carries the snapshot end-to-end from cart to DB.
+  3. Concert breakdowns (`features/concerts/useConcerts.ts`) and sale detail (`app/history/[saleId].tsx`) render from the stored snapshot; live product lookup is removed from these read paths.
+  4. A one-time mobile migration runs on first launch of the new build: scans `sales.items_json`, and for each item missing `productName`/`variantLabel`, best-effort resolves against the current products cache and writes back. Idempotent; guarded by a schema/migration version marker so it runs exactly once per device.
+  5. A matching server-side migration backfills existing `Sale.items[]` documents from current `Product` docs. Also idempotent.
+  6. Sale items whose variant was already deleted before migration — and therefore can't be resolved — render a clear fallback copy (`"Deleted variant"` or equivalent) rather than the raw SKU or an empty string.
+  7. Deleting a product or variant after this phase ships has zero effect on the rendering of any past sale, recap, or concert breakdown.
+**Plans**: TBD
+
+Plans:
+- [ ] TBD during phase planning
+
 ## Progress
 
 **Execution Order:**
@@ -159,7 +177,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 5. Online Shop Core | 0/TBD | Not started | - |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
+| 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 
 ---
 *Created: 2026-02-13*
-*Last updated: 2026-03-19 after Phase 2 UAT gap closure planning (2 gap closure plans)*
+*Last updated: 2026-04-18 — Phase 8 added (immutable sale line snapshots)*
