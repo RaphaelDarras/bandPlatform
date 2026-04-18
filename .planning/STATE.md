@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 Phase: 2 of 7 complete. Phase 3 not yet planned.
 Status: Ready to plan Phase 3
-Last activity: 2026-04-19 — Completed quick task 260419-1hc: Remove duplicate History and Stock cards from dashboard
+Last activity: 2026-04-19 — Completed quick task 260419-1uj: Add Active/Closed tabs to concert management list
 
 Progress: [████████░░] 77%
 
@@ -178,6 +178,7 @@ None yet.
 | 260418-001 | Hide SKU from app UI except product edit forms | 2026-04-18 | 200102a | [260418-001-hide-sku-display](./quick/260418-001-hide-sku-display/) |
 | 260419-15b | Move Start Selling button to top of concert detail | 2026-04-19 | 4a3dc9c | [260419-15b-move-start-selling-button-to-top-of-conc](./quick/260419-15b-move-start-selling-button-to-top-of-conc/) |
 | 260419-1hc | Remove duplicate History and Stock cards from dashboard | 2026-04-19 | 02e4a8e | [260419-1hc-remove-duplicate-history-and-stock-cards](./quick/260419-1hc-remove-duplicate-history-and-stock-cards/) |
+| 260419-1uj | Add Active/Closed tabs to concert management list | 2026-04-19 | ad52a02 | [260419-1uj-add-active-closed-tabs-to-concert-manage](./quick/260419-1uj-add-active-closed-tabs-to-concert-manage/) |
 
 ## Session Continuity
 
