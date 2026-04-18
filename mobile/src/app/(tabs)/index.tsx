@@ -156,20 +156,6 @@ export default function DashboardScreen() {
       onPress: () => router.push('/concerts' as never),
     },
     {
-      id: 'history',
-      title: t('dashboard.transactionHistory'),
-      subtitle: t('dashboard.transactionHistorySubtitle'),
-      icon: '📋',
-      onPress: () => router.push('/(tabs)/history' as never),
-    },
-    {
-      id: 'stock',
-      title: t('dashboard.stockOverview'),
-      subtitle: t('dashboard.stockOverviewSubtitle'),
-      icon: '📦',
-      onPress: () => router.push('/(tabs)/stock' as never),
-    },
-    {
       id: 'deficit',
       title: t('dashboard.needsRestock'),
       subtitle: t('dashboard.needsRestockSubtitle'),
