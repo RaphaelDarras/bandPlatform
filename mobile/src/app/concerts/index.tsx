@@ -1,5 +1,5 @@
 import { router, useIsFocused } from 'expo-router';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -56,6 +56,7 @@ export default function ConcertListScreen() {
   const c = useTheme();
   const { concerts, loading, loadConcerts } = useConcerts();
   const isFocused = useIsFocused();
+  const [selectedTab, setSelectedTab] = useState<'active' | 'closed'>('active');
 
   useEffect(() => {
     if (isFocused) {
@@ -66,6 +67,16 @@ export default function ConcertListScreen() {
   const handleRefresh = useCallback(async () => {
     await loadConcerts();
   }, [loadConcerts]);
+
+  const activeConcerts = useMemo(
+    () => concerts.filter((concert) => concert.active === 1),
+    [concerts],
+  );
+  const closedConcerts = useMemo(
+    () => concerts.filter((concert) => concert.active === 0),
+    [concerts],
+  );
+  const visibleConcerts = selectedTab === 'active' ? activeConcerts : closedConcerts;
 
   if (loading && concerts.length === 0) {
     return (
@@ -94,17 +105,67 @@ export default function ConcertListScreen() {
         </Pressable>
       </View>
 
-      {concerts.length === 0 ? (
+      {/* Active/Closed tab row */}
+      <View style={[styles.tabRow, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
+        <Pressable
+          onPress={() => setSelectedTab('active')}
+          style={[
+            styles.tabPill,
+            selectedTab === 'active'
+              ? { backgroundColor: c.accent }
+              : { backgroundColor: c.backgroundElement },
+          ]}
+          accessibilityLabel={`Active concerts, ${activeConcerts.length}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected: selectedTab === 'active' }}
+        >
+          <Text
+            style={[
+              styles.tabPillText,
+              { color: selectedTab === 'active' ? '#fff' : c.textSecondary },
+            ]}
+          >
+            {`Active (${activeConcerts.length})`}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setSelectedTab('closed')}
+          style={[
+            styles.tabPill,
+            selectedTab === 'closed'
+              ? { backgroundColor: c.accent }
+              : { backgroundColor: c.backgroundElement },
+          ]}
+          accessibilityLabel={`Closed concerts, ${closedConcerts.length}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected: selectedTab === 'closed' }}
+        >
+          <Text
+            style={[
+              styles.tabPillText,
+              { color: selectedTab === 'closed' ? '#fff' : c.textSecondary },
+            ]}
+          >
+            {`Closed (${closedConcerts.length})`}
+          </Text>
+        </Pressable>
+      </View>
+
+      {visibleConcerts.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>{'🎤'}</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>No concerts yet</Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>
+            {selectedTab === 'active' ? 'No active concerts' : 'No closed concerts yet'}
+          </Text>
           <Text style={[styles.emptySubtitle, { color: c.textSecondary }]}>
-            Tap "+ New" to create your first concert.
+            {selectedTab === 'active'
+              ? 'Tap "+ New" to create your first concert.'
+              : 'Closed concerts will appear here.'}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={concerts}
+          data={visibleConcerts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ConcertRow concert={item} />}
           contentContainerStyle={styles.listContent}
@@ -234,5 +295,25 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 8,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tabPill: {
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    minWidth: 96,
+    alignItems: 'center',
+  },
+  tabPillText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
