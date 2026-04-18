@@ -391,6 +391,26 @@ export default function ConcertDetailScreen() {
           </View>
         )}
 
+        {isActive && (
+          <Pressable
+            style={styles.actionBtnWrapper}
+            onPress={handleStartSelling}
+            disabled={actionLoading}
+            accessibilityLabel="Start Selling"
+          >
+            {({ pressed }) => (
+              <View style={[
+                styles.actionBtn,
+                styles.actionBtnPrimary,
+                pressed && styles.actionBtnPressed,
+                actionLoading && styles.actionBtnDisabled,
+              ]}>
+                <Text style={styles.actionBtnTextPrimary}>Start Selling</Text>
+              </View>
+            )}
+          </Pressable>
+        )}
+
         {/* Product Breakdown */}
         {totals && (
           <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
@@ -450,23 +470,6 @@ export default function ConcertDetailScreen() {
         <View style={[styles.actionsCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           {isActive ? (
             <>
-              <Pressable
-                style={styles.actionBtnWrapper}
-                onPress={handleStartSelling}
-                disabled={actionLoading}
-                accessibilityLabel="Start Selling"
-              >
-                {({ pressed }) => (
-                  <View style={[
-                    styles.actionBtn,
-                    styles.actionBtnPrimary,
-                    pressed && styles.actionBtnPressed,
-                    actionLoading && styles.actionBtnDisabled,
-                  ]}>
-                    <Text style={styles.actionBtnTextPrimary}>Start Selling</Text>
-                  </View>
-                )}
-              </Pressable>
               <Pressable
                 style={styles.actionBtnWrapper}
                 onPress={handleClose}
