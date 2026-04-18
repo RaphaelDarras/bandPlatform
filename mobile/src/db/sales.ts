@@ -1,8 +1,8 @@
 import * as SQLite from 'expo-sqlite';
-import type { LocalSale } from './outbox';
+import type { LocalSale, PaymentSplitEntry } from './outbox';
 import type { ApiSale } from '@/api/sales';
 
-export interface LocalSaleRow extends Omit<LocalSale, 'items'> {
+export interface LocalSaleRow extends Omit<LocalSale, 'items' | 'paymentSplit'> {
   items_json: string;
   voided: number;
   voided_at: number | null;
@@ -12,6 +12,11 @@ export interface LocalSaleRow extends Omit<LocalSale, 'items'> {
   discountType: 'flat' | 'percent';
   totalAmount: number;
   paymentMethod: string;
+  /** Raw JSON string from payment_split_json column; may be null/undefined. */
+  payment_split_json: string | null;
+  paymentSplitJson: string | null;
+  /** Parsed split entries, populated by getLocalSales. Undefined when not a split sale. */
+  paymentSplit?: PaymentSplitEntry[];
   concertId: string;
   createdAt: number;
   voidedAt: number | null;
@@ -27,23 +32,35 @@ export async function getLocalSales(
 ): Promise<LocalSaleRow[]> {
   const selectCols = `
     *,
-    discount_type   AS discountType,
-    total_amount    AS totalAmount,
-    payment_method  AS paymentMethod,
-    concert_id      AS concertId,
-    created_at      AS createdAt,
-    voided_at       AS voidedAt,
-    items_json      AS itemsJson
+    discount_type       AS discountType,
+    total_amount        AS totalAmount,
+    payment_method      AS paymentMethod,
+    payment_split_json  AS paymentSplitJson,
+    concert_id          AS concertId,
+    created_at          AS createdAt,
+    voided_at           AS voidedAt,
+    items_json          AS itemsJson
   `;
-  if (concertId !== undefined) {
-    return db.getAllAsync<LocalSaleRow>(
-      `SELECT ${selectCols} FROM sales WHERE concert_id = ? ORDER BY created_at DESC`,
-      [concertId]
-    );
+  const rows = concertId !== undefined
+    ? await db.getAllAsync<LocalSaleRow>(
+        `SELECT ${selectCols} FROM sales WHERE concert_id = ? ORDER BY created_at DESC`,
+        [concertId]
+      )
+    : await db.getAllAsync<LocalSaleRow>(
+        `SELECT ${selectCols} FROM sales ORDER BY created_at DESC`
+      );
+  // Parse payment_split_json into paymentSplit array for consumers
+  for (const row of rows) {
+    const raw = row.paymentSplitJson ?? row.payment_split_json ?? null;
+    if (raw) {
+      try {
+        row.paymentSplit = JSON.parse(raw) as PaymentSplitEntry[];
+      } catch {
+        row.paymentSplit = undefined;
+      }
+    }
   }
-  return db.getAllAsync<LocalSaleRow>(
-    `SELECT ${selectCols} FROM sales ORDER BY created_at DESC`
-  );
+  return rows;
 }
 
 /**
@@ -127,17 +144,21 @@ export async function reconcileSalesFromServer(
         }))
       );
 
+      const paymentSplitJson = sale.paymentSplit && Array.isArray(sale.paymentSplit) && sale.paymentSplit.length > 0
+        ? JSON.stringify(sale.paymentSplit)
+        : null;
       await db.runAsync(
         `INSERT OR REPLACE INTO sales
-         (id, concert_id, items_json, total_amount, payment_method,
+         (id, concert_id, items_json, total_amount, payment_method, payment_split_json,
           currency, discount, discount_type, voided, voided_at, synced, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
         [
           localId,
           sale.concertId ?? '',
           itemsJson,
           sale.totalAmount,
           sale.paymentMethod,
+          paymentSplitJson,
           sale.currency,
           sale.discount ?? 0,
           sale.discountType ?? 'flat',

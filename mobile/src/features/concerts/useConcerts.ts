@@ -174,8 +174,17 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
     const currency = s.currency || 'EUR';
     const amount = (s as unknown as Record<string, number>)['total_amount'] ?? s.totalAmount ?? 0;
 
-    // Check if this is a split payment (format: "Card:10.00/Cash:15.00")
-    if (rawMethod.includes('/') && rawMethod.includes(':')) {
+    // Preferred: normalised split sale carries paymentSplit array (current format).
+    if (rawMethod.toLowerCase() === 'split' && Array.isArray(s.paymentSplit) && s.paymentSplit.length > 0) {
+      for (const entry of s.paymentSplit) {
+        if (entry && typeof entry.amount === 'number' && !isNaN(entry.amount)) {
+          addToPaymentMap(entry.method, entry.amount, currency);
+        }
+      }
+    }
+    // Legacy fallback: pre-fix local rows stored the encoded form "Card:10.00/Cash:15.00"
+    // in payment_method. Keep parsing it so historical data still renders correctly.
+    else if (rawMethod.includes('/') && rawMethod.includes(':')) {
       const parts = rawMethod.split('/');
       for (const part of parts) {
         const colonIdx = part.indexOf(':');

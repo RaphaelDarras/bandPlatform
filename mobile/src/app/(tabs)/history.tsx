@@ -45,6 +45,7 @@ interface SaleRowItem {
   items_json: string;
   totalAmount: number;
   paymentMethod: string;
+  paymentSplit?: Array<{ method: string; amount: number }>;
   currency: string;
   discount: number;
   discountType: string;
@@ -55,12 +56,60 @@ interface SaleRowItem {
   parsedItems: SaleItem[];
 }
 
+const PAYMENT_DISPLAY_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  'e-transfer': 'E-transfer',
+  etransfer: 'E-transfer',
+  paypal: 'PayPal',
+};
+
+function formatMethodLabel(raw: string): string {
+  const normalised = (raw ?? '').toLowerCase();
+  if (PAYMENT_DISPLAY_LABELS[normalised]) return PAYMENT_DISPLAY_LABELS[normalised];
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : '';
+}
+
+/**
+ * Returns a human-readable payment label.
+ * - Split sales with a paymentSplit array: "Cash 20 + Card 30"
+ * - Legacy encoded split "Card:30/Cash:20": reformatted to "Card 30 + Cash 20"
+ * - Anything else: titlecased method name
+ */
+function formatPaymentDisplay(
+  rawMethod: string,
+  paymentSplit: Array<{ method: string; amount: number }> | undefined,
+  currency: string,
+): string {
+  const method = (rawMethod ?? '').toLowerCase();
+  if (method === 'split' && paymentSplit && paymentSplit.length > 0) {
+    return paymentSplit
+      .map((s) => `${formatMethodLabel(s.method)} ${currency} ${s.amount.toFixed(2)}`)
+      .join(' + ');
+  }
+  if (rawMethod && rawMethod.includes('/') && rawMethod.includes(':')) {
+    // Legacy encoded form
+    return rawMethod
+      .split('/')
+      .map((part) => {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx <= 0) return part;
+        const label = formatMethodLabel(part.substring(0, colonIdx).trim());
+        const amt = parseFloat(part.substring(colonIdx + 1));
+        return isNaN(amt) ? label : `${label} ${currency} ${amt.toFixed(2)}`;
+      })
+      .join(' + ');
+  }
+  return formatMethodLabel(rawMethod);
+}
+
 function SaleRow({ sale, onPress }: { sale: SaleRowItem; onPress: () => void }) {
   const c = useTheme();
   const raw = sale as unknown as { total_amount?: number; payment_method?: string };
   const itemCount = sale.parsedItems.reduce((sum, i) => sum + i.quantity, 0);
   const total = raw.total_amount ?? sale.totalAmount;
-  const paymentMethod = raw.payment_method ?? sale.paymentMethod;
+  const paymentMethodRaw = raw.payment_method ?? sale.paymentMethod;
+  const paymentMethod = formatPaymentDisplay(paymentMethodRaw, sale.paymentSplit, sale.currency);
   const isVoided = sale.voided === 1;
 
   return (

@@ -18,12 +18,22 @@ export interface LocalSaleItem {
   priceAtSale: number;
 }
 
+export interface PaymentSplitEntry {
+  method: string;
+  amount: number;
+}
+
 export interface LocalSale {
   id: string;
   concertId: string;
   items: LocalSaleItem[];
   totalAmount: number;
   paymentMethod: string;
+  /**
+   * Per-method breakdown for split payments. Only set when paymentMethod === 'split'.
+   * Persisted as JSON in sales.payment_split_json.
+   */
+  paymentSplit?: PaymentSplitEntry[];
   currency: string;
   discount: number;
   discountType: 'flat' | 'percent';
@@ -44,14 +54,15 @@ export async function recordSaleLocally(
   try {
     await db.runAsync(
       `INSERT INTO sales (id, concert_id, items_json, total_amount, payment_method,
-        currency, discount, discount_type, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        payment_split_json, currency, discount, discount_type, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sale.id,
         sale.concertId,
         JSON.stringify(sale.items),
         sale.totalAmount,
         sale.paymentMethod,
+        sale.paymentSplit ? JSON.stringify(sale.paymentSplit) : null,
         sale.currency,
         sale.discount,
         sale.discountType,

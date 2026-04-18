@@ -5,6 +5,8 @@ export interface ApiSale {
   concertId: string;
   totalAmount: number;
   paymentMethod: string;
+  /** Per-method breakdown when paymentMethod === 'split'. */
+  paymentSplit?: Array<{ method: string; amount: number }>;
   currency: string;
   discount: number;
   discountType: 'flat' | 'percent';

@@ -52,6 +52,20 @@ function formatTimestamp(ts: number): string {
   });
 }
 
+const PAYMENT_DISPLAY_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  'e-transfer': 'E-transfer',
+  etransfer: 'E-transfer',
+  paypal: 'PayPal',
+};
+
+function formatMethodLabel(raw: string): string {
+  const normalised = (raw ?? '').toLowerCase();
+  if (PAYMENT_DISPLAY_LABELS[normalised]) return PAYMENT_DISPLAY_LABELS[normalised];
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : '';
+}
+
 export default function SaleDetailScreen() {
   const c = useTheme();
   const { saleId } = useLocalSearchParams<{ saleId: string }>();
@@ -254,10 +268,34 @@ export default function SaleDetailScreen() {
             <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Date & Time</Text>
             <Text style={[styles.metaValue, { color: c.text }]}>{formatTimestamp(sale.created_at)}</Text>
           </View>
-          <View style={styles.metaRow}>
-            <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Payment</Text>
-            <Text style={[styles.metaValue, { color: c.text }]}>{sale.paymentMethod}</Text>
-          </View>
+          {(() => {
+            const rawMethod = (sale.paymentMethod ?? '').toLowerCase();
+            const isSplit = rawMethod === 'split' && Array.isArray(sale.paymentSplit) && sale.paymentSplit.length > 0;
+            if (isSplit) {
+              return (
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Payment</Text>
+                  <View style={[styles.metaValueRow, { flexDirection: 'column', alignItems: 'flex-end', gap: 2 }]}>
+                    <Text style={[styles.metaValue, { color: c.text }]}>Split</Text>
+                    {sale.paymentSplit!.map((s, i) => (
+                      <Text
+                        key={`${s.method}-${i}`}
+                        style={[styles.metaValue, { color: c.textSecondary, fontWeight: '500', fontSize: 13 }]}
+                      >
+                        {`${formatMethodLabel(s.method)}: ${sale.currency} ${s.amount.toFixed(2)}`}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              );
+            }
+            return (
+              <View style={styles.metaRow}>
+                <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Payment</Text>
+                <Text style={[styles.metaValue, { color: c.text }]}>{formatMethodLabel(sale.paymentMethod)}</Text>
+              </View>
+            );
+          })()}
           <View style={styles.metaRow}>
             <Text style={[styles.metaLabel, { color: c.textSecondary }]}>Currency</Text>
             <Text style={[styles.metaValue, { color: c.text }]}>{sale.currency}</Text>

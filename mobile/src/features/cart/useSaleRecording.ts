@@ -41,23 +41,6 @@ export function useSaleRecording() {
     const currentConcertId = useCartStore.getState().concertId;
     const currentCurrency = useCartStore.getState().currency;
 
-    // Build LocalSale
-    const sale: LocalSale = {
-      id: saleId,
-      concertId: currentConcertId ?? '',
-      items: cartItems.map((item) => ({
-        productId: item.productId,
-        variantSku: item.variantSku,
-        quantity: item.quantity,
-        priceAtSale: item.priceAtSale,
-      })),
-      totalAmount: totalFn(),
-      paymentMethod,
-      currency: currentCurrency,
-      discount,
-      discountType,
-    };
-
     // Map UI payment method labels to backend enum values
     const paymentMethodMap: Record<string, string> = {
       'Cash': 'cash',
@@ -83,6 +66,26 @@ export function useSaleRecording() {
     } else {
       resolvedMethod = paymentMethodMap[paymentMethod] ?? paymentMethod.toLowerCase();
     }
+
+    // Build LocalSale — store the NORMALISED paymentMethod (e.g. 'split', 'cash')
+    // and persist paymentSplit locally so UI consumers can render per-method
+    // breakdowns without parsing encoded strings.
+    const sale: LocalSale = {
+      id: saleId,
+      concertId: currentConcertId ?? '',
+      items: cartItems.map((item) => ({
+        productId: item.productId,
+        variantSku: item.variantSku,
+        quantity: item.quantity,
+        priceAtSale: item.priceAtSale,
+      })),
+      totalAmount: totalFn(),
+      paymentMethod: resolvedMethod,
+      paymentSplit,
+      currency: currentCurrency,
+      discount,
+      discountType,
+    };
 
     // Build outbox payload (matches API batch format)
     const outboxPayload: Record<string, unknown> = {

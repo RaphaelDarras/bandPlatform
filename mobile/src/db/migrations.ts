@@ -8,6 +8,7 @@ export async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       items_json TEXT NOT NULL,
       total_amount REAL NOT NULL,
       payment_method TEXT NOT NULL,
+      payment_split_json TEXT,
       currency TEXT NOT NULL DEFAULT 'EUR',
       discount REAL NOT NULL DEFAULT 0,
       discount_type TEXT NOT NULL DEFAULT 'flat',
@@ -65,4 +66,7 @@ export async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync(`ALTER TABLE concerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'`); } catch {}
   // Remove rows with null id (accumulated before _id→id mapping was fixed)
   try { await db.execAsync(`DELETE FROM concerts WHERE id IS NULL`); } catch {}
+
+  // Migrate existing sales table: add payment_split_json for split-payment breakdown
+  try { await db.execAsync(`ALTER TABLE sales ADD COLUMN payment_split_json TEXT`); } catch {}
 }
