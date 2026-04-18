@@ -245,6 +245,28 @@
   }
 
   function trackClick(platform) {
+    // navigator.sendBeacon survives page navigation — the browser holds the
+    // request open even after the user is redirected to the streaming app.
+    // fbq() uses fetch/Image internally, both of which get cancelled when
+    // the page unloads, so we hit Meta's /tr endpoint directly here.
+    if (navigator.sendBeacon) {
+      var lead = new URLSearchParams({
+        id: '462106368687515',
+        ev: 'Lead',
+        'cd[content_name]': 'Crowned',
+        'cd[content_category]': platform
+      });
+      navigator.sendBeacon('https://www.facebook.com/tr?' + lead.toString());
+
+      var click = new URLSearchParams({
+        id: '462106368687515',
+        ev: 'StreamingClick',
+        'cd[platform]': platform
+      });
+      navigator.sendBeacon('https://www.facebook.com/tr?' + click.toString());
+    }
+
+    // Fallback for browsers without sendBeacon (very rare in 2026).
     if (typeof fbq !== 'undefined') {
       fbq('trackCustom', 'StreamingClick', { platform: platform });
       fbq('track', 'Lead', { content_name: 'Crowned', content_category: platform });
@@ -299,20 +321,16 @@
       var appUrl = isIOS ? links.ios : links.android;
       var webUrl = links.web;
 
-      // Delay navigation by ~250ms so the Meta pixel beacon (queued by the
-      // inline trackClick onclick) has time to send before the browser
-      // unloads the page. Without this, StreamingClick / Lead events get
-      // cancelled in-flight and never reach Meta.
-      setTimeout(function () {
-        if (isAndroid && appUrl.indexOf('intent://') === 0) {
-          window.location.href = appUrl;
-          return;
-        }
+      // Navigate immediately — trackClick uses navigator.sendBeacon which
+      // survives the unload, so no delay is needed to keep the events alive.
+      if (isAndroid && appUrl.indexOf('intent://') === 0) {
         window.location.href = appUrl;
-        setTimeout(function () {
-          window.location.href = webUrl;
-        }, 1500);
-      }, 250);
+        return;
+      }
+      window.location.href = appUrl;
+      setTimeout(function () {
+        window.location.href = webUrl;
+      }, 1500);
     });
   })();
 </script>
