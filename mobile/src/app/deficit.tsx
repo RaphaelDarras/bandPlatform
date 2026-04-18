@@ -56,7 +56,6 @@ export default function DeficitScreen() {
                   <View key={v.sku} style={[styles.variantRow, { borderTopColor: c.border }]}>
                     <View style={styles.variantInfo}>
                       <Text style={[styles.variantLabel, { color: c.text }]}>{v.label}</Text>
-                      <Text style={[styles.variantSku, { color: c.textSecondary }]}>{v.sku}</Text>
                     </View>
                     <View style={styles.variantNumbers}>
                       <Text style={styles.currentStock}>{v.stock}</Text>

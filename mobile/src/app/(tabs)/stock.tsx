@@ -48,7 +48,6 @@ function ProductRow({ product }: { product: CachedProduct }) {
         <View style={[styles.variantList, { borderTopColor: c.border }]}>
           {product.variants.map((variant) => (
             <View key={variant.sku} style={styles.variantRow}>
-              <Text style={[styles.variantSku, { color: c.textSecondary }]}>{variant.sku}</Text>
               <Text style={[styles.variantLabel, { color: c.text }]}>{variant.label}</Text>
               <Text style={[styles.variantStock, { color: stockColor(variant.stock) }]}>{variant.stock}</Text>
             </View>
@@ -108,7 +107,7 @@ export default function StockScreen() {
                     <Text style={[styles.deficitProductName, { color: c.text }]}>{product.name}</Text>
                     {deficitVariants.map((v) => (
                       <Text key={v.sku} style={[styles.deficitVariantText, { color: c.danger }]}>
-                        {v.sku} ({v.label}): {v.stock}
+                        {v.label}: {v.stock}
                       </Text>
                     ))}
                   </View>

@@ -20,6 +20,7 @@ import * as Crypto from 'expo-crypto';
 import { requestSync } from '@/features/sync/SyncManager';
 import { apiClient } from '@/api/client';
 import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
+import { getCachedProducts } from '@/db/products';
 import { useTheme } from '@/hooks/use-theme';
 
 function concertLabel(c: CachedConcert): string {
@@ -37,8 +38,14 @@ interface ParsedItem {
   priceAtSale: number;
 }
 
+interface DisplayItem extends ParsedItem {
+  productName: string;
+  variantLabel: string;
+}
+
 interface SaleDetail extends LocalSaleRow {
   parsedItems: ParsedItem[];
+  displayItems: DisplayItem[];
 }
 
 function formatTimestamp(ts: number): string {
@@ -87,9 +94,29 @@ export default function SaleDetailScreen() {
       const rows = await getLocalSales(db);
       const row = rows.find((r) => r.id === saleId);
       if (row) {
+        const parsedItems = JSON.parse(row.items_json ?? '[]') as ParsedItem[];
+        const products = await getCachedProducts(db);
+        const productMap = new Map<string, { productName: string; variantLabel: string }>();
+        for (const product of products) {
+          for (const variant of product.variants) {
+            productMap.set(`${product.id}:${variant.sku}`, {
+              productName: product.name,
+              variantLabel: variant.label,
+            });
+          }
+        }
+        const displayItems: DisplayItem[] = parsedItems.map((item) => {
+          const lookup = productMap.get(`${item.productId}:${item.variantSku}`);
+          return {
+            ...item,
+            productName: lookup?.productName ?? 'Unknown item',
+            variantLabel: lookup?.variantLabel ?? '',
+          };
+        });
         const detail: SaleDetail = {
           ...row,
-          parsedItems: JSON.parse(row.items_json ?? '[]') as ParsedItem[],
+          parsedItems,
+          displayItems,
         };
         setSale(detail);
 
@@ -313,11 +340,13 @@ export default function SaleDetailScreen() {
         {/* Items */}
         <View style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
           <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Items</Text>
-          {sale.parsedItems.map((item, index) => (
+          {sale.displayItems.map((item, index) => (
             <View key={`${item.productId}-${item.variantSku}-${index}`} style={[styles.itemRow, { borderTopColor: c.border }]}>
               <View style={styles.itemInfo}>
-                <Text style={[styles.itemSku, { color: c.text }]}>{item.variantSku}</Text>
-                <Text style={[styles.itemQty, { color: c.textSecondary }]}>{`× ${item.quantity}`}</Text>
+                <Text style={[styles.itemSku, { color: c.text }]}>{item.productName}</Text>
+                <Text style={[styles.itemQty, { color: c.textSecondary }]}>
+                  {item.variantLabel ? `${item.variantLabel} × ${item.quantity}` : `× ${item.quantity}`}
+                </Text>
               </View>
               <View style={styles.itemPriceCol}>
                 <Text style={[styles.itemUnitPrice, { color: c.textSecondary }]}>{`${sale.currency} ${item.priceAtSale.toFixed(2)}`}</Text>
