@@ -163,7 +163,12 @@
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
     fbq('init', '462106368687515');
-    fbq('track', 'PageView');
+
+    // event_id shared with CAPI so Meta dedupes the pixel + server event.
+    var pvId = (crypto.randomUUID && crypto.randomUUID()) ||
+      (Date.now().toString(36) + Math.random().toString(36).slice(2));
+    window.__pvEventId = pvId;
+    fbq('track', 'PageView', {}, { eventID: pvId });
   </script>
   <noscript><img height="1" width="1" style="display:none"
     src="https://www.facebook.com/tr?id=462106368687515&ev=PageView&noscript=1"
@@ -240,19 +245,63 @@
 </div>
 
 <script>
-  if (typeof fbq !== 'undefined') {
-    fbq('track', 'ViewContent', { content_name: 'Crowned', content_type: 'music' });
+  var CAPI_ENDPOINT = 'https://hurakan-band-platform.onrender.com/api/capi/event';
+  var PAGE_URL = 'https://hurakanband.fr/crowned/';
+
+  function genEventId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  function readCookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
+    return m ? decodeURIComponent(m[1]) : undefined;
+  }
+
+  // Fires the server-side CAPI event. event_id matches the pixel's eventID so
+  // Meta dedupes. Browser-sent headers provide IP + UA; cookies add fbp/fbc.
+  function sendCapi(event_name, event_id, custom_data, opts) {
+    var payload = JSON.stringify({
+      event_name: event_name,
+      event_id: event_id,
+      event_source_url: PAGE_URL,
+      custom_data: custom_data,
+      fbp: readCookie('_fbp'),
+      fbc: readCookie('_fbc')
+    });
+    // sendBeacon with text/plain avoids CORS preflight and survives unload.
+    if (opts && opts.beacon && navigator.sendBeacon) {
+      var blob = new Blob([payload], { type: 'text/plain' });
+      navigator.sendBeacon(CAPI_ENDPOINT, blob);
+      return;
+    }
+    try {
+      fetch(CAPI_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: payload,
+        keepalive: true,
+        credentials: 'omit'
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  // PageView: client pixel already fired in <head> with window.__pvEventId.
+  // Mirror it server-side with the same id so Meta dedupes.
+  if (window.__pvEventId) {
+    sendCapi('PageView', window.__pvEventId, undefined, { beacon: false });
   }
 
   function trackClick(platform) {
-    // navigator.sendBeacon survives page navigation — the browser holds the
-    // request open even after the user is redirected to the streaming app.
-    // fbq() uses fetch/Image internally, both of which get cancelled when
-    // the page unloads, so we hit Meta's /tr endpoint directly here.
+    var eventId = genEventId();
+
+    // Client pixel via /tr endpoint. sendBeacon survives page navigation —
+    // fbq() uses fetch/Image internally, which get cancelled on unload.
     if (navigator.sendBeacon) {
       var lead = new URLSearchParams({
         id: '462106368687515',
         ev: 'Lead',
+        eid: eventId,
         'cd[content_name]': 'Crowned',
         'cd[content_category]': platform
       });
@@ -266,10 +315,19 @@
       navigator.sendBeacon('https://www.facebook.com/tr?' + click.toString());
     }
 
+    // Server-side CAPI — catches ad-blocker users the pixel can't reach.
+    // Same event_id as the /tr Lead → Meta dedupes.
+    sendCapi('Lead', eventId, {
+      content_name: 'Crowned',
+      content_category: platform
+    }, { beacon: true });
+
     // Fallback for browsers without sendBeacon (very rare in 2026).
     if (typeof fbq !== 'undefined') {
       fbq('trackCustom', 'StreamingClick', { platform: platform });
-      fbq('track', 'Lead', { content_name: 'Crowned', content_category: platform });
+      fbq('track', 'Lead',
+        { content_name: 'Crowned', content_category: platform },
+        { eventID: eventId });
     }
   }
 
