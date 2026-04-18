@@ -20,6 +20,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations
 - [ ] **Phase 7: Shop Enhancements** - Shipping, bundles, pre-orders, and customer features
 - [ ] **Phase 8: Immutable sale line snapshots** - Snapshot product name + variant label on sale items so history survives product/variant deletion
+- [ ] **Phase 9: Concert-first selling UX** - Make concert-linked sales the default fast path from dashboard; lone sale becomes a rare fallback
+- [ ] **Phase 10: Design polish pass** - Lift mobile app visual quality from functional prototype to professional product (icon library, design tokens, typography scale, loading states)
+- [ ] **Phase 11: Multi-tenant band-agnostic platform** - Convert single-tenant (Hurakan) product into a multi-tenant platform any band can sign up for, configure, and customize (scope likely milestone-sized — revisit during discuss)
 
 ## Phase Details
 
@@ -163,6 +166,81 @@ Plans:
 Plans:
 - [ ] TBD during phase planning
 
+### Phase 9: Concert-first selling UX
+**Goal**: Band members reach a concert-linked selling screen from the dashboard in one tap (or at most two, when disambiguation is required), and lone sales — the current default — become a rare, explicit fallback.
+**Depends on**: Phase 2 (Mobile POS Core — selling flow, cart store concert context) and Phase 3 (concert report UI)
+**Requirements**: New (driven by user report that lone sales almost never happen in practice; going through Concerts tab → list → detail → Start Selling to attach a sale to a concert is too many taps for the common case)
+**Success Criteria** (what must be TRUE):
+  1. With exactly one active concert, the dashboard primary CTA opens the selling screen with that concert pre-selected — no intermediate screens.
+  2. With multiple active concerts, the dashboard surfaces them (as inline cards or a picker) so a band member can tap directly into selling for the chosen concert.
+  3. With zero active concerts, the dashboard CTA prompts to create a concert first (or offers an explicit "sell without a concert" affordance) — the silent "lone sale" default is removed.
+  4. The existing concert-detail "Start Selling" button (recently promoted above the Product Breakdown) continues to work as a secondary path — no regression for users who navigate that way.
+  5. Lone sales remain possible but are an explicit choice (secondary card, long-press, settings toggle, or menu item — mechanism decided during discuss), never the implicit default.
+  6. The cart store's concert context (`concertId`, concert currency) is set correctly before navigating to `/selling`, matching what the concert-detail path does today.
+  7. No regression to history, stock, or sync: sales linked this way are indistinguishable on the server and in reports from sales linked via the concert-detail flow.
+**Plans**: TBD
+
+Plans:
+- [ ] TBD during phase planning
+
+### Phase 10: Design polish pass
+**Goal**: The mobile app stops looking like a functional prototype and starts looking like a professional product — consistent iconography, a single source of truth for colors, a reusable typography scale, and at least one polish gesture on high-traffic screens. A band member demoing the app to a label or venue should not flinch at the visuals.
+**Depends on**: Phase 2 (Mobile POS Core — screens exist to polish) and Phase 3 (Mobile POS Optimization — last round of functional changes). Ideally sequenced AFTER Phase 9 (Concert-first selling UX) so the dashboard's final layout is polished, not an interim one.
+**Requirements**: New (driven by user observation that emoji icons, hardcoded hex colors, ad-hoc font sizes, and minimal interaction feedback make the app feel unfinished).
+**Success Criteria** (what must be TRUE):
+  1. Every emoji used as an icon (🎸 🎤 📋 📦 ⚠️ ⬜ ⚙️ ↻ etc. in dashboard cards, tab bar, sync indicator, empty states, badges) is replaced by a real icon — either an installed RN icon library or a curated SVG set — with a single import site.
+  2. Colors are centralized: no raw hex literals (e.g., `#208AEF`, `#f8f9fa`, `#ef4444`, `#22c55e`, `#dcfce7`) remain in screen code; all colors route through `useTheme()` or an equivalent tokens module. Dark mode contrast is audited as part of this.
+  3. A typography scale exists (e.g., `display`, `heading`, `title`, `body`, `caption`) with named text styles; screens use those utilities instead of ad-hoc `fontSize: 15, fontWeight: '600'` pairs.
+  4. At least one polish gesture ships on every high-traffic screen: skeleton loaders on the concert list, products list, history list, and stock list (in place of the current centered ActivityIndicator cold-load state), OR a transition animation on tab switches and navigation pushes — whichever approach is chosen in discuss.
+  5. Badges and pills (Active/Closed concert badge, dashboard alert card, deficit screen warnings) use a single color/shape/size system instead of per-screen ad-hoc styling.
+  6. Press feedback on interactive elements goes beyond `opacity: 0.85` where appropriate (scale transform, color ramp, or haptic feedback — discuss-phase decides the scope).
+  7. A before/after review is conducted on key screens (dashboard, selling flow, concert detail, history, stock) — captured either as side-by-side screenshots in the phase summary or a demo video.
+  8. No functional regressions: every existing flow (sell, close concert, void sale, restock, sync) works identically after the polish pass; this phase is style-only except where a design token replacement requires small structural tweaks.
+
+**Open design questions for discuss-phase**:
+- (1) Adopt a React Native icon library (lucide-react-native? Ionicons from expo/vector-icons? react-native-svg with a curated set?) or hand-roll a small SVG set specific to the app?
+- (2) Formalize design tokens in a standalone `tokens.ts` file vs. extend `useTheme()` with richer structured values?
+- (3) Define a type scale as React Native `StyleSheet` utilities or as a `<Text variant="...">` component?
+- (4) Ship polish across all screens in one phase, or cut scope to dashboard + selling flow first and defer history/stock/settings to a Phase 10.1?
+- (5) Dark mode audit: keep the current two-theme approach, or collapse to a single theme for now if dark mode isn't in active use?
+
+**Plans**: TBD
+
+Plans:
+- [ ] TBD during phase planning
+
+### Phase 11: Multi-tenant band-agnostic platform
+**⚠ Scope warning**: This is almost certainly milestone-sized, not phase-sized. It touches database schema (tenant_id on every table), API authentication (tenant context on every request), mobile app (tenant-aware login + config), online shop (Phases 4-7 must be rebuilt around tenant context before they ship), admin provisioning, domain/subdomain routing, and — implied by "available to any interested bands" — some form of billing. Discuss-phase should either (a) aggressively cut scope to a single foundational plan (e.g., schema migration + tenant middleware only), or (b) re-frame as a new milestone v2.0 ("Multi-tenant platform") with this entry replaced by a placeholder and the real work planned as a fresh roadmap. Leaving this here as an entry so the idea is tracked, not lost.
+
+**Goal**: The codebase (MongoDB + API + mobile app + upcoming e-shop) stops being Hurakan-specific and becomes a platform that any band can sign up for, provision, and customize. A new band onboards by providing their information (name, branding, admin PIN, currency default, Stripe/PayPal accounts when shop ships) and ends up with an isolated workspace: their own products, concerts, sales, admins, and web storefront. Nothing about one band's data, branding, or configuration is visible to another.
+**Depends on**: Phase 1 (existing schema — migration source), Phase 2 (mobile auth flow — needs tenant awareness grafted on), Phase 4-7 (NOT YET BUILT — critical: discuss-phase should decide whether to wait until after Phase 7 ships and retrofit, or block Phase 4 planning and build multi-tenancy into the shop from day one; the latter is almost certainly cheaper despite taking longer to first value)
+**Requirements**: New (driven by user intent to make the platform available to other bands, not just Hurakan)
+**Success Criteria** (what must be TRUE):
+  1. **Data isolation**: Every document in every collection (Product, Concert, Sale, Admin, Order, InventoryAdjustment, etc.) carries a `tenantId` field. No API endpoint returns cross-tenant data, and no query can omit the tenant filter — enforced by a layer, not by caller convention.
+  2. **Authentication**: Login identifies the tenant. Admin PINs are unique per tenant, not globally. The mobile app opens in the context of one specific tenant and cannot be flipped mid-session.
+  3. **Provisioning flow**: A new band can be onboarded end-to-end (create tenant, first admin account, default config) via a defined process — whether self-service signup or operator-driven, decided during discuss.
+  4. **Mobile branding**: App title, accent color, logo, and default currency are per-tenant. The hardcoded "Hurakan Merch" title and `#208AEF` accent become tenant-provided values loaded at login.
+  5. **Web UI customization**: The online shop (when it ships) renders with the tenant's band name, logo, color palette, and product catalog. At minimum: brand name, primary/accent colors, logo, hero copy. Out of scope unless discuss agrees: custom CSS, custom fonts, page-builder UI.
+  6. **Domain/subdomain routing**: Each tenant is reachable at a predictable URL (`<slug>.platform.com` or `platform.com/<slug>` — decided in discuss). Mobile app routes to its tenant's API without the user typing a URL.
+  7. **Migration of Hurakan data**: Existing Hurakan data continues to work — the band becomes tenant #1 on the new platform, not a casualty of the refactor.
+  8. **No regression**: Every existing flow (sell, sync, void, restock, concert management) works identically for Hurakan post-migration, and the new "platform mode" is invisible to a single-tenant user.
+  9. **Security**: A penetration-test-equivalent sanity pass confirms cross-tenant data leakage is blocked at the API layer — request for tenant A's product with tenant B's auth returns 404/403, not the data.
+ 10. **Onboarding docs**: A band joining the platform has documented steps for initial setup (even if those steps are "email us your band name and we'll provision you" in v1). Billing (if included) is out of scope here unless discuss adds it.
+
+**Open strategic questions for discuss-phase**:
+- (1) **Phasing strategy**: retrofit after Phase 7 ships, OR block Phases 4-7 and build them multi-tenant from day one? The first is faster to Hurakan value; the second is cheaper long-term and avoids a painful retrofit.
+- (2) **Tenancy model**: shared database with `tenantId` field (simplest, cheapest, weaker isolation) vs. database-per-tenant (strongest isolation, operationally heavier) vs. schema-per-tenant (middle ground)?
+- (3) **Provisioning**: self-service signup with email verification, OR operator-driven (user creates tenants manually for known bands)? Impacts billing, abuse prevention, and onboarding complexity.
+- (4) **Billing**: in scope for this phase/milestone or deferred entirely? "Available to any interested bands" implies monetization but doesn't commit to it.
+- (5) **Hurakan migration**: does Hurakan's data become tenant_id=1 in the new schema, or does Hurakan run on legacy single-tenant infra alongside the new multi-tenant system?
+- (6) **Customization depth**: minimum viable (name + color + logo) vs. medium (name + color + logo + custom hero copy + font pairing) vs. heavy (page builder, custom CSS)?
+- (7) **Mobile app distribution**: one white-label app in the stores that accepts tenant credentials at login, OR per-tenant branded apps (requires separate app store submissions — much heavier)?
+
+**Plans**: TBD
+
+Plans:
+- [ ] TBD during phase planning
+
 ## Progress
 
 **Execution Order:**
@@ -178,7 +256,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
+| 9. Concert-first selling UX | 0/TBD | Not started | - |
+| 10. Design polish pass | 0/TBD | Not started | - |
+| 11. Multi-tenant band-agnostic platform | 0/TBD | Not started | - |
 
 ---
 *Created: 2026-02-13*
-*Last updated: 2026-04-18 — Phase 8 added (immutable sale line snapshots)*
+*Last updated: 2026-04-19 — Phase 11 added (multi-tenant band-agnostic platform; scope may warrant promotion to milestone)*
