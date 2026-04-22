@@ -292,21 +292,41 @@
     sendCapi('PageView', window.__pvEventId, undefined, { beacon: false });
   }
 
+  // Browser-side Lead fires after 3s of real engagement (tab visible).
+  // Why: Meta's Sales optimizer requires Lead to have a reliable browser
+  // source; CAPI-only keeps it classified as "server-side" and non-
+  // selectable. Firing on engagement (not on click) avoids the unload
+  // cancellation that kills fbq() when the platform link navigates.
+  (function () {
+    var leadId = genEventId();
+    var fired = false;
+
+    function fireLead() {
+      if (fired) return;
+      fired = true;
+      if (typeof fbq !== 'undefined') {
+        fbq('track', 'Lead',
+          { content_name: 'Crowned' },
+          { eventID: leadId });
+      }
+      sendCapi('Lead', leadId, { content_name: 'Crowned' }, { beacon: false });
+    }
+
+    var timer = setTimeout(function () {
+      if (document.visibilityState === 'visible') fireLead();
+    }, 3000);
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') clearTimeout(timer);
+    });
+  })();
+
   function trackClick(platform) {
-    var eventId = genEventId();
-
-    // Client pixel via /tr endpoint. sendBeacon survives page navigation —
-    // fbq() uses fetch/Image internally, which get cancelled on unload.
+    // StreamingClick captures the deeper funnel signal (clicked a platform
+    // button). sendBeacon survives navigation; fbq fallback covers browsers
+    // that don't support it. No Lead here — Lead fires on page engagement
+    // above, so Meta sees a clean browser-side signal independent of clicks.
     if (navigator.sendBeacon) {
-      var lead = new URLSearchParams({
-        id: '462106368687515',
-        ev: 'Lead',
-        eid: eventId,
-        'cd[content_name]': 'Crowned',
-        'cd[content_category]': platform
-      });
-      navigator.sendBeacon('https://www.facebook.com/tr?' + lead.toString());
-
       var click = new URLSearchParams({
         id: '462106368687515',
         ev: 'StreamingClick',
@@ -315,19 +335,8 @@
       navigator.sendBeacon('https://www.facebook.com/tr?' + click.toString());
     }
 
-    // Server-side CAPI — catches ad-blocker users the pixel can't reach.
-    // Same event_id as the /tr Lead → Meta dedupes.
-    sendCapi('Lead', eventId, {
-      content_name: 'Crowned',
-      content_category: platform
-    }, { beacon: true });
-
-    // Fallback for browsers without sendBeacon (very rare in 2026).
     if (typeof fbq !== 'undefined') {
       fbq('trackCustom', 'StreamingClick', { platform: platform });
-      fbq('track', 'Lead',
-        { content_name: 'Crowned', content_category: platform },
-        { eventID: eventId });
     }
   }
 
