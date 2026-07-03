@@ -1,11 +1,15 @@
 import { Link, useLoaderData } from 'react-router-dom'
 import type { BitEvent } from '../lib/bandsintown'
+import { clean, nextEvent, venueDisplay } from '../lib/bandsintown'
+import { releases } from '../data/releases'
 
 // Landing hub (D-25): hero wordmark + next-concert teaser + release teaser.
-// Full content/styling lands in Wave 1 — this is a buildable stub.
+// No merch teaser (Phase 5 scope). All Bandsintown text renders as escaped
+// React text (T-04-xss).
 export function Component() {
   const { events } = (useLoaderData() as { events?: BitEvent[] }) ?? {}
-  const next = events?.[0]
+  const next = nextEvent(events ?? [])
+  const highlightedRelease = releases[0]
 
   return (
     <div className="flex flex-col gap-12">
@@ -24,16 +28,44 @@ export function Component() {
       <section>
         <h2 className="font-display text-3xl uppercase text-white">Next Show</h2>
         {next ? (
-          <p className="mt-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white/75">
-            {next.venue.location} — {new Date(next.datetime).toLocaleDateString('en')}
-          </p>
+          <>
+            <p className="mt-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white/75">
+              {new Date(next.datetime).toLocaleDateString('en')} — {venueDisplay(next)} —{' '}
+              {next.venue.city}, {next.venue.country}
+            </p>
+            {next.offers.length > 0 && (
+              <a
+                href={clean(next.offers[0].url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block border border-[var(--color-accent)] px-4 py-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white hover:bg-[var(--color-accent)] hover:text-black"
+              >
+                Get Tickets
+              </a>
+            )}
+          </>
         ) : (
           <p className="mt-2 font-sans text-sm text-white/75">No shows scheduled.</p>
         )}
-        <Link to="/concerts" className="mt-2 inline-block text-sm text-white/75 underline">
+        <Link to="/concerts" className="mt-2 block text-sm text-white/75 underline">
           All concerts
         </Link>
       </section>
+
+      {highlightedRelease && (
+        <section>
+          <h2 className="font-display text-3xl uppercase text-white">Latest Release</h2>
+          <p className="mt-2 font-sans text-sm text-white/75">
+            Stream the latest track, EP, or video on the Discography page.
+          </p>
+          <Link
+            to="/discography"
+            className="mt-2 inline-block text-sm font-semibold uppercase tracking-[0.06em] text-white underline"
+          >
+            View Discography
+          </Link>
+        </section>
+      )}
     </div>
   )
 }
