@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Completed 02-mobile-pos-core-02-09-PLAN.md
-last_updated: "2026-03-19T20:46:33.496Z"
-last_activity: 2026-03-18 — Post-Phase 2 production bug fixes and feature additions
+status: executing
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-07-03T12:22:46.265Z"
+last_activity: 2026-07-03
 progress:
-  total_phases: 7
+  total_phases: 11
   completed_phases: 3
-  total_plans: 18
-  completed_plans: 18
-  percent: 77
+  total_plans: 23
+  completed_plans: 19
+  percent: 27
 ---
 
 # Project State
@@ -21,19 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Band members can record merchandise sales at concerts quickly and reliably, with stock automatically synchronized across online and physical sales channels, preventing overselling and lost revenue.
-**Current focus:** Phase 3 - Mobile POS Optimization (not yet planned)
+**Current focus:** Phase 04 — showcase-website
 
 ## Current Position
 
-Phase: 2 of 7 complete. Phase 3 not yet planned.
-Status: Ready to plan Phase 3
-Last activity: 2026-04-19 — Completed quick task 260419-1uj: Add Active/Closed tabs to concert management list
+Phase: 04 (showcase-website) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-07-03
 
-Progress: [████████░░] 77%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 2
 - Average duration: 2 minutes
 - Total execution time: 0.07 hours
@@ -59,6 +61,7 @@ Progress: [████████░░] 77%
 | Phase 03-mobile-pos-optimization P03 | 2 | 1 tasks | 4 files |
 | Phase 02-mobile-pos-core P08 | 2min | 2 tasks | 4 files |
 | Phase 02-mobile-pos-core P09 | 2min | 2 tasks | 5 files |
+| Phase 04 P01 | 33min | 4 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -142,6 +145,9 @@ Recent decisions affecting current work:
 - [Phase 02-mobile-pos-core]: apiDeactivateProduct switched from PATCH to DELETE — server only exposes DELETE route for soft-delete deactivation
 - [Phase 02-mobile-pos-core]: partialize in syncStore excludes isOnline from MMKV — cold start always defaults to false
 - [Phase 02-mobile-pos-core]: consecutiveFailures threshold of 3 in NetInfo listener determines server reachability (no store subscription needed)
+- [Phase ?]: [Phase 04-01]: Root npm overrides pin react/react-dom@19.2.7 — eliminates react-helmet-async-driven React 18 dual-instance that broke Vitest rendering
+- [Phase ?]: [Phase 04-01]: @vitejs/plugin-react pinned to 5.1.4 (6.x requires vite@8, conflicts with vite@7 peer cap)
+- [Phase ?]: [Phase 04-01]: fetchUpcomingEvents guarded by import.meta.env.SSR so app_id never ships to client; vite-react-ssg dirStyle=nested
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -159,11 +165,13 @@ None yet.
 ### Blockers/Concerns
 
 **Resolved (2026-03-18):**
+
 - Sync reliability issues from Phase 2 (payload format, missing wiring, pending count bugs) — all fixed
 - Stock reconciliation between app and backend — resolved with delta-based merge (apiStock - pendingOutboxQuantities)
 - SQLite concurrent access crash on Android — resolved with promise-based singleton + health check
 
 **Remaining for Phase 3:**
+
 - Battery efficiency during 4-6 hour events (POS-06) — not yet addressed
 - Low-stock warnings below 5 units (POS-07) — not yet addressed
 - Sales reports with totals filtered by concert (POS-08) — partial (concert detail shows totals; no dedicated report)
@@ -171,6 +179,7 @@ None yet.
 - Poor cellular sync reliability (POS-12) — basic backoff implemented; retry on foreground added
 
 **Timeline:**
+
 - Concert sales tool must be operational by early April (Phase 3 critical path)
 - 8-12 hours per week development time available
 
@@ -185,8 +194,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T20:46:33.491Z
-Stopped at: Completed 02-mobile-pos-core-02-09-PLAN.md
+Last session: 2026-07-03T12:22:46.245Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 

@@ -50,10 +50,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Showcase Website
 
-- [ ] **WEB-01**: Visitor can view band bio and history
-- [ ] **WEB-02**: Visitor can browse discography with streaming links
-- [ ] **WEB-03**: Visitor can view upcoming concert dates and venues
-- [ ] **WEB-04**: Visitor can access contact form or contact information
+- [x] **WEB-01**: Visitor can view band bio and history
+- [x] **WEB-02**: Visitor can browse discography with streaming links
+- [x] **WEB-03**: Visitor can view upcoming concert dates and venues
+- [x] **WEB-04**: Visitor can access contact form or contact information
 
 ### Authentication & Security
 
@@ -120,10 +120,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | POS-08 | Phase 3 | Complete |
 | POS-11 | Phase 3 | Complete |
 | POS-12 | Phase 3 | Complete |
-| WEB-01 | Phase 4 | Pending |
-| WEB-02 | Phase 4 | Pending |
-| WEB-03 | Phase 4 | Pending |
-| WEB-04 | Phase 4 | Pending |
+| WEB-01 | Phase 4 | Complete |
+| WEB-02 | Phase 4 | Complete |
+| WEB-03 | Phase 4 | Complete |
+| WEB-04 | Phase 4 | Complete |
 | SHOP-01 | Phase 5 | Pending |
 | SHOP-02 | Phase 5 | Pending |
 | SHOP-03 | Phase 5 | Pending |
