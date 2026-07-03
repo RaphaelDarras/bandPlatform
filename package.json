@@ -14,6 +14,9 @@
   "author": "Raph",
   "type": "commonjs",
   "main": "index.js",
+  "private": true,
+  "workspaces": ["web", "mobile", "api", "packages/*"],
+  "packageManager": "npm@11.8.0",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:all": "cd api && npm test && cd ../mobile && npm test"
