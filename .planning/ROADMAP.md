@@ -120,7 +120,7 @@ Plans:
 
 - [x] 04-01-PLAN.md — Monorepo workspaces + web scaffold (Vite 7/React 19/Tailwind v4/vite-react-ssg) + test infra + app shell + data contracts
 - [x] 04-02-PLAN.md — Bandsintown build-time client + Concerts page + Home hero/next-concert (WEB-03)
-- [ ] 04-03-PLAN.md — Discography: Spotify/YouTube embeds mapped from releases config (WEB-02)
+- [x] 04-03-PLAN.md — Discography: Spotify/YouTube embeds mapped from releases config (WEB-02)
 - [ ] 04-04-PLAN.md — About + Contact static pages + /stock migration (WEB-01, WEB-04, D-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -304,7 +304,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 1. Foundation & Inventory Core | 6/6 | Complete   | 2026-03-13 |
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
-| 4. Showcase Website | 2/5 | In Progress|  |
+| 4. Showcase Website | 3/5 | In Progress|  |
 | 5. Online Shop Core | 0/TBD | Not started | - |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
