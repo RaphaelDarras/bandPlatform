@@ -71,6 +71,27 @@ export function clean(u: string): string {
 }
 
 /**
+ * Return the soonest upcoming event, or null when there are none. Reused by
+ * Home's next-concert teaser (D-25) and Concerts' full listing.
+ */
+export function nextEvent(events: BitEvent[]): BitEvent | null {
+  return events[0] ?? null
+}
+
+/**
+ * Display-friendly venue string. Mitigates the festival-quirk where
+ * Bandsintown returns the festival `title` as `venue.name` instead of the
+ * real venue name (RESEARCH Pitfall 2) — in that case prefer
+ * `venue.location` + `title`. Otherwise use `venue.name`.
+ */
+export function venueDisplay(e: BitEvent): string {
+  if (e.title && e.venue.name === e.title) {
+    return `${e.venue.location} — ${e.title}`
+  }
+  return e.venue.name
+}
+
+/**
  * Fetch upcoming events at build time. Returns [] on any non-ok response,
  * thrown error, or missing API key (fail-soft → empty state, D-12).
  *
@@ -89,9 +110,13 @@ export async function fetchUpcomingEvents(): Promise<BitEvent[]> {
       `https://rest.bandsintown.com/artists/id_${ARTIST_ID}/events/` +
       `?app_id=${appId}&date_range=upcoming`
     const res = await fetch(url)
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.warn(`[bandsintown] fetch failed with status ${res.status}, falling back to []`)
+      return []
+    }
     return (await res.json()) as BitEvent[]
-  } catch {
+  } catch (err) {
+    console.warn('[bandsintown] fetch threw, falling back to []:', err)
     return []
   }
 }
