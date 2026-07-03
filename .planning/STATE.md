@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-07-03T12:22:46.265Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-07-03T12:40:55.967Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 11
   completed_phases: 3
   total_plans: 23
-  completed_plans: 19
+  completed_plans: 20
   percent: 27
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 04 (showcase-website) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-07-03
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [████████░░] 83%
 | Phase 02-mobile-pos-core P08 | 2min | 2 tasks | 4 files |
 | Phase 02-mobile-pos-core P09 | 2min | 2 tasks | 5 files |
 | Phase 04 P01 | 33min | 4 tasks | 32 files |
+| Phase 04-showcase-website P02 | 10min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04-01]: Root npm overrides pin react/react-dom@19.2.7 — eliminates react-helmet-async-driven React 18 dual-instance that broke Vitest rendering
 - [Phase ?]: [Phase 04-01]: @vitejs/plugin-react pinned to 5.1.4 (6.x requires vite@8, conflicts with vite@7 peer cap)
 - [Phase ?]: [Phase 04-01]: fetchUpcomingEvents guarded by import.meta.env.SSR so app_id never ships to client; vite-react-ssg dirStyle=nested
+- [Phase 04-showcase-website]: [Phase 04-02]: app_id stripped inside fetchUpcomingEvents (sanitizeEvent) before the loader returns, not only at render sites — vite-react-ssg serializes the raw loader value into static-loader-data JSON shipped for hydration
+- [Phase 04-showcase-website]: [Phase 04-02]: venueDisplay() centralizes the Bandsintown festival venue.name===title quirk mitigation, preferring venue.location + title
+- [Phase 04-showcase-website]: [Phase 04-02]: nextEvent() extracted as a pure helper (events[0] ?? null) shared by Home and Concerts
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -194,8 +198,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-03T12:22:46.245Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-07-03T12:40:55.947Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
