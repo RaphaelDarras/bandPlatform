@@ -1,5 +1,4 @@
 {
-  "$comment": "Vercel Project Root Directory MUST be set to \"web\" in the dashboard (Settings -> General -> Root Directory) for this config to take effect (RESEARCH.md Pitfall 5). With Root Directory=web, Vercel auto-detects the Vite framework preset and, because the repo root has npm workspaces + a committed root lockfile, auto-installs from the monorepo root (no custom installCommand needed here). BANDSINTOWN_APP_ID must be added as a Production + Preview env var scoped to Build only, WITHOUT a VITE_ prefix (D-09) -- see web/.env.example. Every workspace package.json must keep a unique `name` for Vercel's skip-unaffected-builds detection (enforced by web/src/test/prerender-output.test.ts).",
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist"
