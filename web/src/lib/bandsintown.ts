@@ -33,6 +33,19 @@ export interface BitOffer {
   url: string // ⚠ echoes app_id — strip with clean() before rendering (Pitfall 8)
 }
 
+/**
+ * Nested artist object present on the live payload. Its `url` (and other link
+ * fields) echo the app_id exactly like the event/offer urls — the field was
+ * previously undeclared, so it slipped through the field-by-field sanitizer and
+ * leaked the key into the SSG hydration JSON (SECURITY regression, D-09). Typed
+ * here + scrubbed by the recursive sanitizer below.
+ */
+export interface BitArtist {
+  name?: string
+  url?: string
+  [key: string]: unknown
+}
+
 export interface BitEvent {
   id: string
   url: string // ⚠ echoes app_id — strip with clean() before rendering (Pitfall 8)
@@ -54,6 +67,7 @@ export interface BitEvent {
   bandsintown_plus: boolean
   presale: string
   venue: BitVenue
+  artist?: BitArtist // ⚠ nested links echo app_id — scrubbed by sanitizeEvent (D-09)
 }
 
 /**
@@ -71,19 +85,49 @@ export function clean(u: string): string {
 }
 
 /**
- * Strip app_id from every URL on an event (top-level `url` + each
- * `offers[].url`). Applied once at the fetch boundary so the *data* baked
- * into the SSG hydration payload never carries the secret — not just the
- * HTML rendered from it (Pitfall 8: the raw loader result is serialized to
- * static-loader-data JSON for client hydration, so cleaning only at JSX
- * render sites would leave the key in that JSON).
+ * Remove app_id from a single string. Uses proper URL parsing when possible;
+ * falls back to a textual strip for query fragments that don't parse as a full
+ * URL, so any string echoing the key is still scrubbed (defence-in-depth).
  */
-function sanitizeEvent(e: BitEvent): BitEvent {
-  return {
-    ...e,
-    url: clean(e.url),
-    offers: e.offers.map((o) => ({ ...o, url: clean(o.url) })),
+function stripAppIdFromString(s: string): string {
+  if (!s.includes('app_id')) return s
+  try {
+    const x = new URL(s)
+    x.searchParams.delete('app_id')
+    return x.toString()
+  } catch {
+    return s.replace(/[?&]app_id=[^&#\s]*/gi, '')
   }
+}
+
+/**
+ * Recursively strip app_id from every string in an object/array tree.
+ */
+function deepStripAppId<T>(value: T): T {
+  if (typeof value === 'string') return stripAppIdFromString(value) as unknown as T
+  if (Array.isArray(value)) return value.map((v) => deepStripAppId(v)) as unknown as T
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) out[k] = deepStripAppId(v)
+    return out as T
+  }
+  return value
+}
+
+/**
+ * Strip app_id from an event at the fetch boundary so the *data* baked into the
+ * SSG hydration payload never carries the secret — not just the HTML rendered
+ * from it (Pitfall 8: the raw loader result is serialized to static-loader-data
+ * JSON for client hydration, so cleaning only at JSX render sites would leave
+ * the key in that JSON).
+ *
+ * Uses recursive redaction rather than cleaning named fields one-by-one: the
+ * live payload echoes app_id in a nested `artist.url` that was undeclared on
+ * BitEvent and thus previously leaked (SECURITY, D-09). Recursion scrubs any
+ * current or future field that carries the key.
+ */
+export function sanitizeEvent(e: BitEvent): BitEvent {
+  return deepStripAppId(e)
 }
 
 /**

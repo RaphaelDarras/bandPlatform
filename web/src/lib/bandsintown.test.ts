@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { clean, nextEvent, venueDisplay, fetchUpcomingEvents } from './bandsintown'
+import { clean, nextEvent, venueDisplay, fetchUpcomingEvents, sanitizeEvent } from './bandsintown'
 import type { BitEvent } from './bandsintown'
 import fixture from './__fixtures__/bandsintown-events.json'
 
@@ -39,6 +39,30 @@ describe('clean', () => {
   it('leaves a URL without app_id untouched aside from normalization', () => {
     const result = clean(events[1].url)
     expect(result).not.toContain('app_id')
+  })
+})
+
+describe('sanitizeEvent (deep app_id redaction — D-09 hydration-leak regression)', () => {
+  it('strips app_id from top-level url, offers[].url, AND nested artist.url', () => {
+    const sanitized = sanitizeEvent(events[0])
+    // The whole serialized event (what gets baked into the SSG hydration JSON)
+    // must not contain the key anywhere — this is the exact leak vector that
+    // shipped to production: artist.url was undeclared and passed through.
+    const serialized = JSON.stringify(sanitized)
+    expect(serialized).not.toContain('app_id=')
+    expect(serialized).not.toContain('FAKE_TEST_APP_ID_0000')
+    // artist object is preserved (just scrubbed), not dropped
+    expect(sanitized.artist?.url).toBeDefined()
+    expect(sanitized.artist?.url).not.toContain('app_id')
+    expect(sanitized.url).not.toContain('app_id')
+    expect(sanitized.offers[0].url).not.toContain('app_id')
+  })
+
+  it('leaves an event with no app_id anywhere structurally intact', () => {
+    const sanitized = sanitizeEvent(events[1])
+    expect(JSON.stringify(sanitized)).not.toContain('app_id=')
+    expect(sanitized.id).toBe('108001122')
+    expect(sanitized.venue.name).toBe('Le Bikini')
   })
 })
 

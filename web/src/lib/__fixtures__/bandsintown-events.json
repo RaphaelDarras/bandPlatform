@@ -1,17 +1,22 @@
 [
   {
     "id": "107890636",
-    "url": "https://www.bandsintown.com/e/107890636-hurakan-at-ugly-fest?app_id=7c05a1b2c3d4e5f6&came_from=267",
+    "url": "https://www.bandsintown.com/e/107890636-hurakan-at-ugly-fest?app_id=FAKE_TEST_APP_ID_0000&came_from=267",
     "datetime": "2026-08-29T15:00:00",
     "title": "Ugly Fest 2026",
     "description": "",
     "artist_id": "10084516",
     "lineup": ["Hurakan"],
+    "artist": {
+      "name": "Hurakan",
+      "url": "https://www.bandsintown.com/a/10084516-hurakan?app_id=FAKE_TEST_APP_ID_0000&came_from=267",
+      "image_url": "https://photos.bandsintown.com/thumb/10084516.jpeg"
+    },
     "offers": [
       {
         "status": "available",
         "type": "Tickets",
-        "url": "https://www.bandsintown.com/t/107890636?app_id=7c05a1b2c3d4e5f6&came_from=267"
+        "url": "https://www.bandsintown.com/t/107890636?app_id=FAKE_TEST_APP_ID_0000&came_from=267"
       }
     ],
     "free": false,
