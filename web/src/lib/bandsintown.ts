@@ -71,6 +71,22 @@ export function clean(u: string): string {
 }
 
 /**
+ * Strip app_id from every URL on an event (top-level `url` + each
+ * `offers[].url`). Applied once at the fetch boundary so the *data* baked
+ * into the SSG hydration payload never carries the secret — not just the
+ * HTML rendered from it (Pitfall 8: the raw loader result is serialized to
+ * static-loader-data JSON for client hydration, so cleaning only at JSX
+ * render sites would leave the key in that JSON).
+ */
+function sanitizeEvent(e: BitEvent): BitEvent {
+  return {
+    ...e,
+    url: clean(e.url),
+    offers: e.offers.map((o) => ({ ...o, url: clean(o.url) })),
+  }
+}
+
+/**
  * Return the soonest upcoming event, or null when there are none. Reused by
  * Home's next-concert teaser (D-25) and Concerts' full listing.
  */
@@ -114,7 +130,8 @@ export async function fetchUpcomingEvents(): Promise<BitEvent[]> {
       console.warn(`[bandsintown] fetch failed with status ${res.status}, falling back to []`)
       return []
     }
-    return (await res.json()) as BitEvent[]
+    const events = (await res.json()) as BitEvent[]
+    return events.map(sanitizeEvent)
   } catch (err) {
     console.warn('[bandsintown] fetch threw, falling back to []:', err)
     return []
