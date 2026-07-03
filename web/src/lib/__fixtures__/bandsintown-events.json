@@ -1,0 +1,72 @@
+[
+  {
+    "id": "107890636",
+    "url": "https://www.bandsintown.com/e/107890636-hurakan-at-ugly-fest?app_id=7c05a1b2c3d4e5f6&came_from=267",
+    "datetime": "2026-08-29T15:00:00",
+    "title": "Ugly Fest 2026",
+    "description": "",
+    "artist_id": "10084516",
+    "lineup": ["Hurakan"],
+    "offers": [
+      {
+        "status": "available",
+        "type": "Tickets",
+        "url": "https://www.bandsintown.com/t/107890636?app_id=7c05a1b2c3d4e5f6&came_from=267"
+      }
+    ],
+    "free": false,
+    "sold_out": false,
+    "starts_at": "2026-08-29T15:00:00",
+    "ends_at": "",
+    "on_sale_datetime": "",
+    "festival_start_date": "2026-08-29",
+    "festival_end_date": "2026-08-30",
+    "datetime_display_rule": "datetime",
+    "festival_datetime_display_rule": "range",
+    "bandsintown_plus": false,
+    "presale": "",
+    "venue": {
+      "name": "Ugly Fest 2026",
+      "location": "Gravigny, France",
+      "city": "Gravigny",
+      "country": "France",
+      "region": "",
+      "street_address": "13 Rue de la Mairie",
+      "postal_code": "27930",
+      "latitude": "49.0298",
+      "longitude": "1.1834"
+    }
+  },
+  {
+    "id": "108001122",
+    "url": "https://www.bandsintown.com/e/108001122-hurakan-at-le-bikini",
+    "datetime": "2026-09-15T20:00:00",
+    "title": "",
+    "description": "",
+    "artist_id": "10084516",
+    "lineup": ["Hurakan"],
+    "offers": [],
+    "free": false,
+    "sold_out": false,
+    "starts_at": "2026-09-15T20:00:00",
+    "ends_at": "",
+    "on_sale_datetime": "",
+    "festival_start_date": "",
+    "festival_end_date": "",
+    "datetime_display_rule": "datetime",
+    "festival_datetime_display_rule": "",
+    "bandsintown_plus": false,
+    "presale": "",
+    "venue": {
+      "name": "Le Bikini",
+      "location": "Ramonville-Saint-Agne, France",
+      "city": "Ramonville-Saint-Agne",
+      "country": "France",
+      "region": "",
+      "street_address": "1 Avenue Louis Ricard",
+      "postal_code": "31520",
+      "latitude": "43.5461",
+      "longitude": "1.4794"
+    }
+  }
+]
