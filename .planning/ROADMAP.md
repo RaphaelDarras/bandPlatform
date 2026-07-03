@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation & Inventory Core** - API infrastructure with atomic inventory operations (completed 2026-03-12)
 - [x] **Phase 2: Mobile POS Core** - Offline-first concert sales tool with core transaction features (completed 2026-03-14)
 - [x] **Phase 3: Mobile POS Optimization** - Battery efficiency, reconciliation, and sync reliability (completed 2026-03-18)
-- [ ] **Phase 4: Showcase Website** - Band presence with bio, discography, concerts, contact
+- [x] **Phase 4: Showcase Website** - Band presence with bio, discography, concerts, contact (completed 2026-07-03)
 - [ ] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout
 - [ ] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations
 - [ ] **Phase 7: Shop Enhancements** - Shipping, bundles, pre-orders, and customer features
@@ -121,11 +121,11 @@ Plans:
 - [x] 04-01-PLAN.md — Monorepo workspaces + web scaffold (Vite 7/React 19/Tailwind v4/vite-react-ssg) + test infra + app shell + data contracts
 - [x] 04-02-PLAN.md — Bandsintown build-time client + Concerts page + Home hero/next-concert (WEB-03)
 - [x] 04-03-PLAN.md — Discography: Spotify/YouTube embeds mapped from releases config (WEB-02)
-- [ ] 04-04-PLAN.md — About + Contact static pages + /stock migration (WEB-01, WEB-04, D-05)
+- [x] 04-04-PLAN.md — About + Contact static pages + /stock migration (WEB-01, WEB-04, D-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-05-PLAN.md — Build gate + Vercel deploy + hurakanband.fr cutover + retire GitHub Pages/crowned
+- [x] 04-05-PLAN.md — Build gate + Vercel deploy + hurakanband.fr cutover + retire GitHub Pages/crowned
 
 ### Phase 5: Online Shop Core
 
@@ -304,7 +304,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 1. Foundation & Inventory Core | 6/6 | Complete   | 2026-03-13 |
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
-| 4. Showcase Website | 3/5 | In Progress|  |
+| 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 0/TBD | Not started | - |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |

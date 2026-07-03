@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-07-03T12:50:45.960Z"
+status: verifying
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-07-03T20:15:06.078Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 11
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 23
-  completed_plans: 21
-  percent: 27
+  completed_plans: 23
+  percent: 36
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 04 (showcase-website) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute
+Plan: 5 of 5
+Status: Phase complete — ready for verification
 Last activity: 2026-07-03
 
-Progress: [█████████░] 91%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -64,6 +64,8 @@ Progress: [█████████░] 91%
 | Phase 04 P01 | 33min | 4 tasks | 32 files |
 | Phase 04-showcase-website P02 | 10min | 3 tasks | 9 files |
 | Phase 04 P03 | 2min | 2 tasks | 8 files |
+| Phase 04 P04 | 12min | 2 tasks | 7 files |
+| Phase 04 P05 | 120min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -155,6 +157,11 @@ Recent decisions affecting current work:
 - [Phase 04-showcase-website]: [Phase 04-02]: nextEvent() extracted as a pure helper (events[0] ?? null) shared by Home and Concerts
 - [Phase 04-showcase-website]: [04-03] Height lookup table for Spotify embed heights (152 track / 352 album+playlist) instead of inline conditionals
 - [Phase 04-showcase-website]: [04-03] Discography.test.tsx mocks releases[] to assert array-order mapping independent of the real seeded config
+- [Phase 04-showcase-website]: [04-04] Contact channels rendered as two h2-labeled blocks (General / Booking-Press) instead of a flat list — makes the D-16 split unambiguous and testable
+- [Phase 04-showcase-website]: [04-04] Stock.tsx splits mount-time sessionStorage restore from token-driven fetch across two useEffects, mirroring the legacy script's if(token) loadStock() guard
+- [Phase ?]: [04-05] app_id leak gate scans for app_id=<value> query-string (not the bare token) across dist HTML/JS/JSON — avoids clean() searchParams.delete false positive while catching real secret leaks
+- [Phase ?]: [04-05] hurakanband.fr cut over from GitHub Pages to Vercel (apex A -> 76.76.21.21) over HTTPS; GitHub Pages workflow + website/crowned/ + root CNAME retired (D-04/D-05)
+- [Phase ?]: [04-05] Facebook domain-verification tag NOT re-homed on crowned/ deletion — user confirmed no more ads; resolves T-04-fbverify to not-needed
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -201,8 +208,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-03T12:50:45.941Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-07-03T20:13:41.618Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
