@@ -22,7 +22,9 @@ export default function Footer() {
         </nav>
 
         <nav aria-label="Social and contact" className="flex flex-col">
-          {/* Placeholder addresses — real values land in Plan 04-04 (D-16) */}
+          {/* Placeholder addresses — see Contact.tsx TODOs for the real
+              general/booking split (D-16); this footer link uses the
+              general channel */}
           <a
             href="mailto:hi@hurakanband.fr"
             rel="noopener"
