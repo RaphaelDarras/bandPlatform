@@ -6,3 +6,10 @@ node_modules/
 package-lock.json
 ./api/package-lock.json
 temp
+
+# web (Vite) build output + local env
+web/dist/
+dist/
+.env
+.env.local
+.env.*.local

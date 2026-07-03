@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 CSS-first theme — UI-SPEC tokens (Phase 4).
+ * Fonts self-hosted via @fontsource (imported in main.tsx), declared here as
+ * theme font families. NO tailwind.config.js, NO v3 @tailwind directives.
+ */
+@theme {
+  /* Color roles (UI-SPEC) */
+  --color-bg: #000000;                    /* Dominant 60% — page background */
+  --color-surface: #141414;               /* Secondary 30% — nav/footer/cards */
+  --color-accent: #ffffff;                /* Accent 10% — CTA, active states, hero headline */
+  --color-hairline: rgba(255, 255, 255, 0.08); /* 1px card border on black */
+
+  /* Typography */
+  --font-display: "Bebas Neue", "Oswald", sans-serif; /* headings / wordmark */
+  --font-sans: "Inter", system-ui, sans-serif;         /* body / labels */
+}
+
+/* Default page background + body foreground (accent white reserved for CTA/active) */
+html,
+body {
+  background-color: var(--color-bg);
+  color: rgba(255, 255, 255, 0.75);
+  font-family: var(--font-sans);
+}
+
+#app,
+#root {
+  min-height: 100vh;
+}
