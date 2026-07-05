@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-07-05T20:02:54.228Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-07-05T20:09:23.320Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 34
-  completed_plans: 24
+  completed_plans: 25
   percent: 36
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 05 (online-shop-core) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
 Status: Ready to execute
 Last activity: 2026-07-05
 
-Progress: [███████░░░] 71%
+Progress: [███████░░░] 74%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [███████░░░] 71%
 | Phase 04 P05 | 120min | 3 tasks | 8 files |
 | 04 | 5 | - | - |
 | Phase 05-online-shop-core P01 | 10min | 2 tasks | 4 files |
+| Phase 05-online-shop-core P02 | 5min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05-01]: id: string (not _id) used on Product to match Mongo ObjectId JSON serialization, consistent with existing Concert type
 - [Phase ?]: [Phase 05-01]: OrderItem/Order interfaces added now but explicitly marked Phase-6 forward-compat, not persisted this phase
 - [Phase ?]: [Phase 05-01]: products.ts has no build-time/SSR guard and no auth header, public runtime client, opposite constraints from bandsintown.ts
+- [Phase 05-02]: zustand legitimacy verified manually by human on npmjs.com before install; package-lock.json not committed (gitignored/untracked in this repo, web/package.json is source of truth for the dependency)
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -213,8 +215,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T19:59:54.385Z
-Stopped at: Phase 5 UI-SPEC approved
+Last session: 2026-07-05T20:09:23.288Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 

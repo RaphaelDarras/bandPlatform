@@ -147,7 +147,7 @@ Plans:
 **Wave 1**
 
 - [x] 05-01-PLAN.md — Shared Product/Order types + browser product fetch client + VITE_API_URL + health ping
-- [ ] 05-02-PLAN.md — zustand legitimacy checkpoint + install (blocking human-verify)
+- [x] 05-02-PLAN.md — zustand legitimacy checkpoint + install (blocking human-verify)
 - [ ] 05-03-PLAN.md — Remove Meta Pixel/CAPI (D-27) + Stock.tsx D-15 threshold reconcile note
 - [ ] 05-04-PLAN.md — StockBadge (D-15 3-state) + QuantityStepper (D-18) leaf components
 
@@ -325,7 +325,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
-| 5. Online Shop Core | 1/11 | In Progress|  |
+| 5. Online Shop Core | 2/11 | In Progress|  |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
