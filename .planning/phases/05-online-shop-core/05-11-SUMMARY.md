@@ -99,3 +99,7 @@ None - no external service configuration required. The `/shop/<id>` direct-link/
 - Phase 05 (online-shop-core) routing and deploy-safety wiring is complete: SHOP-01 (routes reachable) and SHOP-11 (served over the existing HTTPS deploy, now including deep-link `/shop/:id`) are both satisfied.
 - **Manual phase-gate checklist item (not automatable in Vitest — Pitfall 1):** after the next Vercel deploy, hard-refresh a real `https://<domain>/shop/<product-id>` URL directly (not via in-app navigation) and confirm it returns 200 with the product detail rendering, not a Vercel 404.
 - Phase 6 (orders/payments) can build on this routing: Checkout's currently-disabled "Place Order" button and Cart's checkout link both already point at real, routed pages ready to receive live submit behavior.
+
+## Self-Check: PASSED
+
+All created/modified files verified present on disk; all four commits (605dd6e, 301146a, f6cc24c, 3fee51e) verified in git log.
