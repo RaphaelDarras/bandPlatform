@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-07-PLAN.md
-last_updated: "2026-07-05T21:04:07.063Z"
+stopped_at: Completed 05-09-PLAN.md
+last_updated: "2026-07-05T21:28:57.180Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 34
-  completed_plans: 30
+  completed_plans: 32
   percent: 36
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 05 (online-shop-core) — EXECUTING
-Plan: 8 of 11
+Plan: 10 of 11
 Status: Ready to execute
 Last activity: 2026-07-05
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -74,6 +74,8 @@ Progress: [█████████░] 88%
 | Phase 05-online-shop-core P05 | 4min | 2 tasks | 3 files |
 | Phase 05-online-shop-core P06 | 5min | 2 tasks | 4 files |
 | Phase 05-online-shop-core P07 | 8min | 1 tasks | 2 files |
+| Phase 05-online-shop-core P08 | 6min | 1 tasks | 2 files |
+| Phase 05 P09 | 8min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -186,6 +188,11 @@ Recent decisions affecting current work:
 - [Phase 05-06]: Cold-start note timer runs in its own useEffect keyed on [products, error], separate from the fetch-triggering effect keyed on [attempt]
 - [Phase 05-07]: Selecting a variant resets quantity to 1 rather than clamping a stale quantity to the new variant's stock
 - [Phase 05-07]: Add-to-cart payload assembly ({productId, variantSku, quantity, name, variantLabel, unitPrice, image}) is the contract Cart.tsx (Plan 08) reads from useCartStore.lines
+- [Phase 05-08]: Subtotal computed inline in Cart.tsx via lines.reduce, not a new cartStore.ts selector (out of this plan's files_modified scope)
+- [Phase 05-08]: Flagged cart lines show a text Remove action instead of the icon-button remove, avoiding duplicate 'Remove {name} from cart' aria-labels in the same row
+- [Phase 05-08]: Cart revalidation treats a product/variant missing from the live catalog as currentStock 0 for flagging purposes (Open Q3)
+- [Phase 05-09]: Place Order button uses type="button" with no <form> onSubmit at all — no submit path to short-circuit, not just a disabled one (D-01/D-03)
+- [Phase 05-09]: maxLength mitigation (T-5-15) applied to all free-text address fields, not just country, per threat register's plural wording
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -232,8 +239,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T21:04:07.021Z
-Stopped at: Completed 05-07-PLAN.md
+Last session: 2026-07-05T21:28:57.155Z
+Stopped at: Completed 05-09-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 

@@ -109,3 +109,11 @@ None — no external service configuration required.
 ---
 *Phase: 05-online-shop-core*
 *Completed: 2026-07-05*
+
+## Self-Check: PASSED
+
+- FOUND: web/src/pages/Cart.tsx
+- FOUND: web/src/pages/Cart.test.tsx
+- FOUND: .planning/phases/05-online-shop-core/05-08-SUMMARY.md
+- FOUND: commit 1ddb842 (test(05-08): add failing test for cart page)
+- FOUND: commit a16246a (feat(05-08): implement cart page with revalidation and checkout gate)
