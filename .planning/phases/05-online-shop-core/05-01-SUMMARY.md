@@ -108,3 +108,12 @@ None - no external service configuration required. `VITE_API_URL` has a working 
 ---
 *Phase: 05-online-shop-core*
 *Completed: 2026-07-05*
+
+## Self-Check: PASSED
+
+- FOUND: web/src/lib/products.ts
+- FOUND: packages/shared/src/index.ts
+- FOUND: .planning/phases/05-online-shop-core/05-01-SUMMARY.md
+- FOUND commit: b456ad0
+- FOUND commit: 77dca4c
+- FOUND commit: 4176ff9
