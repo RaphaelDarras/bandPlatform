@@ -17,6 +17,14 @@ export const routes: RouteRecord[] = [
       { path: 'about', lazy: () => import('./pages/About') },
       { path: 'contact', lazy: () => import('./pages/Contact') },
       { path: 'stock', lazy: () => import('./pages/Stock') },
+      { path: 'shop', lazy: () => import('./pages/Shop') },
+      // No loader/getStaticPaths — deliberately excluded from the static
+      // prerender (D-06). Stock is live data and must never be baked into
+      // static HTML; direct-link/refresh is served via the vercel.json
+      // scoped rewrite instead.
+      { path: 'shop/:id', lazy: () => import('./pages/ShopDetail') },
+      { path: 'cart', lazy: () => import('./pages/Cart') },
+      { path: 'checkout', lazy: () => import('./pages/Checkout') },
       { path: '*', lazy: () => import('./pages/NotFound') },
     ],
   },
