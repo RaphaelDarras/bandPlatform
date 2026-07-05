@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-07-05T20:09:23.320Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-07-05T20:25:48.314Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 34
-  completed_plans: 25
+  completed_plans: 27
   percent: 36
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 05 (online-shop-core) — EXECUTING
-Plan: 3 of 11
+Plan: 5 of 11
 Status: Ready to execute
 Last activity: 2026-07-05
 
-Progress: [███████░░░] 74%
+Progress: [████████░░] 79%
 
 ## Performance Metrics
 
@@ -69,6 +69,8 @@ Progress: [███████░░░] 74%
 | 04 | 5 | - | - |
 | Phase 05-online-shop-core P01 | 10min | 2 tasks | 4 files |
 | Phase 05-online-shop-core P02 | 5min | 2 tasks | 1 files |
+| Phase 05 P03 | 6min | 2 tasks | 3 files |
+| Phase 05-online-shop-core P04 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -169,6 +171,11 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05-01]: OrderItem/Order interfaces added now but explicitly marked Phase-6 forward-compat, not persisted this phase
 - [Phase ?]: [Phase 05-01]: products.ts has no build-time/SSR guard and no auth header, public runtime client, opposite constraints from bandsintown.ts
 - [Phase 05-02]: zustand legitimacy verified manually by human on npmjs.com before install; package-lock.json not committed (gitignored/untracked in this repo, web/package.json is source of truth for the dependency)
+- [Phase ?]: D-27 executed exactly as scoped: delete capi.js, remove its mount, remove 3 META_* vars from api/.env.example
+- [Phase ?]: Stock.tsx threshold left at <= 5 per D-15 (deliberately divergent from the future shop StockBadge's < 5), annotated rather than changed
+- [Phase 05-04]: StockBadge uses < 5 threshold (intentionally diverges from Stock.tsx's <= 5 per D-15 — annotated, not reconciled)
+- [Phase 05-04]: QuantityStepper is fully controlled (value/max/onChange/disabled props, no internal state)
+- [Phase 05-04]: Test click simulation uses fireEvent from @testing-library/react (existing convention) instead of adding @testing-library/user-event dependency
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -215,8 +222,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T20:09:23.288Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-07-05T20:25:48.282Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
