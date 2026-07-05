@@ -153,7 +153,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 05-05-PLAN.md — Cart store (zustand persist + skipHydration) + Layout rehydrate/keep-alive
+- [x] 05-05-PLAN.md — Cart store (zustand persist + skipHydration) + Layout rehydrate/keep-alive
 - [ ] 05-06-PLAN.md — Catalog page + CatalogGrid (SHOP-01/07) + D-25 manual-seed doc
 
 **Wave 3** *(blocked on Wave 2)*
@@ -325,7 +325,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
-| 5. Online Shop Core | 4/11 | In Progress|  |
+| 5. Online Shop Core | 5/11 | In Progress|  |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
