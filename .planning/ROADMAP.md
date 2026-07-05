@@ -161,7 +161,7 @@ Plans:
 - [x] 05-07-PLAN.md — Product detail: gallery, variant selector, stepper, add-to-cart (SHOP-08/13)
 - [x] 05-08-PLAN.md — Cart page: revalidation, flagging, checkout gate, empty state (SHOP-02/13, D-14)
 - [x] 05-09-PLAN.md — Guest checkout form (form-only, disabled submit) (SHOP-03, D-01/02/03)
-- [ ] 05-10-PLAN.md — Header cart icon/badge + Shop nav + Home merch teaser (D-20/D-21)
+- [x] 05-10-PLAN.md — Header cart icon/badge + Shop nav + Home merch teaser (D-20/D-21)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -325,7 +325,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
-| 5. Online Shop Core | 9/11 | In Progress|  |
+| 5. Online Shop Core | 10/11 | In Progress|  |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |

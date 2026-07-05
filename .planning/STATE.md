@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-09-PLAN.md
-last_updated: "2026-07-05T21:28:57.180Z"
+stopped_at: Completed 05-10-PLAN.md
+last_updated: "2026-07-05T21:38:57.595Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 34
-  completed_plans: 32
+  completed_plans: 33
   percent: 36
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 05 (online-shop-core) — EXECUTING
-Plan: 10 of 11
+Plan: 11 of 11
 Status: Ready to execute
 Last activity: 2026-07-05
 
-Progress: [█████████░] 94%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [█████████░] 94%
 | Phase 05-online-shop-core P07 | 8min | 1 tasks | 2 files |
 | Phase 05-online-shop-core P08 | 6min | 1 tasks | 2 files |
 | Phase 05 P09 | 8min | 1 tasks | 2 files |
+| Phase 05-online-shop-core P10 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -193,6 +194,9 @@ Recent decisions affecting current work:
 - [Phase 05-08]: Cart revalidation treats a product/variant missing from the live catalog as currentStock 0 for flagging purposes (Open Q3)
 - [Phase 05-09]: Place Order button uses type="button" with no <form> onSubmit at all — no submit path to short-circuit, not just a disabled one (D-01/D-03)
 - [Phase 05-09]: maxLength mitigation (T-5-15) applied to all free-text address fields, not just country, per threat register's plural wording
+- [Phase 05-10]: Cart icon and hamburger button share a flex items-center wrapper div for clean right-alignment of two controls
+- [Phase 05-10]: Shop Merch teaser inserted after Next Show section on Home, superseding Phase 4 D-25's original merch-off-Home scope
+- [Phase 05-10]: Home.test.tsx negative merch-teaser assertion replaced (not kept) since Phase 5 intentionally adds what D-25 deferred
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -239,8 +243,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T21:28:57.155Z
-Stopped at: Completed 05-09-PLAN.md
+Last session: 2026-07-05T21:38:57.558Z
+Stopped at: Completed 05-10-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
