@@ -104,3 +104,7 @@ Both components are pure, prop-driven, and fully tested — ready to be imported
 ---
 *Phase: 05-online-shop-core*
 *Completed: 2026-07-05*
+
+## Self-Check: PASSED
+
+All 4 component files and the SUMMARY.md exist on disk; all 5 commits (b8c1730, 7b46e8b, 0d59716, 576888a, 5de873a) verified present in git log.
