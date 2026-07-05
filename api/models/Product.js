@@ -61,7 +61,15 @@ const ProductSchema = new mongoose.Schema({
   },
   variants: [VariantSchema]
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret) => {
+      ret.id = ret._id.toString();
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    },
+  },
 });
 
 // Index on variants.sku for fast variant lookups

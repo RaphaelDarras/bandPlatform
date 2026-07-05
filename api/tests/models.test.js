@@ -114,6 +114,42 @@ describe('Sale model - extended fields', () => {
   });
 });
 
+// ---- Product model ----
+
+describe('Product model - JSON serialization', () => {
+  let Product;
+
+  beforeAll(() => {
+    Product = require('../models/Product');
+  });
+
+  const baseProduct = () => ({
+    name: 'Test Shirt',
+    basePrice: 25,
+    variants: [{ sku: 'S-BLK', size: 'S', color: 'Black', stock: 10 }],
+  });
+
+  // Regression (Phase 05 verification): Product.toJSON must expose `id` and hide
+  // `_id`/`__v`, mirroring Concert. Without it the shop API returns `_id` only, so
+  // every frontend `product.id` is undefined and detail links resolve to /shop/undefined.
+  it('serializes with `id` (not `_id`/`__v`) via toJSON transform', async () => {
+    const product = await Product.create(baseProduct());
+    const json = product.toJSON();
+
+    expect(json.id).toBe(product._id.toString());
+    expect(json._id).toBeUndefined();
+    expect(json.__v).toBeUndefined();
+  });
+
+  it('exposes `id` when serialized through res.json (JSON.stringify path)', async () => {
+    const product = await Product.create(baseProduct());
+    const serialized = JSON.parse(JSON.stringify(product));
+
+    expect(serialized.id).toBe(product._id.toString());
+    expect(serialized._id).toBeUndefined();
+  });
+});
+
 // ---- Admin model ----
 
 describe('Admin model - pinHash field', () => {
