@@ -97,3 +97,12 @@ None - no external service configuration required.
 ---
 *Phase: 05-online-shop-core*
 *Completed: 2026-07-05*
+
+## Self-Check: PASSED
+
+All created files and commit hashes verified present on disk / in git log:
+- web/src/lib/cartStore.ts — FOUND
+- web/src/lib/cartStore.test.ts — FOUND
+- web/src/components/Layout.tsx — FOUND
+- .planning/phases/05-online-shop-core/05-05-SUMMARY.md — FOUND
+- 0fa3845, ddd5cdc, f807456 — FOUND in git log
