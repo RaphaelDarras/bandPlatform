@@ -30,7 +30,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **SHOP-04**: Customer can pay with Stripe credit card
 - [ ] **SHOP-05**: Customer can pay with PayPal
 - [ ] **SHOP-06**: Customer receives order confirmation email after purchase
-- [ ] **SHOP-07**: Site is mobile-responsive and works on all devices
+- [x] **SHOP-07**: Site is mobile-responsive and works on all devices
 - [x] **SHOP-08**: Customer can select product variants (size, color)
 - [ ] **SHOP-09**: Customer sees shipping cost calculated during checkout
 - [ ] **SHOP-10**: Customer can track order status (pending/shipped/delivered)
@@ -127,7 +127,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-01 | Phase 5 | Complete |
 | SHOP-02 | Phase 5 | Complete |
 | SHOP-03 | Phase 5 | Pending |
-| SHOP-07 | Phase 5 | Pending |
+| SHOP-07 | Phase 5 | Complete |
 | SHOP-08 | Phase 5 | Complete |
 | SHOP-11 | Phase 5 | Pending |
 | SHOP-13 | Phase 5 | Complete |
