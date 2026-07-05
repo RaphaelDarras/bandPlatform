@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 04 complete (5/5) — ready to discuss Phase 08
-last_updated: 2026-07-03T20:50:28.269Z
-last_activity: 2026-07-03
+status: executing
+stopped_at: Phase 5 UI-SPEC approved
+last_updated: "2026-07-05T20:02:54.228Z"
+last_activity: 2026-07-05
 progress:
   total_phases: 11
   completed_phases: 4
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 34
+  completed_plans: 24
   percent: 36
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Band members can record merchandise sales at concerts quickly and reliably, with stock automatically synchronized across online and physical sales channels, preventing overselling and lost revenue.
-**Current focus:** Phase 08 — snapshot sale item names
+**Current focus:** Phase 05 — online-shop-core
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-03
+Phase: 05 (online-shop-core) — EXECUTING
+Plan: 2 of 11
+Status: Ready to execute
+Last activity: 2026-07-05
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [██████████] 100%
 | Phase 04 P04 | 12min | 2 tasks | 7 files |
 | Phase 04 P05 | 120min | 3 tasks | 8 files |
 | 04 | 5 | - | - |
+| Phase 05-online-shop-core P01 | 10min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [04-05] app_id leak gate scans for app_id=<value> query-string (not the bare token) across dist HTML/JS/JSON — avoids clean() searchParams.delete false positive while catching real secret leaks
 - [Phase ?]: [04-05] hurakanband.fr cut over from GitHub Pages to Vercel (apex A -> 76.76.21.21) over HTTPS; GitHub Pages workflow + website/crowned/ + root CNAME retired (D-04/D-05)
 - [Phase ?]: [04-05] Facebook domain-verification tag NOT re-homed on crowned/ deletion — user confirmed no more ads; resolves T-04-fbverify to not-needed
+- [Phase ?]: [Phase 05-01]: id: string (not _id) used on Product to match Mongo ObjectId JSON serialization, consistent with existing Concert type
+- [Phase ?]: [Phase 05-01]: OrderItem/Order interfaces added now but explicitly marked Phase-6 forward-compat, not persisted this phase
+- [Phase ?]: [Phase 05-01]: products.ts has no build-time/SSR guard and no auth header, public runtime client, opposite constraints from bandsintown.ts
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -209,8 +213,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-03T20:13:41.618Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-07-05T19:59:54.385Z
+Stopped at: Phase 5 UI-SPEC approved
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 

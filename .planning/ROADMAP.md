@@ -141,11 +141,31 @@ Plans:
   5. Site uses HTTPS encryption for all pages
   6. Customer sees stock availability (in stock / low stock / out of stock)
 
-**Plans**: TBD
+**Plans**: 11 plans in 4 waves
 
 Plans:
+**Wave 1**
 
-- [ ] TBD during phase planning
+- [x] 05-01-PLAN.md — Shared Product/Order types + browser product fetch client + VITE_API_URL + health ping
+- [ ] 05-02-PLAN.md — zustand legitimacy checkpoint + install (blocking human-verify)
+- [ ] 05-03-PLAN.md — Remove Meta Pixel/CAPI (D-27) + Stock.tsx D-15 threshold reconcile note
+- [ ] 05-04-PLAN.md — StockBadge (D-15 3-state) + QuantityStepper (D-18) leaf components
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 05-05-PLAN.md — Cart store (zustand persist + skipHydration) + Layout rehydrate/keep-alive
+- [ ] 05-06-PLAN.md — Catalog page + CatalogGrid (SHOP-01/07) + D-25 manual-seed doc
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 05-07-PLAN.md — Product detail: gallery, variant selector, stepper, add-to-cart (SHOP-08/13)
+- [ ] 05-08-PLAN.md — Cart page: revalidation, flagging, checkout gate, empty state (SHOP-02/13, D-14)
+- [ ] 05-09-PLAN.md — Guest checkout form (form-only, disabled submit) (SHOP-03, D-01/02/03)
+- [ ] 05-10-PLAN.md — Header cart icon/badge + Shop nav + Home merch teaser (D-20/D-21)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 05-11-PLAN.md — Shop routes + Vercel /shop rewrite + prerender assertions (SHOP-01/11, D-06)
 
 ### Phase 6: Payment Processing
 
@@ -305,7 +325,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
-| 5. Online Shop Core | 0/TBD | Not started | - |
+| 5. Online Shop Core | 1/11 | In Progress|  |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |

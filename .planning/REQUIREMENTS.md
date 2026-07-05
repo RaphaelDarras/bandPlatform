@@ -24,19 +24,19 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Online Shop (E-Commerce)
 
-- [ ] **SHOP-01**: Customer can browse product catalog with images
+- [x] **SHOP-01**: Customer can browse product catalog with images
 - [ ] **SHOP-02**: Customer can add products to shopping cart
 - [ ] **SHOP-03**: Customer can checkout as guest (email only required)
 - [ ] **SHOP-04**: Customer can pay with Stripe credit card
 - [ ] **SHOP-05**: Customer can pay with PayPal
 - [ ] **SHOP-06**: Customer receives order confirmation email after purchase
 - [ ] **SHOP-07**: Site is mobile-responsive and works on all devices
-- [ ] **SHOP-08**: Customer can select product variants (size, color)
+- [x] **SHOP-08**: Customer can select product variants (size, color)
 - [ ] **SHOP-09**: Customer sees shipping cost calculated during checkout
 - [ ] **SHOP-10**: Customer can track order status (pending/shipped/delivered)
 - [ ] **SHOP-11**: Site uses SSL/HTTPS encryption
 - [ ] **SHOP-12**: Customer can search products by name or description
-- [ ] **SHOP-13**: Customer sees stock availability (in stock/low stock/out of stock)
+- [x] **SHOP-13**: Customer sees stock availability (in stock/low stock/out of stock)
 - [ ] **SHOP-14**: Customer can access return/refund policy page
 - [ ] **SHOP-15**: Customer can purchase product bundles (combo pricing)
 - [ ] **SHOP-16**: Customer can pre-order products before stock arrives
@@ -124,13 +124,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WEB-02 | Phase 4 | Complete |
 | WEB-03 | Phase 4 | Complete |
 | WEB-04 | Phase 4 | Complete |
-| SHOP-01 | Phase 5 | Pending |
+| SHOP-01 | Phase 5 | Complete |
 | SHOP-02 | Phase 5 | Pending |
 | SHOP-03 | Phase 5 | Pending |
 | SHOP-07 | Phase 5 | Pending |
-| SHOP-08 | Phase 5 | Pending |
+| SHOP-08 | Phase 5 | Complete |
 | SHOP-11 | Phase 5 | Pending |
-| SHOP-13 | Phase 5 | Pending |
+| SHOP-13 | Phase 5 | Complete |
 | SHOP-04 | Phase 6 | Pending |
 | SHOP-05 | Phase 6 | Pending |
 | SHOP-06 | Phase 6 | Pending |
