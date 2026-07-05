@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-06-PLAN.md
-last_updated: "2026-07-05T20:48:35.224Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-07-05T21:04:07.063Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 34
-  completed_plans: 29
+  completed_plans: 30
   percent: 36
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 05 (online-shop-core) — EXECUTING
-Plan: 7 of 11
+Plan: 8 of 11
 Status: Ready to execute
 Last activity: 2026-07-05
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Progress: [█████████░] 85%
 | Phase 05-online-shop-core P04 | 4min | 2 tasks | 4 files |
 | Phase 05-online-shop-core P05 | 4min | 2 tasks | 3 files |
 | Phase 05-online-shop-core P06 | 5min | 2 tasks | 4 files |
+| Phase 05-online-shop-core P07 | 8min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -183,6 +184,8 @@ Recent decisions affecting current work:
 - [Phase 05-06]: CatalogGrid placeholder guards on images[0] truthiness (not images.length) so images: [''] renders the branded placeholder, not a broken img src
 - [Phase 05-06]: Shop.tsx Retry bumps a local attempt counter to re-run the fetch effect rather than location.reload() - keeps retry client-side and testable
 - [Phase 05-06]: Cold-start note timer runs in its own useEffect keyed on [products, error], separate from the fetch-triggering effect keyed on [attempt]
+- [Phase 05-07]: Selecting a variant resets quantity to 1 rather than clamping a stale quantity to the new variant's stock
+- [Phase 05-07]: Add-to-cart payload assembly ({productId, variantSku, quantity, name, variantLabel, unitPrice, image}) is the contract Cart.tsx (Plan 08) reads from useCartStore.lines
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -229,8 +232,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T20:48:35.166Z
-Stopped at: Completed 05-06-PLAN.md
+Last session: 2026-07-05T21:04:07.021Z
+Stopped at: Completed 05-07-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 
