@@ -57,7 +57,7 @@ describe('Home page', () => {
     expect(concertsLink).toHaveAttribute('href', '/concerts')
   })
 
-  it('renders no merch/shop teaser', () => {
+  it('renders a "Shop Merch" teaser section with a "Shop Now" link to /shop', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     render(
@@ -66,7 +66,9 @@ describe('Home page', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.queryByText(/merch|shop/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Shop Merch')).toBeInTheDocument()
+    const shopNow = screen.getByRole('link', { name: /shop now/i })
+    expect(shopNow).toHaveAttribute('href', '/shop')
   })
 
   it('renders a "Get Tickets" link for the next event when offers exist, app_id stripped', () => {

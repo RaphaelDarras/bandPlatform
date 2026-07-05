@@ -3,8 +3,9 @@ import type { BitEvent } from '../lib/bandsintown'
 import { clean, nextEvent, venueDisplay } from '../lib/bandsintown'
 import { releases } from '../data/releases'
 
-// Landing hub (D-25): hero wordmark + next-concert teaser + release teaser.
-// No merch teaser (Phase 5 scope). All Bandsintown text renders as escaped
+// Landing hub (D-25): hero wordmark + next-concert teaser + release teaser +
+// merch teaser (Phase 5, D-20 — extends D-25's original "no merch teaser"
+// scope now that /shop exists). All Bandsintown text renders as escaped
 // React text (T-04-xss).
 export function Component() {
   const { events } = (useLoaderData() as { events?: BitEvent[] }) ?? {}
@@ -49,6 +50,19 @@ export function Component() {
         )}
         <Link to="/concerts" className="mt-2 block text-sm text-white/75 underline">
           All concerts
+        </Link>
+      </section>
+
+      <section>
+        <h2 className="font-display text-3xl uppercase text-white">Shop Merch</h2>
+        <p className="mt-2 font-sans text-base text-white/75">
+          Grab official Hurakan merch — apparel and more from the online shop.
+        </p>
+        <Link
+          to="/shop"
+          className="mt-4 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
+        >
+          Shop Now
         </Link>
       </section>
 
