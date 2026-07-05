@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-10-PLAN.md
-last_updated: "2026-07-05T21:38:57.595Z"
+status: verifying
+stopped_at: Completed 05-11-PLAN.md
+last_updated: "2026-07-05T21:53:51.616Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 11
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 34
-  completed_plans: 33
-  percent: 36
+  completed_plans: 34
+  percent: 45
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 Phase: 05 (online-shop-core) — EXECUTING
 Plan: 11 of 11
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-05
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [██████████] 97%
 | Phase 05-online-shop-core P08 | 6min | 1 tasks | 2 files |
 | Phase 05 P09 | 8min | 1 tasks | 2 files |
 | Phase 05-online-shop-core P10 | 5min | 2 tasks | 4 files |
+| Phase 05-online-shop-core P11 | 2min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,8 @@ Recent decisions affecting current work:
 - [Phase 05-10]: Cart icon and hamburger button share a flex items-center wrapper div for clean right-alignment of two controls
 - [Phase 05-10]: Shop Merch teaser inserted after Next Show section on Home, superseding Phase 4 D-25's original merch-off-Home scope
 - [Phase 05-10]: Home.test.tsx negative merch-teaser assertion replaced (not kept) since Phase 5 intentionally adds what D-25 deferred
+- [Phase 05-11]: Shop routes placed before the '*' catch-all in App.tsx; none carry a loader key so /shop/:id stays excluded from the SSG prerender (D-06)
+- [Phase 05-11]: Vercel rewrite scoped to /shop/(.*) only, not a global /(.*)  catch-all, so unrelated broken links still surface real 404s (T-5-18)
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -243,8 +246,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T21:38:57.558Z
-Stopped at: Completed 05-10-PLAN.md
+Last session: 2026-07-05T21:53:51.581Z
+Stopped at: Completed 05-11-PLAN.md
 Resume file: None
 Next action: Discuss Phase 3 with `/gsd:discuss-phase`
 

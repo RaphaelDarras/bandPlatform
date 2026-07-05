@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Mobile POS Core** - Offline-first concert sales tool with core transaction features (completed 2026-03-14)
 - [x] **Phase 3: Mobile POS Optimization** - Battery efficiency, reconciliation, and sync reliability (completed 2026-03-18)
 - [x] **Phase 4: Showcase Website** - Band presence with bio, discography, concerts, contact (completed 2026-07-03)
-- [ ] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout
+- [x] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout (completed 2026-07-05)
 - [ ] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations
 - [ ] **Phase 7: Shop Enhancements** - Shipping, bundles, pre-orders, and customer features
 - [ ] **Phase 8: Immutable sale line snapshots** - Snapshot product name + variant label on sale items so history survives product/variant deletion
@@ -165,7 +165,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 05-11-PLAN.md — Shop routes + Vercel /shop rewrite + prerender assertions (SHOP-01/11, D-06)
+- [x] 05-11-PLAN.md — Shop routes + Vercel /shop rewrite + prerender assertions (SHOP-01/11, D-06)
 
 ### Phase 6: Payment Processing
 
@@ -325,7 +325,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
-| 5. Online Shop Core | 10/11 | In Progress|  |
+| 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
 | 6. Payment Processing | 0/TBD | Not started | - |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |

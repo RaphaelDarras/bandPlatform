@@ -34,7 +34,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SHOP-08**: Customer can select product variants (size, color)
 - [ ] **SHOP-09**: Customer sees shipping cost calculated during checkout
 - [ ] **SHOP-10**: Customer can track order status (pending/shipped/delivered)
-- [ ] **SHOP-11**: Site uses SSL/HTTPS encryption
+- [x] **SHOP-11**: Site uses SSL/HTTPS encryption
 - [ ] **SHOP-12**: Customer can search products by name or description
 - [x] **SHOP-13**: Customer sees stock availability (in stock/low stock/out of stock)
 - [ ] **SHOP-14**: Customer can access return/refund policy page
@@ -129,7 +129,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-03 | Phase 5 | Complete |
 | SHOP-07 | Phase 5 | Complete |
 | SHOP-08 | Phase 5 | Complete |
-| SHOP-11 | Phase 5 | Pending |
+| SHOP-11 | Phase 5 | Complete |
 | SHOP-13 | Phase 5 | Complete |
 | SHOP-04 | Phase 6 | Pending |
 | SHOP-05 | Phase 6 | Pending |
