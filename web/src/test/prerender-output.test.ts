@@ -43,10 +43,42 @@ describe('production build output (dist)', () => {
     'about/index.html',
     'contact/index.html',
     'stock/index.html',
+    // Shop shells (SHOP-01/Plan 05-11) — /shop, /cart, /checkout have no
+    // path param so they prerender normally, same as the routes above.
+    'shop/index.html',
+    'cart/index.html',
+    'checkout/index.html',
   ]
 
   it.each(routes)('emits %s', (route) => {
     expect(existsSync(path.join(DIST, ...route.split('/')))).toBe(true)
+  })
+
+  it('never emits a static shell for /shop/:id (D-06 — no loader means no prerender)', () => {
+    // dist/shop must contain the /shop index.html shell only — no nested
+    // per-product subdirectory (e.g. dist/shop/<id>/index.html) — proving
+    // the dynamic route's exclusion from the prerender pass is real, not
+    // accidental (Plan 05-11 Task 3).
+    const shopDir = path.join(DIST, 'shop')
+    expect(existsSync(shopDir)).toBe(true)
+    const entries = readdirSync(shopDir)
+    const subdirsWithIndex = entries.filter(
+      (entry) =>
+        statSync(path.join(shopDir, entry)).isDirectory() &&
+        existsSync(path.join(shopDir, entry, 'index.html')),
+    )
+    expect(subdirsWithIndex).toEqual([])
+  })
+
+  it('web/vercel.json has the scoped /shop/(.*) rewrite for direct-link/refresh (Pitfall 1)', () => {
+    const vercelConfig = JSON.parse(
+      readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf-8'),
+    ) as { rewrites?: { source: string; destination: string }[] }
+    const shopRewrite = vercelConfig.rewrites?.find((r) => r.source === '/shop/(.*)')
+    expect(shopRewrite).toEqual({ source: '/shop/(.*)', destination: '/shop/index.html' })
+    // Guard against a global catch-all silently masking genuine 404s
+    // elsewhere (RESEARCH anti-pattern / T-5-18).
+    expect(vercelConfig.rewrites?.some((r) => r.source === '/(.*)')).toBe(false)
   })
 
   it('bakes concert data (or the D-12 empty state) into concerts/index.html at build time', () => {
