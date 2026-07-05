@@ -132,3 +132,7 @@ None - no external service configuration required.
 ---
 *Phase: 05-online-shop-core*
 *Completed: 2026-07-05*
+
+## Self-Check: PASSED
+
+All 4 created files (CatalogGrid.tsx, CatalogGrid.test.tsx, Shop.tsx, Shop.test.tsx) verified present on disk; all 4 commits (08ea3b6, c9b5457, 6f102cb, c89a8f5) verified present in git log.
