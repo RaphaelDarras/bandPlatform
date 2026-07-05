@@ -28,6 +28,10 @@ interface StockData {
   products: StockProduct[]
 }
 
+// Intentional divergence from the shop's StockBadge (web/src/components/StockBadge.tsx),
+// which uses `< 5` per CONTEXT.md D-15. This admin page keeps `<= 5` for its amber
+// warning. The split is deliberate and scoped to these two call sites — do not "fix"
+// one threshold to match the other without checking CONTEXT.md D-15 first.
 function stockColorClass(stock: number) {
   if (stock === 0) return 'text-[#ef4444]' // stock-zero (danger)
   if (stock <= 5) return 'text-[#f59e0b]' // stock-low (warning)
