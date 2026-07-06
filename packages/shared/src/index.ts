@@ -50,6 +50,7 @@ export interface Product {
 export interface OrderItem {
   productId: string;
   variantSku: string;
+  name: string;
   quantity: number;
   priceAtPurchase: number;
 }

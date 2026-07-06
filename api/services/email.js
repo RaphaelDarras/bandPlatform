@@ -18,10 +18,11 @@
  * no-tracking posture (Phase 5 Meta Pixel/CAPI removal) must not be
  * reintroduced via "read receipt" style tracking images.
  *
- * order.items entries are expected to carry a `name` (product name
- * snapshot) attached by the caller, mirroring stripeClient.js's
- * createCheckoutSession — the Order model's OrderItemSchema has no
- * persisted `name` field yet. Falls back to variantSku if absent.
+ * order.items entries carry a persisted `name` (product name snapshot,
+ * CR-01) set by orders.js at order-creation time and stored on
+ * OrderItemSchema — the same field stripeClient.js's createCheckoutSession
+ * reads for product_data.name. renderItemsRows() still falls back to
+ * variantSku defensively (e.g. for pre-CR-01 legacy documents).
  */
 
 const { Resend } = require('resend');
