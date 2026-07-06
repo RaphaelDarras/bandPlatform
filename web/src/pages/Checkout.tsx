@@ -1,21 +1,21 @@
-import { useState, type ChangeEvent, type FocusEvent } from 'react'
+import { useState, type ChangeEvent, type FocusEvent, type FormEvent } from 'react'
 import { useCartStore } from '../lib/cartStore'
+import { createOrder } from '../lib/orders'
 
-// Checkout page (SHOP-03, `/checkout`). Guest checkout FORM ONLY — no Order
-// is persisted and no payment is processed this phase (D-01). The "Place
-// Order" button below carries an unconditional `disabled` attribute, is
-// `type="button"`, and the <form> has no `onSubmit` — there is no submit
-// path to the network anywhere in this file (D-03/T-5-16). Payment + Order
-// persistence land in Phase 6.
+// Checkout page (SHOP-03/SHOP-04/SHOP-05, `/checkout`). Guest checkout: on
+// submit, builds the order payload from the form + cart and calls
+// createOrder() (web/src/lib/orders.ts), then redirects the browser to the
+// returned hosted-provider URL (D-02/D-05). A rejected createOrder shows an
+// inline error (reusing errorClassName) rather than a silent no-op
+// (T-06-16). The customer picks Stripe-card vs PayPal before submit (D-03).
 //
 // Country is a free-text input, not a <select> (D-04) — shipping
 // restrictions/validation are deferred to Phase 7. All free-text fields
-// carry a maxLength bound (T-5-15) since nothing here is sent to (or
-// validated by) the API this phase.
+// carry a maxLength bound (T-5-15).
 //
 // Input styling + the min-h-5 error-slot pattern are copied verbatim from
 // Stock.tsx's login form — the only other hand-rolled controlled-input form
-// in this codebase — per 05-PATTERNS.md.
+// in this codebase — per 05-PATTERNS.md/06-PATTERNS.md.
 
 interface FormFields {
   email: string
@@ -28,6 +28,7 @@ interface FormFields {
 }
 
 type FieldErrors = Partial<Record<keyof FormFields, string>>
+type PaymentMethod = 'stripe' | 'paypal'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -62,6 +63,10 @@ function validateField(field: keyof FormFields, value: string): string {
   return ''
 }
 
+const REQUIRED_FIELDS = (Object.keys(initialFields) as (keyof FormFields)[]).filter(
+  (field) => field !== 'addressLine2',
+)
+
 const inputClassName =
   'mt-1 w-full rounded-md border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-3 font-sans text-white'
 const errorClassName = 'min-h-5 font-sans text-sm text-[#ef4444]'
@@ -72,8 +77,12 @@ export function Component() {
   const [fields, setFields] = useState<FormFields>(initialFields)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [touched, setTouched] = useState<Partial<Record<keyof FormFields, boolean>>>({})
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const subtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0)
+  const allFieldsValid = REQUIRED_FIELDS.every((field) => validateField(field, fields[field]) === '')
 
   function handleChange(field: keyof FormFields) {
     return (e: ChangeEvent<HTMLInputElement>) => {
@@ -92,12 +101,55 @@ export function Component() {
     }
   }
 
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitError('')
+
+    // Belt-and-braces: re-validate everything on submit (the button is
+    // already disabled until allFieldsValid, but guard here too).
+    const nextErrors: FieldErrors = {}
+    for (const field of REQUIRED_FIELDS) {
+      nextErrors[field] = validateField(field, fields[field])
+    }
+    setErrors(nextErrors)
+    setTouched(
+      REQUIRED_FIELDS.reduce((acc, field) => ({ ...acc, [field]: true }), {} as Record<keyof FormFields, boolean>),
+    )
+    if (Object.values(nextErrors).some((msg) => msg)) return
+
+    setSubmitting(true)
+    try {
+      const { redirectUrl } = await createOrder({
+        customerEmail: fields.email,
+        customerName: fields.name || undefined,
+        items: lines.map((l) => ({
+          productId: l.productId,
+          variantSku: l.variantSku,
+          quantity: l.quantity,
+        })),
+        shippingAddress: {
+          addressLine1: fields.addressLine1,
+          addressLine2: fields.addressLine2 || undefined,
+          city: fields.city,
+          postalCode: fields.postalCode,
+          country: fields.country,
+        },
+        paymentMethod,
+      })
+      window.location.href = redirectUrl
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : 'Failed to create order. Please try again.',
+      )
+      setSubmitting(false)
+    }
+  }
+
   return (
     <section className="mx-auto max-w-md">
       <h1 className="font-display text-3xl uppercase text-white">Checkout</h1>
 
-      {/* No onSubmit — form-only this phase, nothing is ever submitted (D-01). */}
-      <form className="mt-6 flex flex-col gap-6" noValidate>
+      <form className="mt-6 flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
         <fieldset className="flex flex-col gap-4">
           <legend className="font-display text-xl uppercase text-white">Contact</legend>
           <div>
@@ -226,22 +278,48 @@ export function Component() {
           </div>
         </fieldset>
 
+        <fieldset className="flex flex-col gap-3">
+          <legend className="font-display text-xl uppercase text-white">Payment Method</legend>
+          <label className="flex items-center gap-2 font-sans text-sm text-white">
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="stripe"
+              checked={paymentMethod === 'stripe'}
+              onChange={() => setPaymentMethod('stripe')}
+            />
+            Credit / Debit Card
+          </label>
+          <label className="flex items-center gap-2 font-sans text-sm text-white">
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="paypal"
+              checked={paymentMethod === 'paypal'}
+              onChange={() => setPaymentMethod('paypal')}
+            />
+            PayPal
+          </label>
+        </fieldset>
+
         <div className="border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4">
           <h2 className="font-display text-3xl uppercase text-white">Order Summary</h2>
-          <p className="mt-2 font-sans text-base text-white/75">Subtotal: ${subtotal} CAD</p>
+          <p className="mt-2 font-sans text-base text-white/75">Subtotal: €{subtotal}</p>
         </div>
 
         <div>
           <button
-            type="button"
-            disabled
-            className="w-full bg-white/20 px-6 py-3 text-center font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white/40 cursor-not-allowed"
+            type="submit"
+            disabled={!allFieldsValid || submitting}
+            className={`w-full px-6 py-3 text-center font-sans text-sm font-semibold uppercase tracking-[0.06em] ${
+              !allFieldsValid || submitting
+                ? 'bg-white/20 text-white/40 cursor-not-allowed'
+                : 'bg-[var(--color-accent)] text-black'
+            }`}
           >
-            Place Order
+            {submitting ? 'Placing Order…' : 'Place Order'}
           </button>
-          <p className="mt-2 font-sans text-sm text-white/50">
-            Online payment is coming soon — checkout will be enabled once payments launch.
-          </p>
+          <div className={errorClassName}>{submitError}</div>
         </div>
       </form>
     </section>
