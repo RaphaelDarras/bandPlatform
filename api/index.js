@@ -15,7 +15,16 @@ app.use('/api/webhooks', require('./routes/webhooks'));
 
 // 2. THEN the global JSON parser for every other route.
 app.use(express.json());
-app.use(cors({ origin: '*' }));
+// WR-09 — was origin: '*'. Now that /api/orders collects guest-checkout PII
+// (email, name, full shipping address) and drives real PayPal capture calls,
+// an unrestricted origin lets any third-party site's client-side JS invoke
+// these unauthenticated endpoints directly. Restrict to the single known web
+// origin (WEB_BASE_URL, already used app-wide for Stripe/PayPal redirect
+// URLs); the `cors` package treats a falsy origin the same as '*', so local
+// dev without WEB_BASE_URL set is unaffected. This is a browser-only
+// restriction — it does not affect the mobile app's native fetch calls,
+// which never enforce/require CORS headers.
+app.use(cors({ origin: process.env.WEB_BASE_URL }));
 
 // Swagger API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
