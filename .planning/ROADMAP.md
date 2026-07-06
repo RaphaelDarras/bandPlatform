@@ -186,7 +186,7 @@ Plans:
 **Wave 1**
 
 - [x] 06-01-PLAN.md — Package legitimacy checkpoint + install (stripe/@paypal/paypal-server-sdk/resend) + env vars + PayPal CJS interop guard
-- [ ] 06-02-PLAN.md — Order model shippingAddress + toJSON, crypto orderNumber service, shared types (D-04/D-11)
+- [x] 06-02-PLAN.md — Order model shippingAddress + toJSON, crypto orderNumber service, shared types (D-04/D-11)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -353,7 +353,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
-| 6. Payment Processing | 1/8 | In Progress|  |
+| 6. Payment Processing | 2/8 | In Progress|  |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |

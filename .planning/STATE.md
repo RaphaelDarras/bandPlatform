@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-07-06T21:26:48.110Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-07-06T21:49:46.035Z"
 last_activity: 2026-07-06
 progress:
   total_phases: 12
   completed_phases: 5
   total_plans: 42
-  completed_plans: 35
+  completed_plans: 36
   percent: 42
 ---
 
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 06 (payment-processing) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-07-06
 
 > Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Progress: [████████░░] 83%
 | Phase 05-online-shop-core P11 | 2min | 3 tasks | 3 files |
 | 05 | 11 | - | - |
 | Phase 06 P01 | 30min | 3 tasks | 4 files |
+| Phase 06 P02 | 16min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -208,6 +209,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: Task 1 package-legitimacy checkpoint treated as pre-approved per orchestrator instruction (human already verified stripe/@paypal/paypal-server-sdk/resend on npmjs.com)
 - [Phase 06-01]: PayPal SDK CJS interop confirmed: require('@paypal/paypal-server-sdk') exposes Client, OrdersController, Environment, CheckoutPaymentIntent directly at top level, no .default wrapper needed
 - [Phase 06-01]: Fixed pre-existing Jest 30 CLI flag (--testPathPattern -> --testPathPatterns) in api/package.json, blocking this plan's own test verification
+- [Phase 06-02]: createOrderWithUniqueNumber signature is (Model, data) - generic over any Mongoose model, not hardcoded to Order
+- [Phase 06-02]: Kept OrderItemSchema's existing min:0 on stockBefore/stockAfter untouched - intentional asymmetry with Sale.js per D-08
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -254,8 +257,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-06T21:26:48.084Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-07-06T21:49:46.013Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
 Next action: Discuss Phase 6 (Payment Processing) with `/gsd:discuss-phase 6`
 
