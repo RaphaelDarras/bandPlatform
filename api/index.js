@@ -6,7 +6,14 @@ const { swaggerUi, swaggerSpec } = require('./config/swagger');
 
 const app = express();
 
-// Middleware
+// 1. Webhook routes FIRST -- raw body required for Stripe/PayPal signature
+// verification (AUTH-03). Must be mounted BEFORE express.json() below:
+// otherwise Express parses+re-serializes the body, destroying the exact
+// bytes the provider's signature was computed over (webhooks.js scopes
+// express.raw() per-route internally).
+app.use('/api/webhooks', require('./routes/webhooks'));
+
+// 2. THEN the global JSON parser for every other route.
 app.use(express.json());
 app.use(cors({ origin: '*' }));
 
@@ -18,12 +25,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// Mount routes
+// 3. Normal routes (unaffected -- receive parsed JSON bodies)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/concerts', require('./routes/concerts'));
 app.use('/api/sales', require('./routes/sales'));
+app.use('/api/orders', require('./routes/orders'));
 
 // Start server
 const PORT = process.env.PORT || 5000;
