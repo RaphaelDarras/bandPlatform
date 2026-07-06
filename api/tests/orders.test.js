@@ -267,3 +267,50 @@ describe('POST /api/orders', () => {
     expect(res.body).toEqual({ error: 'Internal server error' });
   });
 });
+
+// ---- POST /api/orders/paypal/capture ----
+
+describe('POST /api/orders/paypal/capture', () => {
+  let app;
+
+  beforeAll(() => {
+    app = buildApp();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('calls capturePaypalOrder and returns { status }', async () => {
+    mockPaypalClient.capturePaypalOrder.mockResolvedValue({ status: 'COMPLETED' });
+
+    const res = await request(app).post('/api/orders/paypal/capture').send({ paypalOrderId: 'PAYPAL123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'COMPLETED' });
+    expect(mockPaypalClient.capturePaypalOrder).toHaveBeenCalledWith('PAYPAL123');
+  });
+
+  it('never touches Product stock or Order creation (side-effect-free beyond the capture call)', async () => {
+    mockPaypalClient.capturePaypalOrder.mockResolvedValue({ status: 'COMPLETED' });
+
+    await request(app).post('/api/orders/paypal/capture').send({ paypalOrderId: 'PAYPAL123' });
+
+    expect(mockProductModule.findById).not.toHaveBeenCalled();
+    expect(mockOrderModule.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when paypalOrderId is missing', async () => {
+    const res = await request(app).post('/api/orders/paypal/capture').send({});
+    expect(res.status).toBe(400);
+    expect(mockPaypalClient.capturePaypalOrder).not.toHaveBeenCalled();
+  });
+
+  it('returns a 4xx with { error } on capture failure', async () => {
+    mockPaypalClient.capturePaypalOrder.mockRejectedValue(new Error('capture failed'));
+    const res = await request(app).post('/api/orders/paypal/capture').send({ paypalOrderId: 'PAYPAL123' });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(res.body.error).toBeDefined();
+  });
+});

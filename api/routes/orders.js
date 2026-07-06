@@ -6,7 +6,7 @@ const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { createOrderWithUniqueNumber } = require('../services/orderNumber');
 const { createCheckoutSession } = require('../services/stripeClient');
-const { createPaypalOrder } = require('../services/paypalClient');
+const { createPaypalOrder, capturePaypalOrder } = require('../services/paypalClient');
 
 // Public guest checkout — NO authenticateToken (mirrors products.js's public
 // GET routes). Anonymous customers have no JWT.
@@ -160,6 +160,41 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Create order error:', error);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/orders/paypal/capture:
+ *   post:
+ *     summary: Capture an approved PayPal order (return-flow)
+ *     description: |
+ *       Public, unauthenticated. Explicitly captures a previously-approved
+ *       PayPal order (approval alone does not move money). Does NOT deduct
+ *       stock, flip Order.status, or send email — those remain the sole
+ *       responsibility of the webhook handler (D-07/D-09/D-14), keeping a
+ *       single source of truth.
+ *     tags: [Orders]
+ *     requestBody:
+ *       required: true
+ *     responses:
+ *       200:
+ *         description: Capture result
+ *       400:
+ *         description: paypalOrderId missing or capture failed
+ */
+router.post('/paypal/capture', async (req, res) => {
+  try {
+    const { paypalOrderId } = req.body;
+    if (!paypalOrderId) {
+      return res.status(400).json({ error: 'paypalOrderId is required' });
+    }
+
+    const result = await capturePaypalOrder(paypalOrderId);
+    return res.status(200).json({ status: result.status });
+  } catch (error) {
+    console.error('Capture PayPal order error:', error);
+    return res.status(400).json({ error: 'Failed to capture PayPal order' });
   }
 });
 
