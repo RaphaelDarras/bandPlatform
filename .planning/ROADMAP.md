@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Mobile POS Optimization** - Battery efficiency, reconciliation, and sync reliability (completed 2026-03-18)
 - [x] **Phase 4: Showcase Website** - Band presence with bio, discography, concerts, contact (completed 2026-07-03)
 - [x] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout (completed 2026-07-05)
-- [ ] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations
+- [x] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations (completed 2026-07-06)
 - [ ] **Phase 7: Shop Enhancements** - Shipping, bundles, pre-orders, and customer features
 - [ ] **Phase 8: Immutable sale line snapshots** - Snapshot product name + variant label on sale items so history survives product/variant deletion
 - [ ] **Phase 9: Concert-first selling UX** - Make concert-linked sales the default fast path from dashboard; lone sale becomes a rare fallback
@@ -201,7 +201,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 06-06-PLAN.md — Webhooks (raw-body mount, signature verify, atomic idempotent paid + stock $inc + emails) + go-live checklist (AUTH-03, D-07/D-08/D-09/D-10/D-19)
+- [x] 06-06-PLAN.md — Webhooks (raw-body mount, signature verify, atomic idempotent paid + stock $inc + emails) + go-live checklist (AUTH-03, D-07/D-08/D-09/D-10/D-19)
 
 ### Phase 06.1: Admin panel: gated login moved to /admin, with /stock, /orders (sorted by sent/to-be-sent), and /products CRUD (INSERTED)
 
@@ -353,7 +353,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
-| 6. Payment Processing | 7/8 | In Progress|  |
+| 6. Payment Processing | 8/8 | Complete   | 2026-07-06 |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |

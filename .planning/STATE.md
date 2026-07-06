@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 06-08-PLAN.md
-last_updated: "2026-07-06T22:47:13.587Z"
+status: verifying
+stopped_at: Completed 06-06-PLAN.md
+last_updated: "2026-07-06T23:01:25.976Z"
 last_activity: 2026-07-06
 progress:
   total_phases: 12
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 42
-  completed_plans: 41
-  percent: 42
+  completed_plans: 42
+  percent: 50
 ---
 
 # Project State
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 
 Phase: 06 (payment-processing) — EXECUTING
 Plan: 8 of 8
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-06
 
 > Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Progress: [██████████] 98%
 | Phase 06 P07 | 4min | 3 tasks | 11 files |
 | Phase 06 P05 | 14min | 2 tasks | 2 files |
 | Phase 06 P08 | 6min | 3 tasks | 5 files |
+| Phase 06 P06 | 5min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -228,6 +229,8 @@ Recent decisions affecting current work:
 - [Phase 06-08]: PaypalReturn reads both token (PayPal order id to capture) and order (our orderNumber, forwarded to success page) query params
 - [Phase 06-08]: Missing token on PaypalReturn mount redirects to /checkout/cancel rather than rendering an inline error
 - [Phase 06-08]: CheckoutSuccess.test.tsx spies on the real useCartStore.getState().clearCart instead of mocking the module, to assert lines are actually emptied
+- [Phase 06-06]: webhooks.js's stock-mutation shape is a hybrid unique to the online channel: inventory.js's $elemMatch floor-guard without its 409-reject/version-guard, and explicitly NOT sales.js's bare allow-negative $inc (D-08)
+- [Phase 06-06]: webhooks-paypal.test.js mocks stripeClient.js even though only the PayPal path is exercised, because webhooks.js requires both provider clients at module load and the real Stripe SDK throws synchronously without STRIPE_SECRET_KEY set
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -274,8 +277,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-06T22:47:13.564Z
-Stopped at: Completed 06-08-PLAN.md
+Last session: 2026-07-06T23:01:25.947Z
+Stopped at: Completed 06-06-PLAN.md
 Resume file: None
 Next action: Discuss Phase 6 (Payment Processing) with `/gsd:discuss-phase 6`
 

@@ -59,7 +59,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **AUTH-01**: Admin can log in to mobile POS app securely
 - [x] **AUTH-02**: System securely stores authentication credentials
-- [ ] **AUTH-03**: System validates payment webhooks from Stripe/PayPal
+- [x] **AUTH-03**: System validates payment webhooks from Stripe/PayPal
 
 ## v2 Requirements
 
@@ -134,7 +134,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-04 | Phase 6 | Complete |
 | SHOP-05 | Phase 6 | Complete |
 | SHOP-06 | Phase 6 | Complete |
-| AUTH-03 | Phase 6 | Pending |
+| AUTH-03 | Phase 6 | Complete |
 | SHOP-09 | Phase 7 | Pending |
 | SHOP-10 | Phase 7 | Pending |
 | SHOP-12 | Phase 7 | Pending |
