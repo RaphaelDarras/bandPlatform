@@ -12,6 +12,16 @@ const OrderItemSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // Product name snapshot at time of purchase (CR-01) — never trust a
+  // client-recomputed name; the caller (orders.js) populates this from
+  // Product.name, mirroring the same never-trust pattern already used for
+  // price. Persisted so email.js's renderItemsRows() can show the real
+  // product name instead of falling back to the raw variantSku.
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
   quantity: {
     type: Number,
     required: true,
@@ -102,6 +112,12 @@ const OrderSchema = new mongoose.Schema({
   paymentIntentId: {
     type: String,
     trim: true
+  },
+  // WR-01 — set by fulfillOrder()'s atomic $set on the paid transition.
+  // Without this field declaration, Mongoose's default strict mode
+  // silently strips paidAt from that update.
+  paidAt: {
+    type: Date
   },
   source: {
     type: String,
