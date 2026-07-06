@@ -197,7 +197,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2)*
 
 - [x] 06-05-PLAN.md — POST /api/orders: pending order + server price recompute + provider session (D-05/D-06)
-- [ ] 06-08-PLAN.md — Success/Cancel/PaypalReturn pages + routes (D-15/D-16)
+- [x] 06-08-PLAN.md — Success/Cancel/PaypalReturn pages + routes (D-15/D-16)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -353,7 +353,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
-| 6. Payment Processing | 6/8 | In Progress|  |
+| 6. Payment Processing | 7/8 | In Progress|  |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |
