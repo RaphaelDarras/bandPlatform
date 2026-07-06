@@ -42,9 +42,9 @@ describe('Sale model - extended fields', () => {
     Concert = require('../models/Concert');
     // Create a concert to use as concertId
     const concert = await Concert.create({
-      name: 'Test Concert',
       date: new Date('2026-06-01'),
-      location: 'Dublin',
+      country: 'Ireland',
+      city: 'Dublin',
     });
     concertId = concert._id;
   });

@@ -239,7 +239,9 @@ describe('POST /api/inventory/restock', () => {
       .send({ ...validRestockBody, quantity: 2.5 });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/positive integer/i);
+    // Restock accepts negative quantities (removal), so the guard rejects
+    // non-integers and zero, not "non-positive" values.
+    expect(res.body.error).toMatch(/non-zero integer/i);
   });
 
   it('returns 400 for zero quantity', async () => {
@@ -263,17 +265,26 @@ describe('POST /api/inventory/restock', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 409 on version conflict', async () => {
-    mockProductModule.findOne.mockResolvedValue(mockProductWith(10, 0));
-    mockProductModule.findOneAndUpdate.mockResolvedValue(null);
+  it('restocks legacy variants without an optimistic-lock version check', async () => {
+    // Restock deliberately dropped version-based optimistic locking so that
+    // products created before the `version` field existed can still be
+    // restocked (Phase 02-post fix). A plain $inc is used, so there is no
+    // version-conflict 409 path here (unlike deduct/reserve/release).
+    mockProductModule.findOne.mockResolvedValue(mockProductWith(10, undefined));
+    mockProductModule.findOneAndUpdate.mockResolvedValue(updatedProductWith(15, undefined));
+    mockInventoryAdjustmentModule.create.mockResolvedValue({ _id: 'adj1' });
 
     const res = await request(app)
       .post('/api/inventory/restock')
       .set('Authorization', AUTH_HEADER)
       .send(validRestockBody);
 
-    expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/version mismatch/i);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.stockAfter).toBe(15);
+    // findOneAndUpdate must NOT be scoped by variant version
+    const updateFilter = mockProductModule.findOneAndUpdate.mock.calls[0][0];
+    expect(JSON.stringify(updateFilter)).not.toMatch(/version/);
   });
 
   it('succeeds and creates InventoryAdjustment audit', async () => {

@@ -100,8 +100,8 @@ describe('GET /api/concerts', () => {
 
 describe('POST /api/concerts', () => {
   const validBody = {
-    name: 'Summer Tour',
     date: '2026-08-15',
+    country: 'Germany',
     city: 'Berlin',
     venue: 'Tempodrom',
   };
@@ -117,7 +117,16 @@ describe('POST /api/concerts', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 400 when name is missing', async () => {
+  it('returns 400 when date is missing', async () => {
+    const res = await request(app)
+      .post('/api/concerts')
+      .set('Authorization', AUTH_HEADER)
+      .send({ country: 'Germany', city: 'Berlin' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when country is missing', async () => {
     const res = await request(app)
       .post('/api/concerts')
       .set('Authorization', AUTH_HEADER)
@@ -126,30 +135,21 @@ describe('POST /api/concerts', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when date is missing', async () => {
-    const res = await request(app)
-      .post('/api/concerts')
-      .set('Authorization', AUTH_HEADER)
-      .send({ name: 'Tour', city: 'Berlin' });
-
-    expect(res.status).toBe(400);
-  });
-
   it('returns 400 when city is missing', async () => {
     const res = await request(app)
       .post('/api/concerts')
       .set('Authorization', AUTH_HEADER)
-      .send({ name: 'Tour', date: '2026-08-15' });
+      .send({ date: '2026-08-15', country: 'Germany' });
 
     expect(res.status).toBe(400);
   });
 
-  it('returns 201 and maps city to location field', async () => {
+  it('returns 201 and persists country and city', async () => {
     const created = {
       _id: 'c1',
-      name: 'Summer Tour',
       date: new Date('2026-08-15'),
-      location: 'Berlin',
+      country: 'Germany',
+      city: 'Berlin',
       venue: 'Tempodrom',
       active: true,
     };
@@ -161,18 +161,19 @@ describe('POST /api/concerts', () => {
       .send(validBody);
 
     expect(res.status).toBe(201);
-    expect(res.body.location).toBe('Berlin');
+    expect(res.body.city).toBe('Berlin');
+    expect(res.body.country).toBe('Germany');
     expect(mockConcertModule.create).toHaveBeenCalledWith(
-      expect.objectContaining({ location: 'Berlin', name: 'Summer Tour' })
+      expect.objectContaining({ country: 'Germany', city: 'Berlin' })
     );
   });
 
   it('creates concert without venue (optional)', async () => {
     const created = {
       _id: 'c2',
-      name: 'Acoustic Night',
       date: new Date('2026-09-01'),
-      location: 'Paris',
+      country: 'France',
+      city: 'Paris',
       active: true,
     };
     mockConcertModule.create.mockResolvedValue(created);
@@ -180,7 +181,7 @@ describe('POST /api/concerts', () => {
     const res = await request(app)
       .post('/api/concerts')
       .set('Authorization', AUTH_HEADER)
-      .send({ name: 'Acoustic Night', date: '2026-09-01', city: 'Paris' });
+      .send({ date: '2026-09-01', country: 'France', city: 'Paris' });
 
     expect(res.status).toBe(201);
   });

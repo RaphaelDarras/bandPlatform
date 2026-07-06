@@ -111,13 +111,18 @@ describe('PUT /api/products/:id — safe field whitelisting', () => {
 
     expect(res.status).toBe(200);
 
-    // updateOne should have been called with positional $set for color only
+    // PUT manages the whole variant set: it may $pull removed SKUs before
+    // $set-ing the matching one, so locate the positional $set call explicitly
+    // rather than assuming it is the first updateOne call.
     expect(mockProductModule.updateOne).toHaveBeenCalled();
-    const updateOneArg = mockProductModule.updateOne.mock.calls[0][1];
-    expect(updateOneArg.$set['variants.$.color']).toBe('Red');
+    const setCall = mockProductModule.updateOne.mock.calls.find(
+      (c) => c[1] && c[1].$set
+    );
+    expect(setCall).toBeDefined();
+    expect(setCall[1].$set['variants.$.color']).toBe('Red');
     // stock and version must NOT appear
-    expect(updateOneArg.$set['variants.$.stock']).toBeUndefined();
-    expect(updateOneArg.$set['variants.$.version']).toBeUndefined();
+    expect(setCall[1].$set['variants.$.stock']).toBeUndefined();
+    expect(setCall[1].$set['variants.$.version']).toBeUndefined();
   });
 
   // Test 3: PUT with variants containing stock and version has NO effect on those fields
@@ -129,10 +134,13 @@ describe('PUT /api/products/:id — safe field whitelisting', () => {
 
     expect(res.status).toBe(200);
 
-    if (mockProductModule.updateOne.mock.calls.length > 0) {
-      const updateOneArg = mockProductModule.updateOne.mock.calls[0][1];
-      expect(updateOneArg.$set['variants.$.stock']).toBeUndefined();
-      expect(updateOneArg.$set['variants.$.version']).toBeUndefined();
+    // Across every positional $set updateOne call, stock/version must never appear.
+    for (const call of mockProductModule.updateOne.mock.calls) {
+      const arg = call[1];
+      if (arg && arg.$set) {
+        expect(arg.$set['variants.$.stock']).toBeUndefined();
+        expect(arg.$set['variants.$.version']).toBeUndefined();
+      }
     }
     // findByIdAndUpdate should NOT have been called with stock/version in $set
     if (mockProductModule.findByIdAndUpdate.mock.calls.length > 0) {
@@ -178,8 +186,9 @@ describe('PUT /api/products/:id — safe field whitelisting', () => {
     }
   });
 
-  // Test 6: PUT with variant SKU that does not exist is ignored (no new variant added)
-  it('Test 6: ignores variant updates for SKUs that do not exist', async () => {
+  // Test 6: PUT with a variant SKU that does not exist adds it as a new variant
+  // with stock defaulting to 0 (admin product CRUD — full variant-set management).
+  it('Test 6: adds a new variant for an unknown SKU with stock defaulting to 0', async () => {
     const res = await request(app)
       .put('/api/products/prod123')
       .set('Authorization', AUTH_HEADER)
@@ -187,12 +196,14 @@ describe('PUT /api/products/:id — safe field whitelisting', () => {
 
     expect(res.status).toBe(200);
 
-    // updateOne may be called but with a filter that won't match any document
-    // The key assertion: no new variant is added to the product
-    if (mockProductModule.updateOne.mock.calls.length > 0) {
-      const filterArg = mockProductModule.updateOne.mock.calls[0][0];
-      expect(filterArg['variants.sku']).toBe('NONEXISTENT');
-      // This is fine — the DB simply won't match anything, no variant is created
-    }
+    // The new SKU is $push-ed as a variant seeded with stock 0.
+    const pushCall = mockProductModule.updateOne.mock.calls.find(
+      (c) => c[1] && c[1].$push
+    );
+    expect(pushCall).toBeDefined();
+    const pushed = pushCall[1].$push.variants;
+    expect(pushed.sku).toBe('NONEXISTENT');
+    expect(pushed.color).toBe('Blue');
+    expect(pushed.stock).toBe(0);
   });
 });
