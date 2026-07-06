@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 05-11-PLAN.md
-last_updated: "2026-07-05T21:53:51.616Z"
-last_activity: 2026-07-05
+status: executing
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-07-06T21:26:48.110Z"
+last_activity: 2026-07-06
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 5
-  total_plans: 34
-  completed_plans: 34
-  percent: 45
+  total_plans: 42
+  completed_plans: 35
+  percent: 42
 ---
 
 # Project State
@@ -21,22 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Band members can record merchandise sales at concerts quickly and reliably, with stock automatically synchronized across online and physical sales channels, preventing overselling and lost revenue.
-**Current focus:** Phase 05 — online-shop-core
+**Current focus:** Phase 06 — payment-processing
 
 ## Current Position
 
-Phase: 05 (online-shop-core) — EXECUTING
-Plan: 11 of 11
-Status: Phase complete — ready for verification
-Last activity: 2026-07-05
+Phase: 06 (payment-processing) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-07-06
 
-Progress: [██████████] 100%
+> Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
+
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 18
 - Average duration: 2 minutes
 - Total execution time: 0.07 hours
 
@@ -78,6 +80,8 @@ Progress: [██████████] 100%
 | Phase 05 P09 | 8min | 1 tasks | 2 files |
 | Phase 05-online-shop-core P10 | 5min | 2 tasks | 4 files |
 | Phase 05-online-shop-core P11 | 2min | 3 tasks | 3 files |
+| 05 | 11 | - | - |
+| Phase 06 P01 | 30min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -87,6 +91,7 @@ Progress: [██████████] 100%
 - 2026-04-19: Phase 9 added: Concert-first selling UX (make concert-linked sales the default fast path from dashboard; lone sale becomes rare explicit fallback). Driven by user observation that lone sales almost never happen in practice and the Concerts → list → detail → Start Selling detour is too slow. Open design questions parked in the phase goal for discuss-phase: single-active auto-select, multi-active picker shape, zero-active fallback, and lone-sale entry-point location.
 - 2026-04-19: Phase 10 added: Design polish pass (lift mobile app from functional prototype to professional product). Driven by user observation that emoji icons, hardcoded hex colors, ad-hoc font sizes, and minimal interaction feedback make the app feel unfinished. Open design questions parked for discuss-phase: icon library choice, design tokens structure, typography scale shape, scope (all screens vs. dashboard+selling first), and dark-mode audit depth. Should be sequenced AFTER Phase 9 so the final dashboard layout is what gets polished.
 - 2026-04-19: Phase 11 added: Multi-tenant band-agnostic platform (convert single-tenant Hurakan product into a platform any band can sign up for). Driven by user intent to make the platform available to other bands. ⚠ Scope almost certainly milestone-sized (touches DB schema, API auth, mobile app, upcoming e-shop, provisioning, domain routing, possibly billing) — discuss-phase should either aggressively cut scope or promote to v2.0 milestone. Critical open question: retrofit multi-tenancy after Phase 7 online-shop work ships, OR block Phases 4-7 and build them multi-tenant from day one (likely cheaper long-term but delays first online-shop value).
+- Phase 06.1 inserted after Phase 6: Admin panel. The Stock page is currently gated behind a login; KEEP that login but move it to /admin. The /admin page gives access to: /stock (existing stock page), a new /orders page listing all orders sorted by 'sent' vs 'to-be-sent' status, and a new /products page for full product CRUD (D-25 admin-UI gap from Phase 5). Sequenced after Phase 6 because /orders needs persisted orders that only exist once checkout/payment (Phase 6) writes Order records. (URGENT)
 
 ### Decisions
 
@@ -200,6 +205,9 @@ Recent decisions affecting current work:
 - [Phase 05-10]: Home.test.tsx negative merch-teaser assertion replaced (not kept) since Phase 5 intentionally adds what D-25 deferred
 - [Phase 05-11]: Shop routes placed before the '*' catch-all in App.tsx; none carry a loader key so /shop/:id stays excluded from the SSG prerender (D-06)
 - [Phase 05-11]: Vercel rewrite scoped to /shop/(.*) only, not a global /(.*)  catch-all, so unrelated broken links still surface real 404s (T-5-18)
+- [Phase 06-01]: Task 1 package-legitimacy checkpoint treated as pre-approved per orchestrator instruction (human already verified stripe/@paypal/paypal-server-sdk/resend on npmjs.com)
+- [Phase 06-01]: PayPal SDK CJS interop confirmed: require('@paypal/paypal-server-sdk') exposes Client, OrdersController, Environment, CheckoutPaymentIntent directly at top level, no .default wrapper needed
+- [Phase 06-01]: Fixed pre-existing Jest 30 CLI flag (--testPathPattern -> --testPathPatterns) in api/package.json, blocking this plan's own test verification
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -246,10 +254,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T21:53:51.581Z
-Stopped at: Completed 05-11-PLAN.md
+Last session: 2026-07-06T21:26:48.084Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
-Next action: Discuss Phase 3 with `/gsd:discuss-phase`
+Next action: Discuss Phase 6 (Payment Processing) with `/gsd:discuss-phase 6`
 
 ---
 *Created: 2026-02-13*

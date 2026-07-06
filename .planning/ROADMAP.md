@@ -180,11 +180,38 @@ Plans:
   4. System validates payment webhooks from Stripe and PayPal securely (prevents fraud)
   5. System marks orders as paid only after webhook confirmation (prevents payment failures)
 
-**Plans**: TBD
+**Plans**: 8 plans in 4 waves
 
 Plans:
+**Wave 1**
 
-- [ ] TBD during phase planning
+- [x] 06-01-PLAN.md — Package legitimacy checkpoint + install (stripe/@paypal/paypal-server-sdk/resend) + env vars + PayPal CJS interop guard
+- [ ] 06-02-PLAN.md — Order model shippingAddress + toJSON, crypto orderNumber service, shared types (D-04/D-11)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 06-03-PLAN.md — Stripe/PayPal client services + currency-unit helpers (SHOP-04/05, D-02)
+- [ ] 06-04-PLAN.md — Resend email service: customer confirmation (VAT mention) + band notification (SHOP-06, D-13/D-17)
+- [ ] 06-07-PLAN.md — orders.ts client + Checkout activation + provider selector + € relabel (D-01/D-03)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 06-05-PLAN.md — POST /api/orders: pending order + server price recompute + provider session (D-05/D-06)
+- [ ] 06-08-PLAN.md — Success/Cancel/PaypalReturn pages + routes (D-15/D-16)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 06-06-PLAN.md — Webhooks (raw-body mount, signature verify, atomic idempotent paid + stock $inc + emails) + go-live checklist (AUTH-03, D-07/D-08/D-09/D-10/D-19)
+
+### Phase 06.1: Admin panel: gated login moved to /admin, with /stock, /orders (sorted by sent/to-be-sent), and /products CRUD (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
 
 ### Phase 7: Shop Enhancements
 
@@ -326,7 +353,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
-| 6. Payment Processing | 0/TBD | Not started | - |
+| 6. Payment Processing | 1/8 | In Progress|  |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |

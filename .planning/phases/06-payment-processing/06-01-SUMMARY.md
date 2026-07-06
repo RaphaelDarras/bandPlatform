@@ -79,6 +79,7 @@ Each task was committed atomically:
 ## Decisions Made
 - Task 1's blocking human-verify checkpoint was honored as pre-approved per explicit orchestrator instruction (the human had already confirmed all three packages' legitimacy on npmjs.com in a prior session) — proceeded directly to install without re-prompting.
 - Confirmed working PayPal require() access path (see `patterns-established` above) — recorded here for Plan 03 to consume directly, no `.default` indirection needed.
+- **Did NOT mark SHOP-04/SHOP-05/SHOP-06 as Complete in REQUIREMENTS.md**, despite them being listed in this plan's frontmatter `requirements` field. This plan only installs SDKs and scaffolds env-var placeholders — no Stripe checkout, PayPal order flow, or email sending exists yet (that lands across Plans 02-08). Marking these Complete now would misrepresent project state. Recommend the final Phase 6 plan that actually delivers each capability call `requirements mark-complete` for it.
 
 ## Deviations from Plan
 
