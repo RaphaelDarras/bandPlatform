@@ -34,6 +34,34 @@ const OrderItemSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+// Shipping address sub-schema (D-04)
+const ShippingAddressSchema = new mongoose.Schema({
+  addressLine1: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  addressLine2: {
+    type: String,
+    trim: true
+  },
+  city: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  postalCode: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  country: {
+    type: String,
+    required: true,
+    trim: true
+  }
+}, { _id: false });
+
 // Order schema
 const OrderSchema = new mongoose.Schema({
   orderNumber: {
@@ -53,6 +81,10 @@ const OrderSchema = new mongoose.Schema({
     trim: true
   },
   items: [OrderItemSchema],
+  shippingAddress: {
+    type: ShippingAddressSchema,
+    required: true
+  },
   totalAmount: {
     type: Number,
     required: true,
@@ -77,7 +109,15 @@ const OrderSchema = new mongoose.Schema({
     trim: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    transform: (_doc, ret) => {
+      ret.id = ret._id.toString();
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    },
+  },
 });
 
 // Index on orderNumber for fast lookups
