@@ -28,7 +28,17 @@ export function Component() {
     }
 
     capturePaypalOrder(token)
-      .then(() => navigate(`/checkout/success?order=${orderNumber ?? ''}`, { replace: true }))
+      .then(({ status }) => {
+        // WR-06 — PayPal explicitly documents PENDING (and other non-terminal
+        // statuses) as a possible capture outcome for certain funding
+        // sources. Only COMPLETED is genuine success; the webhook remains
+        // the actual source of truth for fulfillment either way.
+        if (status === 'COMPLETED') {
+          navigate(`/checkout/success?order=${orderNumber ?? ''}`, { replace: true })
+        } else {
+          navigate('/checkout/cancel', { replace: true })
+        }
+      })
       .catch(() => navigate('/checkout/cancel', { replace: true }))
     // Run exactly once on mount -- a single capture call, not tied to any
     // prop/state re-evaluation (D-15).
