@@ -118,3 +118,12 @@ None for this plan specifically — the `user_setup` block in `06-01-PLAN.md` fr
 ---
 *Phase: 06-payment-processing*
 *Completed: 2026-07-06*
+
+## Self-Check: PASSED
+
+- FOUND: api/tests/paypal-interop.test.js
+- FOUND: api/package.json contains @paypal/paypal-server-sdk
+- FOUND: .planning/phases/06-payment-processing/deferred-items.md
+- FOUND commit c84f78b (Task 2: feat)
+- FOUND commit bc21b1e (Task 3: test)
+- FOUND commit 5ee0bd5 (docs: SUMMARY)
