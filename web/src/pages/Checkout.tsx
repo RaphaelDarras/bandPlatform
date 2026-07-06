@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FocusEvent, type FormEvent } from 'react'
 import { useCartStore } from '../lib/cartStore'
 import { createOrder } from '../lib/orders'
+import { formatPrice } from '../lib/format'
 
 // Checkout page (SHOP-03/SHOP-04/SHOP-05, `/checkout`). Guest checkout: on
 // submit, builds the order payload from the form + cart and calls
@@ -304,7 +305,7 @@ export function Component() {
 
         <div className="border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4">
           <h2 className="font-display text-3xl uppercase text-white">Order Summary</h2>
-          <p className="mt-2 font-sans text-base text-white/75">Subtotal: €{subtotal}</p>
+          <p className="mt-2 font-sans text-base text-white/75">Subtotal: {formatPrice(subtotal)}</p>
         </div>
 
         <div>

@@ -96,7 +96,7 @@ describe('Cart page', () => {
     const shirtRow = screen.getByText('Tour Shirt').closest('li') as HTMLElement
     expect(within(shirtRow).getByText('M / Black')).toBeInTheDocument()
     expect(within(shirtRow).getByAltText('Tour Shirt')).toBeInTheDocument()
-    expect(within(shirtRow).getByText('€50')).toBeInTheDocument() // 25 * 2
+    expect(within(shirtRow).getByText('€50.00')).toBeInTheDocument() // 25 * 2
     expect(within(shirtRow).getByLabelText('Increase quantity')).toBeInTheDocument()
     expect(
       within(shirtRow).getByLabelText('Remove Tour Shirt from cart'),

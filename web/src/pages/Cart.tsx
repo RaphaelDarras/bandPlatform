@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { fetchProducts } from '../lib/products'
 import { useCartStore, type CartLine } from '../lib/cartStore'
 import QuantityStepper from '../components/QuantityStepper'
+import { formatPrice } from '../lib/format'
 
 // Cart page (SHOP-02/SHOP-13, `/cart`). The reconciliation + review screen
 // before checkout (RESEARCH.md Pattern 5) — the one point where cart-vs-
@@ -124,7 +125,7 @@ export function Component() {
                     </p>
                     <p className="mt-1 font-sans text-sm text-white/75">{line.variantLabel}</p>
                     <p className="mt-1 font-sans text-sm text-white/75">
-                      €{line.unitPrice}
+                      {formatPrice(line.unitPrice)}
                     </p>
 
                     {flagged ? (
@@ -163,7 +164,7 @@ export function Component() {
                           onChange={(n) => setQuantity(line.productId, line.variantSku, n)}
                         />
                         <p className="font-sans text-sm font-semibold text-white">
-                          €{line.unitPrice * line.quantity}
+                          {formatPrice(line.unitPrice * line.quantity)}
                         </p>
                         <button
                           type="button"
@@ -186,7 +187,7 @@ export function Component() {
 
         <div className="mt-8 border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4 lg:mt-0 lg:self-start">
           <h2 className="font-display text-3xl uppercase text-white">Order Summary</h2>
-          <p className="mt-2 font-sans text-base text-white/75">Subtotal: €{subtotal}</p>
+          <p className="mt-2 font-sans text-base text-white/75">Subtotal: {formatPrice(subtotal)}</p>
 
           {anyFlagged ? (
             <>

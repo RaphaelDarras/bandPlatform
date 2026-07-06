@@ -5,6 +5,7 @@ import { fetchProduct } from '../lib/products'
 import { useCartStore } from '../lib/cartStore'
 import StockBadge from '../components/StockBadge'
 import QuantityStepper from '../components/QuantityStepper'
+import { formatPrice } from '../lib/format'
 
 // Product detail page (SHOP-08/SHOP-13, `/shop/:id`). Live client-side fetch
 // of a single product by :id (D-05/D-06) — this file exports NO loader, so
@@ -162,7 +163,7 @@ export function Component() {
           )}
 
           {/* Price in EUR (D-01, resolves D-23) */}
-          <p className="mt-4 font-sans text-lg font-semibold text-white">€{price}</p>
+          <p className="mt-4 font-sans text-lg font-semibold text-white">{formatPrice(price)}</p>
 
           {/* Variant selector (D-16/D-18) */}
           <div className="mt-4 flex flex-wrap gap-2">

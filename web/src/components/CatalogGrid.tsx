@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { Product } from '@bandplatform/shared'
+import { formatPrice } from '../lib/format'
 
 // Catalog grid (SHOP-01/SHOP-07, D-19 flat grid, no category filter). Each
 // card is a single Link click-target to the product detail page, mirroring
@@ -48,7 +49,7 @@ export default function CatalogGrid({ products }: { products: Product[] }) {
               {product.name}
             </p>
             {/* Price in EUR (D-01, resolves D-23) */}
-            <p className="mt-1 font-sans text-sm text-white/75">€{product.basePrice}</p>
+            <p className="mt-1 font-sans text-sm text-white/75">{formatPrice(product.basePrice)}</p>
           </div>
         </Link>
       ))}

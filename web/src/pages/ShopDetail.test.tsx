@@ -88,7 +88,7 @@ describe('ShopDetail page', () => {
     expect(screen.getByText(/in stock/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /add to cart/i })).toBeEnabled()
     expect(screen.getByLabelText('Increase quantity')).toBeEnabled()
-    expect(screen.getByText('€25')).toBeInTheDocument()
+    expect(screen.getByText('€25.00')).toBeInTheDocument()
   })
 
   it('renders an out-of-stock variant as disabled/muted and not selectable', async () => {
