@@ -28,6 +28,7 @@ const router = express.Router();
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { verifyStripeEvent } = require('../services/stripeClient');
+const { verifyPaypalWebhook } = require('../services/paypalClient');
 const { sendOrderConfirmation, sendBandNotification } = require('../services/email');
 
 /**
@@ -122,6 +123,45 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     console.error('Stripe webhook fulfillment error:', error);
     // Still ack 200 below -- payment already captured, must not retry-storm
     // Stripe over a fulfillment-side bug; logged here for investigation.
+  }
+
+  return res.status(200).json({ received: true });
+});
+
+/**
+ * POST /api/webhooks/paypal
+ * Verifies the PayPal transmission signature FIRST (zero DB access before
+ * verification). On a verified PAYMENT.CAPTURE.COMPLETED event, fulfills the
+ * Order matched by the capture resource's custom_id. Reuses fulfillOrder --
+ * no duplicated atomic-transition/$inc/email logic.
+ */
+router.post('/paypal', express.raw({ type: 'application/json' }), async (req, res) => {
+  const rawBodyString = req.body.toString();
+
+  let verified;
+  try {
+    verified = await verifyPaypalWebhook(req.headers, rawBodyString);
+  } catch (error) {
+    console.error('PayPal webhook verification error:', error.message);
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  if (!verified) {
+    console.error('PayPal webhook signature verification failed');
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  try {
+    const event = JSON.parse(rawBodyString);
+    if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      const resource = event.resource || {};
+      const orderNumber = resource.custom_id;
+      await fulfillOrder(orderNumber, resource.id);
+    }
+  } catch (error) {
+    console.error('PayPal webhook fulfillment error:', error);
+    // Still ack 200 below -- payment already captured, must not retry-storm
+    // PayPal over a fulfillment-side bug; logged here for investigation.
   }
 
   return res.status(200).json({ received: true });
