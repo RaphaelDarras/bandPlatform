@@ -1,0 +1,166 @@
+'use strict';
+
+const express = require('express');
+const router = express.Router();
+const Product = require('../models/Product');
+const Order = require('../models/Order');
+const { createOrderWithUniqueNumber } = require('../services/orderNumber');
+const { createCheckoutSession } = require('../services/stripeClient');
+const { createPaypalOrder } = require('../services/paypalClient');
+
+// Public guest checkout — NO authenticateToken (mirrors products.js's public
+// GET routes). Anonymous customers have no JWT.
+
+// Server-side maxLength bounds (V5), mirroring the client-side maxLength
+// attributes already enforced in web/src/pages/Checkout.tsx (T-5-15) —
+// re-validated here since the client bound is trivially bypassable (T-06-11).
+const MAX_LENGTHS = {
+  customerEmail: 254,
+  customerName: 100,
+  addressLine1: 200,
+  addressLine2: 200,
+  city: 100,
+  postalCode: 20,
+  country: 56,
+};
+
+function tooLong(value, field) {
+  return typeof value === 'string' && value.length > MAX_LENGTHS[field];
+}
+
+/**
+ * @swagger
+ * /api/orders:
+ *   post:
+ *     summary: Create a guest order (checkout)
+ *     description: |
+ *       Public, unauthenticated guest checkout. Recomputes every line price
+ *       server-side from Product.basePrice + variant.priceAdjustment (D-06 —
+ *       the client-supplied unitPrice is never trusted), snapshots
+ *       stockBefore WITHOUT deducting (D-05/D-07 — deduction happens only on
+ *       the verified paid webhook), creates a pending Order, then creates
+ *       the chosen provider's hosted session and returns a redirect URL.
+ *     tags: [Orders]
+ *     requestBody:
+ *       required: true
+ *     responses:
+ *       201:
+ *         description: Pending order created; redirect the browser to redirectUrl
+ *       400:
+ *         description: Validation error (missing fields, unknown product/variant, insufficient stock)
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/', async (req, res) => {
+  try {
+    const { customerEmail, customerName, items, shippingAddress, paymentMethod } = req.body;
+
+    if (!customerEmail || !Array.isArray(items) || items.length === 0 || !shippingAddress) {
+      return res.status(400).json({ error: 'customerEmail, items, and shippingAddress are required' });
+    }
+
+    if (!['stripe', 'paypal'].includes(paymentMethod)) {
+      return res.status(400).json({ error: 'paymentMethod must be either "stripe" or "paypal"' });
+    }
+
+    if (tooLong(customerEmail, 'customerEmail') || tooLong(customerName, 'customerName')) {
+      return res.status(400).json({ error: 'customerEmail or customerName exceeds maximum length' });
+    }
+
+    const { addressLine1, addressLine2, city, postalCode, country } = shippingAddress;
+    if (!addressLine1 || !city || !postalCode || !country) {
+      return res.status(400).json({ error: 'shippingAddress is missing required fields' });
+    }
+    if (
+      tooLong(addressLine1, 'addressLine1') ||
+      tooLong(addressLine2, 'addressLine2') ||
+      tooLong(city, 'city') ||
+      tooLong(postalCode, 'postalCode') ||
+      tooLong(country, 'country')
+    ) {
+      return res.status(400).json({ error: 'shippingAddress field exceeds maximum length' });
+    }
+
+    // Resolve each line item against the live catalog. NEVER read
+    // item.unitPrice from the client (D-06) — priceAtPurchase is always
+    // recomputed from Product.basePrice + variant.priceAdjustment.
+    const resolvedItems = [];
+    // Stripe's createCheckoutSession expects item.name for product_data.name
+    // (06-03 interface contract) — the persisted OrderItemSchema has no name
+    // field, so it's attached only on this parallel array, not on the Order.
+    const itemsForStripe = [];
+    let totalAmount = 0;
+
+    for (const item of items) {
+      const { productId, variantSku, quantity } = item;
+
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(400).json({ error: `Unknown product ${productId}` });
+      }
+
+      const variant = product.variants.find((v) => v.sku === variantSku);
+      if (!variant) {
+        return res.status(400).json({ error: `Unknown variant ${variantSku}` });
+      }
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        return res.status(400).json({ error: `Invalid quantity for ${variantSku}` });
+      }
+
+      // D-08 online guard #1 — never start payment for out-of-stock merch
+      // (the webhook's guarded $inc decrement is guard #2).
+      if (quantity > variant.stock) {
+        return res.status(400).json({ error: `Insufficient stock for ${variantSku}` });
+      }
+
+      const priceAtPurchase = product.basePrice + variant.priceAdjustment;
+      const stockBefore = variant.stock;
+
+      resolvedItems.push({
+        productId,
+        variantSku,
+        quantity,
+        priceAtPurchase,
+        stockBefore,
+        // Unchanged — deduction only happens on the paid webhook (D-07).
+        stockAfter: stockBefore,
+      });
+
+      itemsForStripe.push({ name: product.name, priceAtPurchase, quantity });
+
+      totalAmount += priceAtPurchase * quantity;
+    }
+
+    const order = await createOrderWithUniqueNumber(Order, {
+      customerEmail,
+      customerName,
+      items: resolvedItems,
+      totalAmount,
+      shippingAddress: { addressLine1, addressLine2, city, postalCode, country },
+      status: 'pending',
+      source: 'online',
+      paymentMethod,
+    });
+
+    let redirectUrl;
+    if (paymentMethod === 'stripe') {
+      const session = await createCheckoutSession({ orderNumber: order.orderNumber, items: itemsForStripe });
+      redirectUrl = session.url;
+      order.paymentIntentId = session.paymentIntentId;
+    } else {
+      const paypalOrder = await createPaypalOrder(order);
+      redirectUrl = paypalOrder.approveUrl;
+      order.paymentIntentId = paypalOrder.id;
+    }
+
+    await order.save();
+
+    return res.status(201).json({ orderNumber: order.orderNumber, redirectUrl });
+  } catch (error) {
+    console.error('Create order error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = router;
