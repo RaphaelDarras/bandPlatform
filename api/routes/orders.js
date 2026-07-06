@@ -2,6 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { createOrderWithUniqueNumber } = require('../services/orderNumber');
@@ -84,15 +85,23 @@ router.post('/', async (req, res) => {
     // Resolve each line item against the live catalog. NEVER read
     // item.unitPrice from the client (D-06) — priceAtPurchase is always
     // recomputed from Product.basePrice + variant.priceAdjustment.
+    // Each resolvedItems entry also carries `name` (Product.name at
+    // purchase time, CR-01) so it's persisted on the Order and available to
+    // both stripeClient.createCheckoutSession's product_data.name and
+    // email.js's renderItemsRows() — no separate parallel array needed.
     const resolvedItems = [];
-    // Stripe's createCheckoutSession expects item.name for product_data.name
-    // (06-03 interface contract) — the persisted OrderItemSchema has no name
-    // field, so it's attached only on this parallel array, not on the Order.
-    const itemsForStripe = [];
     let totalAmount = 0;
 
     for (const item of items) {
       const { productId, variantSku, quantity } = item;
+
+      // WR-07 — validate the shape up front so a malformed productId (e.g.
+      // not a 24-char hex ObjectId string) returns a clean 400 instead of
+      // Product.findById throwing an uncaught Mongoose CastError that falls
+      // through to the outer catch's generic 500.
+      if (!mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ error: `Invalid productId ${productId}` });
+      }
 
       const product = await Product.findById(productId);
       if (!product) {
@@ -115,19 +124,28 @@ router.post('/', async (req, res) => {
       }
 
       const priceAtPurchase = product.basePrice + variant.priceAdjustment;
+
+      // WR-08 — defensive floor: Product.variants[].priceAdjustment has no
+      // `min` constraint, so a variant configured with an adjustment more
+      // negative than basePrice would otherwise only surface as an
+      // unhandled Mongoose ValidationError (OrderItemSchema.priceAtPurchase
+      // has min: 0) at createOrderWithUniqueNumber -> outer catch -> 500.
+      if (priceAtPurchase < 0) {
+        return res.status(400).json({ error: `Invalid price for ${variantSku}` });
+      }
+
       const stockBefore = variant.stock;
 
       resolvedItems.push({
         productId,
         variantSku,
+        name: product.name,
         quantity,
         priceAtPurchase,
         stockBefore,
         // Unchanged — deduction only happens on the paid webhook (D-07).
         stockAfter: stockBefore,
       });
-
-      itemsForStripe.push({ name: product.name, priceAtPurchase, quantity });
 
       totalAmount += priceAtPurchase * quantity;
     }
@@ -143,18 +161,29 @@ router.post('/', async (req, res) => {
       paymentMethod,
     });
 
+    // WR-03 — the pending Order is already persisted above. If the
+    // provider-session step throws (Stripe/PayPal API error, network blip,
+    // amount below the provider's minimum, etc.), mark the order `failed`
+    // instead of leaving it orphaned in `pending` forever with no
+    // paymentIntentId (no session/webhook will ever reference it, and a
+    // retrying customer would otherwise pile up stale duplicates).
     let redirectUrl;
-    if (paymentMethod === 'stripe') {
-      const session = await createCheckoutSession({ orderNumber: order.orderNumber, items: itemsForStripe });
-      redirectUrl = session.url;
-      order.paymentIntentId = session.paymentIntentId;
-    } else {
-      const paypalOrder = await createPaypalOrder(order);
-      redirectUrl = paypalOrder.approveUrl;
-      order.paymentIntentId = paypalOrder.id;
-    }
+    try {
+      if (paymentMethod === 'stripe') {
+        const session = await createCheckoutSession({ orderNumber: order.orderNumber, items: resolvedItems });
+        redirectUrl = session.url;
+        order.paymentIntentId = session.paymentIntentId;
+      } else {
+        const paypalOrder = await createPaypalOrder(order);
+        redirectUrl = paypalOrder.approveUrl;
+        order.paymentIntentId = paypalOrder.id;
+      }
 
-    await order.save();
+      await order.save();
+    } catch (providerError) {
+      await Order.findByIdAndUpdate(order._id, { status: 'failed' });
+      throw providerError;
+    }
 
     return res.status(201).json({ orderNumber: order.orderNumber, redirectUrl });
   } catch (error) {

@@ -19,6 +19,7 @@ jest.mock('mongoose', () => {
 // Mock Order model
 const mockOrderModule = {
   create: jest.fn(),
+  findByIdAndUpdate: jest.fn(),
 };
 jest.mock('../models/Order', () => mockOrderModule);
 
@@ -265,6 +266,63 @@ describe('POST /api/orders', () => {
     const res = await request(app).post('/api/orders').send(validPayload());
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Internal server error' });
+  });
+
+  it('persists product name on each resolved item and forwards it to Stripe (CR-01)', async () => {
+    mockProductModule.findById.mockResolvedValue(mockProduct());
+    mockOrderModule.create.mockResolvedValue(mockOrderDoc());
+    mockStripeClient.createCheckoutSession.mockResolvedValue({
+      url: 'https://checkout.stripe.com/session123',
+      paymentIntentId: 'pi_123',
+    });
+
+    await request(app).post('/api/orders').send(validPayload());
+
+    expect(mockOrderModule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: [expect.objectContaining({ name: 'Band T-Shirt', variantSku: 'S-BLK' })],
+      })
+    );
+  });
+
+  it('returns 400 for a malformed (non-ObjectId) productId instead of a 500 (WR-07)', async () => {
+    const res = await request(app)
+      .post('/api/orders')
+      .send(
+        validPayload({
+          items: [{ productId: 'not-a-valid-object-id', variantSku: 'S-BLK', quantity: 1 }],
+        })
+      );
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid productId/i);
+    expect(mockProductModule.findById).not.toHaveBeenCalled();
+    expect(mockOrderModule.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the recomputed price would be negative (WR-08)', async () => {
+    mockProductModule.findById.mockResolvedValue(
+      mockProduct({ basePrice: 10, variants: [{ sku: 'S-BLK', stock: 10, priceAdjustment: -20 }] })
+    );
+
+    const res = await request(app).post('/api/orders').send(validPayload());
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid price/i);
+    expect(mockOrderModule.create).not.toHaveBeenCalled();
+  });
+
+  it('marks the pending order failed and returns 500 when provider session creation throws (WR-03)', async () => {
+    mockProductModule.findById.mockResolvedValue(mockProduct());
+    const pendingOrder = mockOrderDoc({ _id: 'order-abc-123' });
+    mockOrderModule.create.mockResolvedValue(pendingOrder);
+    mockStripeClient.createCheckoutSession.mockRejectedValue(new Error('Stripe API unreachable'));
+    mockOrderModule.findByIdAndUpdate.mockResolvedValue({});
+
+    const res = await request(app).post('/api/orders').send(validPayload());
+
+    expect(res.status).toBe(500);
+    expect(mockOrderModule.findByIdAndUpdate).toHaveBeenCalledWith('order-abc-123', { status: 'failed' });
   });
 });
 
