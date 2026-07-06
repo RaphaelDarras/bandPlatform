@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-07-06T21:49:46.035Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-07-06T22:00:40.630Z"
 last_activity: 2026-07-06
 progress:
   total_phases: 12
   completed_phases: 5
   total_plans: 42
-  completed_plans: 36
+  completed_plans: 37
   percent: 42
 ---
 
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 06 (payment-processing) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-07-06
 
 > Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Progress: [█████████░] 86%
 | 05 | 11 | - | - |
 | Phase 06 P01 | 30min | 3 tasks | 4 files |
 | Phase 06 P02 | 16min | 3 tasks | 5 files |
+| Phase 06 P03 | 12min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: Fixed pre-existing Jest 30 CLI flag (--testPathPattern -> --testPathPatterns) in api/package.json, blocking this plan's own test verification
 - [Phase 06-02]: createOrderWithUniqueNumber signature is (Model, data) - generic over any Mongoose model, not hardcoded to Order
 - [Phase 06-02]: Kept OrderItemSchema's existing min:0 on stockBefore/stockAfter untouched - intentional asymmetry with Sale.js per D-08
+- [Phase 06-03]: createCheckoutSession expects item.name attached by the caller since OrderItemSchema has no persisted name field yet
+- [Phase 06-03]: verifyPaypalWebhook hand-rolls an OAuth client-credentials token fetch via global fetch since paypal-server-sdk 2.4.0 exports no WebhooksController
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -257,8 +260,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-06T21:49:46.013Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-07-06T22:00:40.608Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
 Next action: Discuss Phase 6 (Payment Processing) with `/gsd:discuss-phase 6`
 
