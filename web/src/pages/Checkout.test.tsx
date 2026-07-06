@@ -1,7 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useCartStore, type CartLine } from '../lib/cartStore'
 import { Component as Checkout } from './Checkout'
+
+vi.mock('../lib/orders', () => ({
+  createOrder: vi.fn(),
+}))
+
+import { createOrder } from '../lib/orders'
 
 const shirtLine: CartLine = {
   productId: 'p1',
@@ -13,9 +19,36 @@ const shirtLine: CartLine = {
   image: 'https://example.com/shirt.jpg',
 }
 
+const originalLocation = window.location
+
 beforeEach(() => {
   useCartStore.setState({ lines: [], hasHydrated: false })
+  vi.mocked(createOrder).mockReset()
+  Object.defineProperty(window, 'location', {
+    writable: true,
+    configurable: true,
+    value: { ...originalLocation, href: '' },
+  })
 })
+
+afterEach(() => {
+  Object.defineProperty(window, 'location', {
+    writable: true,
+    configurable: true,
+    value: originalLocation,
+  })
+})
+
+function fillValidForm() {
+  fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'fan@example.com' } })
+  fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: 'Fan Name' } })
+  fireEvent.change(screen.getByLabelText(/address line 1/i), {
+    target: { value: '1 Rue Example' },
+  })
+  fireEvent.change(screen.getByLabelText(/city/i), { target: { value: 'Paris' } })
+  fireEvent.change(screen.getByLabelText(/postal code/i), { target: { value: '75001' } })
+  fireEvent.change(screen.getByLabelText(/^country$/i), { target: { value: 'France' } })
+}
 
 describe('Checkout page', () => {
   it('renders all guest-checkout fields', () => {
@@ -72,24 +105,39 @@ describe('Checkout page', () => {
     expect(screen.getByText(/city is required/i)).toBeInTheDocument()
   })
 
-  it('renders Place Order permanently disabled with the coming-soon note', () => {
+  it('renders a Stripe-card vs PayPal payment method selector, defaulting to card', () => {
+    render(<Checkout />)
+
+    const cardOption = screen.getByLabelText(/card/i)
+    const paypalOption = screen.getByLabelText(/paypal/i)
+    expect(cardOption).toBeInTheDocument()
+    expect(paypalOption).toBeInTheDocument()
+    expect(cardOption).toBeChecked()
+    expect(paypalOption).not.toBeChecked()
+
+    fireEvent.click(paypalOption)
+    expect(paypalOption).toBeChecked()
+    expect(cardOption).not.toBeChecked()
+  })
+
+  it('disables Place Order until all required fields are valid, then enables it', () => {
     render(<Checkout />)
 
     const button = screen.getByRole('button', { name: /place order/i })
     expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('type', 'button')
-    expect(button.className).toMatch(/bg-white\/20/)
-    expect(button.className).toMatch(/text-white\/40/)
-    expect(button.className).toMatch(/cursor-not-allowed/)
-    expect(screen.getByText(/online payment is coming soon/i)).toBeInTheDocument()
+    expect(button).toHaveAttribute('type', 'submit')
+
+    fillValidForm()
+
+    expect(button).toBeEnabled()
   })
 
-  it('shows the cart subtotal in the order summary', () => {
+  it('shows the cart subtotal in € in the order summary', () => {
     useCartStore.setState({ lines: [shirtLine], hasHydrated: true })
 
     render(<Checkout />)
 
-    expect(screen.getByText(/subtotal.*50 CAD/i)).toBeInTheDocument()
+    expect(screen.getByText(/subtotal.*€?50/i)).toBeInTheDocument()
   })
 
   it('the country field is free-text with a maxLength bound and no select exists', () => {
@@ -101,12 +149,64 @@ describe('Checkout page', () => {
     expect(document.querySelector('select')).toBeNull()
   })
 
-  it('has no form onSubmit / API submit path', () => {
-    render(<Checkout />)
+  it('submitting a valid form calls createOrder with the cart+form payload and redirects to the returned URL', async () => {
+    useCartStore.setState({ lines: [shirtLine], hasHydrated: true })
+    vi.mocked(createOrder).mockResolvedValue({
+      orderNumber: 'HRK-ABC123',
+      redirectUrl: 'https://checkout.example.com/session/123',
+    })
 
-    const form = document.querySelector('form') as HTMLFormElement
-    expect(form).not.toHaveAttribute('onSubmit')
-    const button = screen.getByRole('button', { name: /place order/i })
-    expect(button).toHaveAttribute('type', 'button')
+    render(<Checkout />)
+    fillValidForm()
+
+    fireEvent.click(screen.getByRole('button', { name: /place order/i }))
+
+    await waitFor(() => expect(window.location.href).toBe('https://checkout.example.com/session/123'))
+
+    expect(createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerEmail: 'fan@example.com',
+        customerName: 'Fan Name',
+        items: [{ productId: 'p1', variantSku: 'TS-M-BLK', quantity: 2 }],
+        shippingAddress: expect.objectContaining({
+          addressLine1: '1 Rue Example',
+          city: 'Paris',
+          postalCode: '75001',
+          country: 'France',
+        }),
+        paymentMethod: 'stripe',
+      }),
+    )
+  })
+
+  it('sends paymentMethod: paypal when the PayPal option is selected', async () => {
+    useCartStore.setState({ lines: [shirtLine], hasHydrated: true })
+    vi.mocked(createOrder).mockResolvedValue({
+      orderNumber: 'HRK-ABC123',
+      redirectUrl: 'https://paypal.example.com/checkout/123',
+    })
+
+    render(<Checkout />)
+    fillValidForm()
+    fireEvent.click(screen.getByLabelText(/paypal/i))
+
+    fireEvent.click(screen.getByRole('button', { name: /place order/i }))
+
+    await waitFor(() =>
+      expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ paymentMethod: 'paypal' })),
+    )
+  })
+
+  it('shows an inline error and does not redirect when createOrder rejects', async () => {
+    useCartStore.setState({ lines: [shirtLine], hasHydrated: true })
+    vi.mocked(createOrder).mockRejectedValue(new Error('Failed to create order (500)'))
+
+    render(<Checkout />)
+    fillValidForm()
+
+    fireEvent.click(screen.getByRole('button', { name: /place order/i }))
+
+    await waitFor(() => expect(screen.getByText(/failed to create order/i)).toBeInTheDocument())
+    expect(window.location.href).toBe('')
   })
 })
