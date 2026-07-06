@@ -47,8 +47,8 @@ export default function CatalogGrid({ products }: { products: Product[] }) {
             <p className="font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white">
               {product.name}
             </p>
-            {/* D-23 price format */}
-            <p className="mt-1 font-sans text-sm text-white/75">${product.basePrice} CAD</p>
+            {/* Price in EUR (D-01, resolves D-23) */}
+            <p className="mt-1 font-sans text-sm text-white/75">€{product.basePrice}</p>
           </div>
         </Link>
       ))}

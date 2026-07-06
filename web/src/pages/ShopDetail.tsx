@@ -161,8 +161,8 @@ export function Component() {
             <p className="mt-2 font-sans text-base text-white/75">{product.description}</p>
           )}
 
-          {/* Price (D-23) */}
-          <p className="mt-4 font-sans text-lg font-semibold text-white">${price} CAD</p>
+          {/* Price in EUR (D-01, resolves D-23) */}
+          <p className="mt-4 font-sans text-lg font-semibold text-white">€{price}</p>
 
           {/* Variant selector (D-16/D-18) */}
           <div className="mt-4 flex flex-wrap gap-2">

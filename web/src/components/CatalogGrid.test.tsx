@@ -22,7 +22,7 @@ function renderGrid(products: Product[]) {
 }
 
 describe('CatalogGrid — populated (SHOP-01/SHOP-07)', () => {
-  it('renders a card per product with image, name, price (CAD), and a link to the detail page', () => {
+  it('renders a card per product with image, name, price (EUR), and a link to the detail page', () => {
     const products: Product[] = [
       { ...baseProduct, id: '1', name: 'Tour Shirt' },
       { ...baseProduct, id: '2', name: 'Hoodie' },
@@ -37,7 +37,7 @@ describe('CatalogGrid — populated (SHOP-01/SHOP-07)', () => {
     expect(links[2]).toHaveAttribute('href', '/shop/3')
 
     expect(screen.getByText('Tour Shirt')).toBeInTheDocument()
-    expect(screen.getAllByText(/CAD/)).toHaveLength(3)
+    expect(screen.getAllByText(/€/)).toHaveLength(3)
 
     const imgs = container.querySelectorAll('img')
     expect(imgs).toHaveLength(3)

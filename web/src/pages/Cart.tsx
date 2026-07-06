@@ -124,7 +124,7 @@ export function Component() {
                     </p>
                     <p className="mt-1 font-sans text-sm text-white/75">{line.variantLabel}</p>
                     <p className="mt-1 font-sans text-sm text-white/75">
-                      ${line.unitPrice} CAD
+                      €{line.unitPrice}
                     </p>
 
                     {flagged ? (
@@ -163,7 +163,7 @@ export function Component() {
                           onChange={(n) => setQuantity(line.productId, line.variantSku, n)}
                         />
                         <p className="font-sans text-sm font-semibold text-white">
-                          ${line.unitPrice * line.quantity} CAD
+                          €{line.unitPrice * line.quantity}
                         </p>
                         <button
                           type="button"
@@ -186,7 +186,7 @@ export function Component() {
 
         <div className="mt-8 border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4 lg:mt-0 lg:self-start">
           <h2 className="font-display text-3xl uppercase text-white">Order Summary</h2>
-          <p className="mt-2 font-sans text-base text-white/75">Subtotal: ${subtotal} CAD</p>
+          <p className="mt-2 font-sans text-base text-white/75">Subtotal: €{subtotal}</p>
 
           {anyFlagged ? (
             <>

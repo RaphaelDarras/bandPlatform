@@ -96,7 +96,7 @@ describe('Cart page', () => {
     const shirtRow = screen.getByText('Tour Shirt').closest('li') as HTMLElement
     expect(within(shirtRow).getByText('M / Black')).toBeInTheDocument()
     expect(within(shirtRow).getByAltText('Tour Shirt')).toBeInTheDocument()
-    expect(within(shirtRow).getByText('$50 CAD')).toBeInTheDocument() // 25 * 2
+    expect(within(shirtRow).getByText('€50')).toBeInTheDocument() // 25 * 2
     expect(within(shirtRow).getByLabelText('Increase quantity')).toBeInTheDocument()
     expect(
       within(shirtRow).getByLabelText('Remove Tour Shirt from cart'),
@@ -175,6 +175,6 @@ describe('Cart page', () => {
     renderCart()
 
     // shirt: 25*2=50, hoodie: 60*1=60 -> subtotal 110
-    await waitFor(() => expect(screen.getByText(/subtotal.*110 CAD/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/subtotal.*€?110/i)).toBeInTheDocument())
   })
 })

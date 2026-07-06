@@ -52,7 +52,7 @@ describe('Shop page', () => {
     renderShop()
 
     await waitFor(() => expect(screen.getByText('Tour Shirt')).toBeInTheDocument())
-    expect(screen.getAllByText(/CAD/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/€/).length).toBeGreaterThan(0)
   })
 
   it('renders the error/retry state when the fetch rejects', async () => {
