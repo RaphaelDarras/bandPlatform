@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-07-06T22:07:14.913Z"
+stopped_at: Completed 06-07-PLAN.md
+last_updated: "2026-07-06T22:22:39.496Z"
 last_activity: 2026-07-06
 progress:
   total_phases: 12
   completed_phases: 5
   total_plans: 42
-  completed_plans: 38
+  completed_plans: 39
   percent: 42
 ---
 
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 06 (payment-processing) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-07-06
 
 > Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -85,6 +85,7 @@ Progress: [█████████░] 90%
 | Phase 06 P02 | 16min | 3 tasks | 5 files |
 | Phase 06 P03 | 12min | 3 tasks | 4 files |
 | Phase 06 P04 | 10min | 1 tasks | 2 files |
+| Phase 06 P07 | 4min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -217,6 +218,9 @@ Recent decisions affecting current work:
 - [Phase 06-03]: verifyPaypalWebhook hand-rolls an OAuth client-credentials token fetch via global fetch since paypal-server-sdk 2.4.0 exports no WebhooksController
 - [Phase 06-04]: order.items[].name attached by caller (not persisted on OrderItemSchema); email templates fall back to variantSku, matching stripeClient.js's line_items convention
 - [Phase 06-04]: sendBandNotification accepts optional { shortfall } flag so the webhook handler can surface a D-08 stock-guard-miss directly in the existing band email
+- [Phase 06-07]: orders.ts mirrors products.ts fetch-in-lib pattern (VITE_API_URL, res.ok throw, no Authorization header) for createOrder/capturePaypalOrder
+- [Phase 06-07]: Checkout.tsx allFieldsValid derived inline from validateField each render, not stored as separate state, to avoid a second source of truth
+- [Phase 06-07]: Stripe-card vs PayPal selector implemented as plain radio inputs in Checkout.tsx, no new shared component (D-03)
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -263,8 +267,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-06T22:07:14.892Z
-Stopped at: Completed 06-04-PLAN.md
+Last session: 2026-07-06T22:22:39.467Z
+Stopped at: Completed 06-07-PLAN.md
 Resume file: None
 Next action: Discuss Phase 6 (Payment Processing) with `/gsd:discuss-phase 6`
 

@@ -192,7 +192,7 @@ Plans:
 
 - [x] 06-03-PLAN.md — Stripe/PayPal client services + currency-unit helpers (SHOP-04/05, D-02)
 - [x] 06-04-PLAN.md — Resend email service: customer confirmation (VAT mention) + band notification (SHOP-06, D-13/D-17)
-- [ ] 06-07-PLAN.md — orders.ts client + Checkout activation + provider selector + € relabel (D-01/D-03)
+- [x] 06-07-PLAN.md — orders.ts client + Checkout activation + provider selector + € relabel (D-01/D-03)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -353,7 +353,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
-| 6. Payment Processing | 4/8 | In Progress|  |
+| 6. Payment Processing | 5/8 | In Progress|  |
 | 7. Shop Enhancements | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |
