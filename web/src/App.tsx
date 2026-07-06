@@ -25,6 +25,13 @@ export const routes: RouteRecord[] = [
       { path: 'shop/:id', lazy: () => import('./pages/ShopDetail') },
       { path: 'cart', lazy: () => import('./pages/Cart') },
       { path: 'checkout', lazy: () => import('./pages/Checkout') },
+      // No loader/getStaticPaths — deliberately excluded from the static
+      // prerender (D-06), same runtime-only convention as shop/:id above.
+      // These three are post-payment/return destinations that only make
+      // sense navigated to at runtime after a live checkout attempt.
+      { path: 'checkout/success', lazy: () => import('./pages/CheckoutSuccess') },
+      { path: 'checkout/cancel', lazy: () => import('./pages/CheckoutCancel') },
+      { path: 'checkout/paypal-return', lazy: () => import('./pages/PaypalReturn') },
       { path: '*', lazy: () => import('./pages/NotFound') },
     ],
   },
