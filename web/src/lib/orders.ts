@@ -29,7 +29,10 @@ export async function createOrder(payload: CreateOrderPayload): Promise<CreateOr
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  if (!res.ok) throw new Error(`Failed to create order (${res.status})`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error ?? `Failed to create order (${res.status})`)
+  }
   return res.json()
 }
 
@@ -43,6 +46,9 @@ export async function capturePaypalOrder(paypalOrderId: string): Promise<{ statu
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ paypalOrderId }),
   })
-  if (!res.ok) throw new Error(`Failed to capture PayPal order (${res.status})`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error ?? `Failed to capture PayPal order (${res.status})`)
+  }
   return res.json()
 }

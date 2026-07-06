@@ -57,6 +57,34 @@ describe('createOrder', () => {
 
     await expect(createOrder(payload)).rejects.toThrow()
   })
+
+  it('surfaces the API-provided error message body instead of a generic status string (WR-05)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'Insufficient stock for TS-M-BLK' }),
+      }),
+    )
+
+    await expect(createOrder(payload)).rejects.toThrow('Insufficient stock for TS-M-BLK')
+  })
+
+  it('falls back to a generic message when the error body cannot be parsed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => {
+          throw new Error('not json')
+        },
+      }),
+    )
+
+    await expect(createOrder(payload)).rejects.toThrow('Failed to create order (500)')
+  })
 })
 
 describe('capturePaypalOrder', () => {
@@ -88,5 +116,14 @@ describe('capturePaypalOrder', () => {
     )
 
     await expect(capturePaypalOrder('PAYPAL-ORDER-1')).rejects.toThrow()
+  })
+
+  it('surfaces the API-provided error message body instead of a generic status string (WR-05)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'Capture already used' }) }),
+    )
+
+    await expect(capturePaypalOrder('PAYPAL-ORDER-1')).rejects.toThrow('Capture already used')
   })
 })
