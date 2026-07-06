@@ -46,7 +46,6 @@ export interface Product {
 
 /**
  * Mirrors the platform API's Order item sub-schema (see api/models/Order.js).
- * Not persisted/used at runtime this phase (D-01) — present for Phase 6 forward-compat (D-07).
  */
 export interface OrderItem {
   productId: string;
@@ -56,8 +55,18 @@ export interface OrderItem {
 }
 
 /**
+ * Mirrors the platform API's shippingAddress sub-schema (see api/models/Order.js, D-04).
+ */
+export interface ShippingAddress {
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  postalCode: string;
+  country: string;
+}
+
+/**
  * Mirrors the platform API's Order model (see api/models/Order.js).
- * Not persisted/used at runtime this phase (D-01) — present for Phase 6 forward-compat (D-07).
  */
 export interface Order {
   orderNumber: string;
@@ -66,4 +75,14 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   status: 'pending' | 'paid' | 'failed' | 'shipped' | 'delivered';
+  shippingAddress: ShippingAddress;
+  paymentMethod?: 'stripe' | 'paypal';
+}
+
+/**
+ * Response shape from POST /api/orders (see api/routes/orders.js, D-02/D-05).
+ */
+export interface CreateOrderResponse {
+  orderNumber: string;
+  redirectUrl: string;
 }
