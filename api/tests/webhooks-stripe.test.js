@@ -70,6 +70,7 @@ async function createPendingOrder({ orderNumber = 'HRK-TEST01', productId, varia
       {
         productId,
         variantSku,
+        name: 'Band T-Shirt',
         quantity,
         priceAtPurchase: 20,
         stockBefore: 10,
@@ -219,5 +220,32 @@ describe('POST /api/webhooks/stripe', () => {
     expect(updatedProduct.variants[0].stock).toBe(1); // unchanged, NEVER negative
 
     expect(sendBandNotification).toHaveBeenCalledWith(expect.anything(), { shortfall: true });
+  });
+
+  it('still sends the band notification and still acks 200 when the customer email send rejects (WR-02)', async () => {
+    const product = await Product.create({
+      name: 'Band T-Shirt',
+      basePrice: 20,
+      variants: [{ sku: 'S-BLK', stock: 10 }],
+    });
+    await createPendingOrder({ productId: product._id, quantity: 2 });
+
+    sendOrderConfirmation.mockRejectedValueOnce(new Error('Resend rejected the customer address'));
+    verifyStripeEvent.mockReturnValue(stripeCheckoutEvent({ orderNumber: 'HRK-TEST01' }));
+
+    const res = await request(app)
+      .post('/api/webhooks/stripe')
+      .set('stripe-signature', 'valid')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ id: 'evt_1' }));
+
+    expect(res.status).toBe(200);
+
+    const order = await Order.findOne({ orderNumber: 'HRK-TEST01' });
+    expect(order.status).toBe('paid');
+
+    expect(sendOrderConfirmation).toHaveBeenCalledTimes(1);
+    // The band notification must still fire even though the customer email rejected.
+    expect(sendBandNotification).toHaveBeenCalledTimes(1);
   });
 });

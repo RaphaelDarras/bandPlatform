@@ -90,8 +90,21 @@ async function fulfillOrder(orderNumber, paymentIntentId) {
 
   await order.save();
 
-  await sendOrderConfirmation(order);
-  await sendBandNotification(order, { shortfall: hadShortfall });
+  // WR-02 — send independently via Promise.allSettled so a failure on one
+  // (e.g. Resend rejects the customer's address) can never suppress the
+  // other. Neither failure should reject fulfillOrder: the payment is
+  // already captured and stock already deducted, so the caller must still
+  // ack the webhook 200 -- a rejected email here is only logged for manual
+  // follow-up, never retried via a provider retry-storm.
+  const emailResults = await Promise.allSettled([
+    sendOrderConfirmation(order),
+    sendBandNotification(order, { shortfall: hadShortfall }),
+  ]);
+  for (const result of emailResults) {
+    if (result.status === 'rejected') {
+      console.error('Order fulfillment email failed:', result.reason);
+    }
+  }
 }
 
 /**

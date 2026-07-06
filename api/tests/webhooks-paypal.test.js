@@ -79,6 +79,7 @@ async function createPendingOrder({ orderNumber = 'HRK-PAY01', productId, varian
       {
         productId,
         variantSku,
+        name: 'Band T-Shirt',
         quantity,
         priceAtPurchase: 20,
         stockBefore: 10,
