@@ -17,9 +17,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Mobile POS Core** - Offline-first concert sales tool with core transaction features (completed 2026-03-14)
 - [x] **Phase 3: Mobile POS Optimization** - Battery efficiency, reconciliation, and sync reliability (completed 2026-03-18)
 - [x] **Phase 4: Showcase Website** - Band presence with bio, discography, concerts, contact (completed 2026-07-03)
-- [x] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout (completed 2026-07-05)
-- [x] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations (completed 2026-07-06)
-- [ ] **Phase 7: Shop Enhancements** - Shipping, bundles, pre-orders, and customer features
+- [x] **Phase 5: Online Shop Core** - E-commerce catalog, cart, and guest checkout (completed 2026-07-05) — ⚠ SUPERSEDED by Shopify pivot (Phase 7): self-built storefront goes dark once /shop redirects to Shopify
+- [x] **Phase 6: Payment Processing** - Stripe and PayPal integration with order confirmations (completed 2026-07-06) — ⚠ SUPERSEDED by Shopify pivot (Phase 7): Shopify owns payments; the 5-item human-UAT is now moot
+- [ ] **Phase 7: Shopify Integration** - Website shop-entry redirects to a Shopify storefront; Mongo DB ↔ Shopify bidirectional product + inventory sync
 - [ ] **Phase 8: Immutable sale line snapshots** - Snapshot product name + variant label on sale items so history survives product/variant deletion
 - [ ] **Phase 9: Concert-first selling UX** - Make concert-linked sales the default fast path from dashboard; lone sale becomes a rare fallback
 - [ ] **Phase 10: Design polish pass** - Lift mobile app visual quality from functional prototype to professional product (icon library, design tokens, typography scale, loading states)
@@ -129,6 +129,8 @@ Plans:
 
 ### Phase 5: Online Shop Core
 
+**⚠ SUPERSEDED (Shopify pivot, Phase 7)**: Shipped and complete, but the self-built catalog/cart/guest-checkout is replaced by a redirect to the Shopify storefront. Code remains in the repo but goes dark once /shop redirects out.
+
 **Goal**: Customers can browse products and purchase merchandise online with guest checkout
 **Depends on**: Phase 4
 **Requirements**: SHOP-01, SHOP-02, SHOP-03, SHOP-07, SHOP-08, SHOP-11, SHOP-13
@@ -169,6 +171,8 @@ Plans:
 
 ### Phase 6: Payment Processing
 
+**⚠ SUPERSEDED (Shopify pivot, Phase 7)**: Shipped and complete, but self-built Stripe/PayPal checkout is replaced by Shopify's payments once /shop redirects to Shopify. Code remains in the repo but goes dark. The 5-item human-UAT in `06-VERIFICATION.md` / `06-HUMAN-UAT.md` is now moot — close it as "superseded" rather than running the live payment tests.
+
 **Goal**: Customers can pay securely via Stripe or PayPal and receive automated order confirmations
 **Depends on**: Phase 5
 **Requirements**: SHOP-04, SHOP-05, SHOP-06, AUTH-03
@@ -203,29 +207,24 @@ Plans:
 
 - [x] 06-06-PLAN.md — Webhooks (raw-body mount, signature verify, atomic idempotent paid + stock $inc + emails) + go-live checklist (AUTH-03, D-07/D-08/D-09/D-10/D-19)
 
-### Phase 06.1: Admin panel: gated login moved to /admin, with /stock, /orders (sorted by sent/to-be-sent), and /products CRUD (INSERTED)
+### Phase 7: Shopify Integration
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
-**Depends on:** Phase 6
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
-
-### Phase 7: Shop Enhancements
-
-**Goal**: Online shop provides complete e-commerce experience with shipping, bundles, and pre-orders
-**Depends on**: Phase 6
-**Requirements**: SHOP-09, SHOP-10, SHOP-12, SHOP-14, SHOP-15, SHOP-16
+**Goal**: The band keeps its own website, but the shop entry redirects to a Shopify storefront, and the existing Mongo DB is linked to Shopify via bidirectional product + inventory sync so the mobile POS (Mongo) and the Shopify storefront never oversell or drift.
+**Depends on**: Phase 4 (Showcase Website — the "Shop" entry point) and Phase 1 (Foundation & Inventory Core — the Mongo product/inventory model that syncs to Shopify)
+**Requirements**: SHOP-17, SHOP-18, SHOP-19 (new — redirect + bidirectional sync + conflict resolution; refine during discuss/plan). Supersedes the dropped self-built enhancement requirements SHOP-09/10/12/14/15/16, which Shopify provides natively.
 **Success Criteria** (what must be TRUE):
 
-  1. Customer sees shipping cost calculated during checkout
-  2. Customer can track order status (pending / shipped / delivered)
-  3. Customer can search products by name or description
-  4. Customer can access return and refund policy page
-  5. Customer can purchase product bundles at combo pricing (album + shirt)
-  6. Customer can pre-order products before stock arrives
+  1. The website "Shop" entry redirects visitors to the Shopify storefront (no self-built catalog/checkout in the redirect path).
+  2. A product created or updated in Mongo appears in Shopify, and a product created or updated in Shopify appears in Mongo.
+  3. An inventory change in either system (a POS sale in Mongo, a storefront sale in Shopify) propagates to the other without overselling the shared stock.
+  4. Conflict-resolution rules for simultaneous/divergent updates are defined and documented (which system wins per field, how races are reconciled).
+  5. The mobile POS continues to write stock to Mongo with no regression to the offline-first sale/sync flow.
+
+**Notes**:
+
+- This phase replaces the former "Shop Enhancements" phase. Shipping, order tracking, product search, returns/refund policy, bundles, and pre-orders (old SHOP-09/10/12/14/15/16) are now delivered by Shopify rather than built in-house.
+- Phases 5 (Online Shop Core) and 6 (Payment Processing) are superseded once the shop entry redirects to Shopify — their code remains in the repo but goes dark. Discuss-phase should decide whether to retire that code or leave it dormant.
+- Sync direction is **bidirectional** (Shopify inventory sync + webhooks), per the pivot decision.
 
 **Plans**: TBD
 
@@ -352,9 +351,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Mobile POS Core | 9/9 | Complete   | 2026-03-19 |
 | 3. Mobile POS Optimization | 3/3 | Complete   | 2026-03-18 |
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
-| 5. Online Shop Core | 11/11 | Complete   | 2026-07-05 |
-| 6. Payment Processing | 8/8 | Complete   | 2026-07-06 |
-| 7. Shop Enhancements | 0/TBD | Not started | - |
+| 5. Online Shop Core | 11/11 | Complete (superseded by Shopify pivot) | 2026-07-05 |
+| 6. Payment Processing | 8/8 | Complete (superseded by Shopify pivot) | 2026-07-06 |
+| 7. Shopify Integration | 0/TBD | Not started | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |
 | 10. Design polish pass | 0/TBD | Not started | - |
@@ -363,3 +362,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 ---
 *Created: 2026-02-13*
 *Last updated: 2026-04-19 — Phase 11 added (multi-tenant band-agnostic platform; scope may warrant promotion to milestone)*
+*Last updated: 2026-07-07 — Shopify pivot: removed Phase 06.1 (Admin panel) and the old Phase 7 (Shop Enhancements); repurposed Phase 7 as "Shopify Integration" (redirect + bidirectional Mongo↔Shopify sync); annotated Phases 5 & 6 as superseded.*

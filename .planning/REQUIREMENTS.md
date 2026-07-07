@@ -32,14 +32,20 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SHOP-06**: Customer receives order confirmation email after purchase
 - [x] **SHOP-07**: Site is mobile-responsive and works on all devices
 - [x] **SHOP-08**: Customer can select product variants (size, color)
-- [ ] **SHOP-09**: Customer sees shipping cost calculated during checkout
-- [ ] **SHOP-10**: Customer can track order status (pending/shipped/delivered)
+- [~] **SHOP-09**: ~~Customer sees shipping cost calculated during checkout~~ — DROPPED (Shopify pivot 2026-07-07): provided natively by Shopify checkout
+- [~] **SHOP-10**: ~~Customer can track order status (pending/shipped/delivered)~~ — DROPPED (Shopify pivot 2026-07-07): provided natively by Shopify
 - [x] **SHOP-11**: Site uses SSL/HTTPS encryption
-- [ ] **SHOP-12**: Customer can search products by name or description
+- [~] **SHOP-12**: ~~Customer can search products by name or description~~ — DROPPED (Shopify pivot 2026-07-07): provided natively by Shopify storefront
 - [x] **SHOP-13**: Customer sees stock availability (in stock/low stock/out of stock)
-- [ ] **SHOP-14**: Customer can access return/refund policy page
-- [ ] **SHOP-15**: Customer can purchase product bundles (combo pricing)
-- [ ] **SHOP-16**: Customer can pre-order products before stock arrives
+- [~] **SHOP-14**: ~~Customer can access return/refund policy page~~ — DROPPED (Shopify pivot 2026-07-07): handled in Shopify storefront
+- [~] **SHOP-15**: ~~Customer can purchase product bundles (combo pricing)~~ — DROPPED (Shopify pivot 2026-07-07): use Shopify apps/discounts
+- [~] **SHOP-16**: ~~Customer can pre-order products before stock arrives~~ — DROPPED (Shopify pivot 2026-07-07): use Shopify pre-order apps
+
+> **Shopify pivot (2026-07-07):** The band keeps its own website but the shop entry redirects to a Shopify storefront rather than a self-built shop. SHOP-01–08/11/13 (Phase 5) and SHOP-04/05/06 (Phase 6) were delivered but are **superseded** — the self-built catalog/cart/checkout/payments go dark once /shop redirects to Shopify. SHOP-09/10/12/14/15/16 are dropped because Shopify provides them natively. New Phase 7 ("Shopify Integration") requirements — redirect + bidirectional Mongo↔Shopify product/inventory sync with conflict resolution — are defined during discuss/plan (see SHOP-17..SHOP-19 placeholders below).
+
+- [ ] **SHOP-17** *(new, Phase 7)*: Website "Shop" entry redirects visitors to the Shopify storefront
+- [ ] **SHOP-18** *(new, Phase 7)*: Products and inventory sync bidirectionally between Mongo DB and Shopify without overselling shared stock
+- [ ] **SHOP-19** *(new, Phase 7)*: Conflict-resolution rules for divergent Mongo/Shopify updates are defined and documented; mobile POS continues writing to Mongo with no regression
 
 ### Inventory Management
 
@@ -131,22 +137,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-08 | Phase 5 | Complete |
 | SHOP-11 | Phase 5 | Complete |
 | SHOP-13 | Phase 5 | Complete |
-| SHOP-04 | Phase 6 | Complete |
-| SHOP-05 | Phase 6 | Complete |
-| SHOP-06 | Phase 6 | Complete |
-| AUTH-03 | Phase 6 | Complete |
-| SHOP-09 | Phase 7 | Pending |
-| SHOP-10 | Phase 7 | Pending |
-| SHOP-12 | Phase 7 | Pending |
-| SHOP-14 | Phase 7 | Pending |
-| SHOP-15 | Phase 7 | Pending |
-| SHOP-16 | Phase 7 | Pending |
+| SHOP-04 | Phase 6 | Complete (superseded by Shopify) |
+| SHOP-05 | Phase 6 | Complete (superseded by Shopify) |
+| SHOP-06 | Phase 6 | Complete (superseded by Shopify) |
+| AUTH-03 | Phase 6 | Complete (superseded by Shopify) |
+| SHOP-09 | — | Dropped (Shopify pivot) |
+| SHOP-10 | — | Dropped (Shopify pivot) |
+| SHOP-12 | — | Dropped (Shopify pivot) |
+| SHOP-14 | — | Dropped (Shopify pivot) |
+| SHOP-15 | — | Dropped (Shopify pivot) |
+| SHOP-16 | — | Dropped (Shopify pivot) |
+| SHOP-17 | Phase 7 | Pending |
+| SHOP-18 | Phase 7 | Pending |
+| SHOP-19 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 38 total
-- Mapped to phases: 38 (100%)
+- v1 requirements: 35 active (32 delivered + 3 new for Phase 7); 6 dropped in the Shopify pivot (SHOP-09/10/12/14/15/16)
+- Mapped to phases: 35 (100% of active)
 - Unmapped: 0
+- Note: SHOP-04/05/06 (payments) and the Phase 5 shop requirements were delivered but are superseded going forward by the Shopify storefront.
 
 ---
 *Requirements defined: 2026-02-13*
 *Last updated: 2026-02-13 after roadmap creation with traceability mappings*
+*Last updated: 2026-07-07 — Shopify pivot: dropped SHOP-09/10/12/14/15/16 (Shopify-native); added SHOP-17/18/19 for Phase 7 Shopify Integration; annotated SHOP-04/05/06 + Phase 5 shop requirements as superseded.*

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
+status: planning
 stopped_at: Completed 06-06-PLAN.md
-last_updated: "2026-07-06T23:01:25.976Z"
+last_updated: "2026-07-07T20:36:35.932Z"
 last_activity: 2026-07-06
 progress:
-  total_phases: 12
+  total_phases: 11
   completed_phases: 6
   total_plans: 42
   completed_plans: 42
-  percent: 50
+  percent: 55
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Band members can record merchandise sales at concerts quickly and reliably, with stock automatically synchronized across online and physical sales channels, preventing overselling and lost revenue.
-**Current focus:** Phase 06 — payment-processing
+**Current focus:** Phase 06.1 — admin panel gated login moved to admin with stock orders sor
 
 ## Current Position
 
-Phase: 06 (payment-processing) — EXECUTING
-Plan: 8 of 8
-Status: Phase complete — ready for verification
+Phase: 06.1
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-06
 
 > Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
@@ -38,7 +38,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 18
+- Total plans completed: 26
 - Average duration: 2 minutes
 - Total execution time: 0.07 hours
 
@@ -89,6 +89,7 @@ Progress: [██████████] 100%
 | Phase 06 P05 | 14min | 2 tasks | 2 files |
 | Phase 06 P08 | 6min | 3 tasks | 5 files |
 | Phase 06 P06 | 5min | 3 tasks | 5 files |
+| 06 | 8 | - | - |
 
 ## Accumulated Context
 
@@ -99,6 +100,7 @@ Progress: [██████████] 100%
 - 2026-04-19: Phase 10 added: Design polish pass (lift mobile app from functional prototype to professional product). Driven by user observation that emoji icons, hardcoded hex colors, ad-hoc font sizes, and minimal interaction feedback make the app feel unfinished. Open design questions parked for discuss-phase: icon library choice, design tokens structure, typography scale shape, scope (all screens vs. dashboard+selling first), and dark-mode audit depth. Should be sequenced AFTER Phase 9 so the final dashboard layout is what gets polished.
 - 2026-04-19: Phase 11 added: Multi-tenant band-agnostic platform (convert single-tenant Hurakan product into a platform any band can sign up for). Driven by user intent to make the platform available to other bands. ⚠ Scope almost certainly milestone-sized (touches DB schema, API auth, mobile app, upcoming e-shop, provisioning, domain routing, possibly billing) — discuss-phase should either aggressively cut scope or promote to v2.0 milestone. Critical open question: retrofit multi-tenancy after Phase 7 online-shop work ships, OR block Phases 4-7 and build them multi-tenant from day one (likely cheaper long-term but delays first online-shop value).
 - Phase 06.1 inserted after Phase 6: Admin panel. The Stock page is currently gated behind a login; KEEP that login but move it to /admin. The /admin page gives access to: /stock (existing stock page), a new /orders page listing all orders sorted by 'sent' vs 'to-be-sent' status, and a new /products page for full product CRUD (D-25 admin-UI gap from Phase 5). Sequenced after Phase 6 because /orders needs persisted orders that only exist once checkout/payment (Phase 6) writes Order records. (URGENT)
+- Phase 7 edited: Shopify pivot: Phase 7 repurposed from Shop Enhancements to Shopify Integration (website shop-entry redirect + bidirectional Mongo<->Shopify product/inventory sync). Removed Phase 06.1 (Admin panel) and old Phase 7 scope. Phases 5 & 6 superseded.
 
 ### Decisions
 
