@@ -27,7 +27,20 @@
 
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy singleton (mirrors stripeClient.js / paypalClient.js): `new Resend()`
+// throws ("Missing API key") when RESEND_API_KEY is unset, which would crash
+// the entire api at boot (index.js → webhooks route → this file). Defer
+// construction to first use so the server boots and only the email send path
+// errors cleanly until the key is configured.
+let _resend;
+function getResend() {
+  if (!_resend) {
+    // `new Resend()` throws ("Missing API key") without RESEND_API_KEY, so this
+    // is only reached on the actual send path — never at module load.
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 const FROM_ADDRESS = 'Hurakan <noreply@hurakanband.fr>';
 
@@ -112,7 +125,7 @@ function renderBandNotificationEmail(order, { shortfall } = {}) {
  * @returns {Promise<*>} resend.emails.send() result.
  */
 async function sendOrderConfirmation(order) {
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_ADDRESS,
     to: [order.customerEmail],
     subject: `Order confirmed — ${order.orderNumber}`,
@@ -129,7 +142,7 @@ async function sendOrderConfirmation(order) {
  * @returns {Promise<*>} resend.emails.send() result.
  */
 async function sendBandNotification(order, options = {}) {
-  return resend.emails.send({
+  return getResend().emails.send({
     from: FROM_ADDRESS,
     to: [process.env.BAND_NOTIFICATION_EMAIL],
     subject: `New paid order — ${order.orderNumber} — ship to ${order.shippingAddress?.city ?? ''}`,

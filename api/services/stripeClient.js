@@ -8,8 +8,26 @@
  * source of truth).
  */
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const Stripe = require('stripe');
 const { toStripeMinorUnits } = require('./amounts');
+
+// Lazy singleton: the Stripe SDK throws ("Neither apiKey nor
+// config.authenticator provided") the instant it is constructed without a
+// key. Constructing at module load would crash the ENTIRE api at boot
+// (index.js requires the orders + webhooks routes, which require this file)
+// whenever STRIPE_SECRET_KEY is unset — taking down every unrelated route and
+// failing the deploy. Defer construction to first use so the server boots and
+// only the checkout path errors cleanly until the key is configured.
+let _stripe;
+function getStripe() {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    _stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return _stripe;
+}
 
 /**
  * Creates a hosted Stripe Checkout Session for a pending Order.
@@ -22,7 +40,7 @@ const { toStripeMinorUnits } = require('./amounts');
  * @returns {Promise<{ url: string, paymentIntentId: string }>}
  */
 async function createCheckoutSession(order) {
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: 'payment',
     payment_method_types: ['card'],
     line_items: order.items.map((item) => ({
@@ -52,7 +70,7 @@ async function createCheckoutSession(order) {
  * @returns {import('stripe').Stripe.Event}
  */
 function verifyStripeEvent(rawBody, signatureHeader) {
-  return stripe.webhooks.constructEvent(rawBody, signatureHeader, process.env.STRIPE_WEBHOOK_SECRET);
+  return getStripe().webhooks.constructEvent(rawBody, signatureHeader, process.env.STRIPE_WEBHOOK_SECRET);
 }
 
 module.exports = { createCheckoutSession, verifyStripeEvent };

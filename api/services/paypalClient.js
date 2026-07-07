@@ -18,15 +18,23 @@
 const { Client, Environment, CheckoutPaymentIntent, OrdersController } = require('@paypal/paypal-server-sdk');
 const { toPaypalAmountString } = require('./amounts');
 
-const client = new Client({
-  clientCredentialsAuthCredentials: {
-    oAuthClientId: process.env.PAYPAL_CLIENT_ID,
-    oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET,
-  },
-  environment: process.env.PAYPAL_ENV === 'live' ? Environment.Production : Environment.Sandbox,
-});
-
-const ordersController = new OrdersController(client);
+// Lazy singleton (mirrors stripeClient.js): defer client construction to first
+// use so a missing PAYPAL_CLIENT_ID/SECRET never crashes the api at boot. Only
+// the PayPal checkout/capture path errors cleanly until credentials exist.
+let _ordersController;
+function getOrdersController() {
+  if (!_ordersController) {
+    const client = new Client({
+      clientCredentialsAuthCredentials: {
+        oAuthClientId: process.env.PAYPAL_CLIENT_ID,
+        oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET,
+      },
+      environment: process.env.PAYPAL_ENV === 'live' ? Environment.Production : Environment.Sandbox,
+    });
+    _ordersController = new OrdersController(client);
+  }
+  return _ordersController;
+}
 
 const PAYPAL_API_BASE =
   process.env.PAYPAL_ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
@@ -42,7 +50,7 @@ const PAYPAL_API_BASE =
  * @returns {Promise<{ id: string, approveUrl: string }>}
  */
 async function createPaypalOrder(order) {
-  const { result } = await ordersController.createOrder({
+  const { result } = await getOrdersController().createOrder({
     body: {
       intent: CheckoutPaymentIntent.Capture,
       purchaseUnits: [
@@ -78,7 +86,7 @@ async function createPaypalOrder(order) {
  * @returns {Promise<object>} the capture result (status COMPLETED on success).
  */
 async function capturePaypalOrder(paypalOrderId) {
-  const { result } = await ordersController.captureOrder({ id: paypalOrderId });
+  const { result } = await getOrdersController().captureOrder({ id: paypalOrderId });
   return result;
 }
 
