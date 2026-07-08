@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { NavLink, Link } from 'react-router-dom'
-import { useCartStore } from '../lib/cartStore'
+import { NavLink } from 'react-router-dom'
 
 // Main navigation is Home / Discography / Concerts / Shop (D-20/D-24). About
 // and Contact live in the footer. Desktop shows the full nav inline; mobile
 // uses a hamburger toggle (D-27). Toggle button is a 44x44 tap target
-// (UI-SPEC). A persistent cart icon + item-count badge (D-21) sits outside
-// the md:hidden hamburger gate so it shows on desktop AND mobile.
+// (UI-SPEC).
 
 // The Shop lives on a separate Shopify storefront, so it opens in a new tab
 // via an external href rather than an in-app route.
@@ -19,9 +17,6 @@ const NAV_LINKS = [
 
 export default function Header() {
   const [open, setOpen] = useState(false)
-  const itemCount = useCartStore((state) =>
-    state.lines.reduce((sum, l) => sum + l.quantity, 0),
-  )
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     [
@@ -66,31 +61,6 @@ export default function Header() {
         </ul>
 
         <div className="flex items-center">
-          {/* Persistent cart icon (D-21) — visible on desktop AND mobile,
-              not gated behind the hamburger. */}
-          <Link
-            to="/cart"
-            aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
-            className="relative flex h-11 w-11 items-center justify-center text-white"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M4 7h2l1.5 10.5A2 2 0 0 0 9.48 19h7.04a2 2 0 0 0 1.98-1.5L20 9H6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="9.5" cy="21.5" r="1" fill="currentColor" />
-              <circle cx="17.5" cy="21.5" r="1" fill="currentColor" />
-            </svg>
-            {itemCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--color-accent)] px-1 font-sans text-[11px] font-semibold text-black">
-                {itemCount}
-              </span>
-            )}
-          </Link>
-
           {/* Mobile hamburger toggle (44x44 tap target) */}
           <button
             type="button"

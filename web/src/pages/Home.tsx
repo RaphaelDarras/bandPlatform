@@ -5,8 +5,8 @@ import { releases } from '../data/releases'
 
 // Landing hub (D-25): hero wordmark + next-concert teaser + release teaser +
 // merch teaser (Phase 5, D-20 — extends D-25's original "no merch teaser"
-// scope now that /shop exists). All Bandsintown text renders as escaped
-// React text (T-04-xss).
+// scope; the teaser now links out to the Shopify storefront). All Bandsintown
+// text renders as escaped React text (T-04-xss).
 export function Component() {
   const { events } = (useLoaderData() as { events?: BitEvent[] }) ?? {}
   const next = nextEvent(events ?? [])
@@ -58,12 +58,14 @@ export function Component() {
         <p className="mt-2 font-sans text-base text-white/75">
           Grab official Hurakan merch — apparel and more from the online shop.
         </p>
-        <Link
-          to="/shop"
+        <a
+          href="https://shop.hurakanband.fr/"
+          target="_blank"
+          rel="noopener noreferrer"
           className="mt-4 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
         >
           Shop Now
-        </Link>
+        </a>
       </section>
 
       {highlightedRelease && (

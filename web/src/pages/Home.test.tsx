@@ -57,7 +57,7 @@ describe('Home page', () => {
     expect(concertsLink).toHaveAttribute('href', '/concerts')
   })
 
-  it('renders a "Shop Merch" teaser section with a "Shop Now" link to /shop', () => {
+  it('renders a "Shop Merch" teaser whose "Shop Now" link opens the Shopify storefront in a new tab', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     render(
@@ -68,7 +68,9 @@ describe('Home page', () => {
 
     expect(screen.getByText('Shop Merch')).toBeInTheDocument()
     const shopNow = screen.getByRole('link', { name: /shop now/i })
-    expect(shopNow).toHaveAttribute('href', '/shop')
+    expect(shopNow).toHaveAttribute('href', 'https://shop.hurakanband.fr/')
+    expect(shopNow).toHaveAttribute('target', '_blank')
+    expect(shopNow).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
 
   it('renders a "Get Tickets" link for the next event when offers exist, app_id stripped', () => {
