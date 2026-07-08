@@ -8,11 +8,13 @@ import { useCartStore } from '../lib/cartStore'
 // (UI-SPEC). A persistent cart icon + item-count badge (D-21) sits outside
 // the md:hidden hamburger gate so it shows on desktop AND mobile.
 
+// The Shop lives on a separate Shopify storefront, so it opens in a new tab
+// via an external href rather than an in-app route.
 const NAV_LINKS = [
   { to: '/', label: 'Home', end: true },
   { to: '/discography', label: 'Discography', end: false },
   { to: '/concerts', label: 'Concerts', end: false },
-  { to: '/shop', label: 'Shop', end: false },
+  { href: 'https://shop.hurakanband.fr/', label: 'Shop' },
 ]
 
 export default function Header() {
@@ -44,10 +46,21 @@ export default function Header() {
         {/* Desktop nav */}
         <ul className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((l) => (
-            <li key={l.to}>
-              <NavLink to={l.to} end={l.end} className={linkClass}>
-                {l.label}
-              </NavLink>
+            <li key={l.label}>
+              {'href' in l ? (
+                <a
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={linkClass({ isActive: false })}
+                >
+                  {l.label}
+                </a>
+              ) : (
+                <NavLink to={l.to} end={l.end} className={linkClass}>
+                  {l.label}
+                </NavLink>
+              )}
             </li>
           ))}
         </ul>
@@ -102,23 +115,37 @@ export default function Header() {
       {/* Mobile menu panel */}
       {open && (
         <ul className="flex flex-col gap-1 border-t border-[var(--color-hairline)] px-4 py-2 md:hidden">
-          {NAV_LINKS.map((l) => (
-            <li key={l.to}>
-              <NavLink
-                to={l.to}
-                end={l.end}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  [
-                    'flex min-h-11 items-center font-sans text-sm font-semibold uppercase tracking-[0.06em]',
-                    isActive ? 'text-[var(--color-accent)]' : 'text-white/75',
-                  ].join(' ')
-                }
-              >
-                {l.label}
-              </NavLink>
-            </li>
-          ))}
+          {NAV_LINKS.map((l) => {
+            const mobileClass = (isActive: boolean) =>
+              [
+                'flex min-h-11 items-center font-sans text-sm font-semibold uppercase tracking-[0.06em]',
+                isActive ? 'text-[var(--color-accent)]' : 'text-white/75',
+              ].join(' ')
+            return (
+              <li key={l.label}>
+                {'href' in l ? (
+                  <a
+                    href={l.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
+                    className={mobileClass(false)}
+                  >
+                    {l.label}
+                  </a>
+                ) : (
+                  <NavLink
+                    to={l.to}
+                    end={l.end}
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) => mobileClass(isActive)}
+                  >
+                    {l.label}
+                  </NavLink>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </header>

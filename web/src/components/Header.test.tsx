@@ -33,7 +33,7 @@ function mockCartLines(quantities: number[]) {
 }
 
 describe('Header', () => {
-  it('renders the Shop nav link', () => {
+  it('renders the Shop nav link to the external Shopify storefront in a new tab', () => {
     mockCartLines([])
 
     render(
@@ -43,7 +43,12 @@ describe('Header', () => {
     )
 
     const shopLinks = screen.getAllByRole('link', { name: /shop/i })
-    expect(shopLinks.some((l) => l.getAttribute('href') === '/shop')).toBe(true)
+    const external = shopLinks.find(
+      (l) => l.getAttribute('href') === 'https://shop.hurakanband.fr/',
+    )
+    expect(external).toBeDefined()
+    expect(external).toHaveAttribute('target', '_blank')
+    expect(external).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
 
   it('renders a persistent cart link to /cart', () => {
