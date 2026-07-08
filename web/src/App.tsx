@@ -16,22 +16,15 @@ export const routes: RouteRecord[] = [
       { path: 'concerts', lazy: () => import('./pages/Concerts'), loader: eventsLoader },
       { path: 'about', lazy: () => import('./pages/About') },
       { path: 'contact', lazy: () => import('./pages/Contact') },
+      // No loader/getStaticPaths — deliberately kept from baking live data
+      // into the static prerender (D-06). Stock is live data and must never
+      // be baked into static HTML; the shell prerenders and hydrates at runtime.
       { path: 'stock', lazy: () => import('./pages/Stock') },
-      { path: 'shop', lazy: () => import('./pages/Shop') },
-      // No loader/getStaticPaths — deliberately excluded from the static
-      // prerender (D-06). Stock is live data and must never be baked into
-      // static HTML; direct-link/refresh is served via the vercel.json
-      // scoped rewrite instead.
-      { path: 'shop/:id', lazy: () => import('./pages/ShopDetail') },
-      { path: 'cart', lazy: () => import('./pages/Cart') },
-      { path: 'checkout', lazy: () => import('./pages/Checkout') },
-      // No loader/getStaticPaths — deliberately excluded from the static
-      // prerender (D-06), same runtime-only convention as shop/:id above.
-      // These three are post-payment/return destinations that only make
-      // sense navigated to at runtime after a live checkout attempt.
-      { path: 'checkout/success', lazy: () => import('./pages/CheckoutSuccess') },
-      { path: 'checkout/cancel', lazy: () => import('./pages/CheckoutCancel') },
-      { path: 'checkout/paypal-return', lazy: () => import('./pages/PaypalReturn') },
+      // The storefront moved to Shopify (shop.hurakanband.fr). The former
+      // in-app commerce routes (/shop, /shop/:id, /cart, /checkout and its
+      // success/cancel/paypal-return pages) are intentionally unmounted; their
+      // page components remain in the tree but are now unreferenced dead code,
+      // along with the /shop/(.*) vercel rewrite that used to front them.
       { path: '*', lazy: () => import('./pages/NotFound') },
     ],
   },
