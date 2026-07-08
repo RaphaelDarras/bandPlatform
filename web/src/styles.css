@@ -9,8 +9,12 @@
   /* Color roles (UI-SPEC) */
   --color-bg: #000000;                    /* Dominant 60% — page background */
   --color-surface: #141414;               /* Secondary 30% — nav/footer/cards */
-  --color-accent: #ffffff;                /* Accent 10% — CTA, active states, hero headline */
+  --color-accent: #c8bc86;                /* Accent 10% — CTA, active states, hero headline */
   --color-hairline: rgba(255, 255, 255, 0.08); /* 1px card border on black */
+
+  /* Text color: what was white is now gold (C8BC86). Overriding Tailwind's
+     --color-white recolors every text-white / text-white/N utility at once. */
+  --color-white: #c8bc86;
 
   /* Typography */
   --font-display: "Bebas Neue", "Oswald", sans-serif; /* headings / wordmark */
@@ -21,7 +25,7 @@
 html,
 body {
   background-color: var(--color-bg);
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(200, 188, 134, 0.75); /* C8BC86 @ 75% — was white */
   font-family: var(--font-sans);
 }
 
