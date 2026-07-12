@@ -35,6 +35,16 @@ export function Component() {
             </li>
             <li>
               <a
+                href="https://www.tiktok.com/@hurakanband"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                TikTok
+              </a>
+            </li>
+            <li>
+              <a
                 href="https://open.spotify.com/artist/5w35Gt5153qhoSwR4MVtEU"
                 target="_blank"
                 rel="noopener noreferrer"

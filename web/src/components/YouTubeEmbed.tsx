@@ -6,7 +6,7 @@ export default function YouTubeEmbed({ videoId }: { videoId: string }) {
       src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0`}
       width="560"
       height="315"
-      className="mx-auto aspect-video h-auto w-[60%]"
+      className="aspect-video h-auto w-[60%]"
       frameBorder={0}
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen

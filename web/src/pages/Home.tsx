@@ -16,7 +16,12 @@ export function Component() {
   return (
     <div className="flex flex-col gap-12">
       <section className="text-center">
-        <img src="/images/BANDCAMP.jpg" alt="Hurakan" className="w-full" />
+        <picture>
+          {/* Wide Bandcamp banner on tablet/desktop; the less-extreme FB banner
+              on phones so the hero isn't a thin sliver (< 640px). */}
+          <source media="(min-width: 640px)" srcSet="/images/BANDCAMP.jpg" />
+          <img src="/images/FB.jpg" alt="Hurakan" className="w-full" />
+        </picture>
         <Link
           to="/listen"
           className="mt-6 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
