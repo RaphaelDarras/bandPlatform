@@ -83,13 +83,13 @@ None.
 
 ## User Setup Required
 
-**Manual action required — cannot be automated from this repo:**
+**Manual action — COMPLETED 2026-07-06 (confirmed by user during Phase 5 secure-phase):**
 
-- [ ] Log into the Render dashboard → `hurakan-band-platform` service → Environment
-- [ ] Delete the `META_PIXEL_ID`, `META_CAPI_ACCESS_TOKEN`, and `META_CAPI_TEST_EVENT_CODE` environment variables
-- [ ] Verify the service redeploys/restarts cleanly with those vars removed (the app never referenced them outside the now-deleted `capi.js`, so no functional impact is expected)
+- [x] Log into the Render dashboard → `hurakan-band-platform` service → Environment
+- [x] Delete the `META_PIXEL_ID` and `META_CAPI_ACCESS_TOKEN` environment variables (the third, `META_CAPI_TEST_EVENT_CODE`, was never present in the live env — nothing to delete)
+- [x] Verify the service redeploys/restarts cleanly with those vars removed (the app never referenced them outside the now-deleted `capi.js`, so no functional impact)
 
-This closes threat T-5-03 (stale ad-tracking credential in the live Render env store) once completed. The repo-side mitigation (removing `META_*` from `api/.env.example` and deleting the route that consumed them) is already committed.
+This **closes threat T-5-03** (stale ad-tracking credential in the live Render env store). The repo-side mitigation (removing `META_*` from `api/.env.example` and deleting the route that consumed them) is committed; the Render-side deletion is now done.
 
 ## Next Phase Readiness
 - D-27 cleanup fully closed on the repo side; only the external Render dashboard step remains (tracked above, not blocking further Phase 5 work)

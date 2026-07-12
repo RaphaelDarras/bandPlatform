@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Completed 06-06-PLAN.md
-last_updated: "2026-07-07T20:36:35.932Z"
-last_activity: 2026-07-06
+status: Phase 7 planned (10 plans, verified) — ready to execute
+stopped_at: Phase 7 planned and plan-checker verified
+last_updated: "2026-07-09T21:06:02.000Z"
+last_activity: 2026-07-09
 progress:
   total_phases: 11
   completed_phases: 6
-  total_plans: 42
+  total_plans: 52
   completed_plans: 42
   percent: 55
 ---
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Band members can record merchandise sales at concerts quickly and reliably, with stock automatically synchronized across online and physical sales channels, preventing overselling and lost revenue.
-**Current focus:** Phase 06.1 — admin panel gated login moved to admin with stock orders sor
+**Current focus:** Phase 7 — Shopify Integration (website /shop redirects to Shopify storefront + bidirectional Mongo↔Shopify product/inventory sync)
 
 ## Current Position
 
-Phase: 06.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-06
+Phase: 7
+Plan: 10 plans written (07-01…07-10), plan-checker VERIFICATION PASSED (2026-07-09)
+Status: Planned — ready to execute
+Last activity: 2026-07-09
 
-> Note: Phase 06.1 (Admin panel) is inserted AFTER Phase 6 — it needs the Order records that Phase 6's checkout/payment writes. Sequence: 6 → 06.1 → 7.
+> Note: Shopify pivot (commit b63a205) removed the former Phase 06.1 (Admin panel) and repurposed the old Phase 7 (Shop Enhancements) into "Shopify Integration". Phases 5 (Online Shop Core) and 6 (Payment Processing) shipped fully but are SUPERSEDED — their self-built catalog/checkout/payment code goes dark once /shop redirects to Shopify. The 5-item human-UAT in 06-HUMAN-UAT.md is now moot (close as "superseded").
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 55% (6/11 phases)
 
 ## Performance Metrics
 
@@ -279,10 +279,14 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-06T23:01:25.947Z
-Stopped at: Completed 06-06-PLAN.md
-Resume file: None
-Next action: Discuss Phase 6 (Payment Processing) with `/gsd:discuss-phase 6`
+Last session: 2026-07-09T21:06:02.000Z
+Stopped at: Phase 7 planned and plan-checker verified (10 plans, PASSED)
+Resume file: .planning/phases/07-shopify-integration/07-01-PLAN.md
+Next action: Execute Phase 7 (Shopify Integration) with `/gsd:execute-phase 7`
+
+> Planning note (2026-07-09): plan-checker found 1 blocker (07-07 outbound Shopify push was hooked to products.js/inventory.js only, missing the dominant POS path `POST /api/sales/batch` in sales.js + void/unvoid) + 4 warnings; all fixed in a revision pass and re-verified PASSED. Requirements SHOP-17/18/19 covered.
+
+> Open item (not blocking Phase 7): unresolved debug session `debug/manage-concert-crash-android.md` (Android crash on Manage Concert navigation, status: investigating since 2026-04-18).
 
 ---
 *Created: 2026-02-13*

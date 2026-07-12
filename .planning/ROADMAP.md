@@ -226,11 +226,36 @@ Plans:
 - Phases 5 (Online Shop Core) and 6 (Payment Processing) are superseded once the shop entry redirects to Shopify — their code remains in the repo but goes dark. Discuss-phase should decide whether to retire that code or leave it dormant.
 - Sync direction is **bidirectional** (Shopify inventory sync + webhooks), per the pivot decision.
 
-**Plans**: TBD
+**Plans**: 10 plans in 6 waves
 
 Plans:
+**Wave 1**
 
-- [ ] TBD during phase planning
+- [ ] 07-01-PLAN.md — Package legitimacy checkpoint + install @shopify/admin-api-client + env vars (D-16)
+- [ ] 07-02-PLAN.md — Schema foundations: Product/Order Shopify fields + shippingAddress fix (D-08/D-15/D-17, Pitfall 2)
+- [ ] 07-03-PLAN.md — Retire web storefront/checkout + SHOP-17 redirect verification (D-18/D-19)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 07-04-PLAN.md — Shopify plumbing: token cache + GraphQL client + HMAC verifier (D-16)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 07-05-PLAN.md — Outbound sync service: productSet + inventorySetQuantities absolute (D-01/D-06/D-12/D-13)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 07-06-PLAN.md — Inbound webhook route: HMAC gate + orders/refunds/products handlers (D-07/D-10/D-14/D-17)
+- [ ] 07-07-PLAN.md — Outbound push triggers in products.js + inventory.js (D-04/D-05)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 07-08-PLAN.md — Reconcile endpoint + GitHub Actions scheduled trigger (D-05)
+- [ ] 07-09-PLAN.md — Go-live ops scripts (seed + webhook/location setup) + SHOP-19 conflict-resolution doc (D-09)
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 07-10-PLAN.md — API wiring (index.js raw-body mount + reconcile) + retire Phase 6 payment code (D-18)
 
 ### Phase 8: Immutable sale line snapshots
 
@@ -353,7 +378,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete (superseded by Shopify pivot) | 2026-07-05 |
 | 6. Payment Processing | 8/8 | Complete (superseded by Shopify pivot) | 2026-07-06 |
-| 7. Shopify Integration | 0/TBD | Not started | - |
+| 7. Shopify Integration | 0/10 | Planned (verified) | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |
 | 10. Design polish pass | 0/TBD | Not started | - |
