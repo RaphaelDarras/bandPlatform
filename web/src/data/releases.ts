@@ -9,5 +9,4 @@ export type Release =
 
 export const releases: Release[] = [
   { kind: 'youtube', videoId: 'a57M7zclUE4' }, // Latest release (video)
-  { kind: 'spotify', embedType: 'track', id: '6LTsmmbLiocRTRnOVK4tjk' }, // Latest release
 ]
