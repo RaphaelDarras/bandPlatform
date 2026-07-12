@@ -8,5 +8,6 @@ export type Release =
   | { kind: 'youtube'; videoId: string }
 
 export const releases: Release[] = [
-  { kind: 'spotify', embedType: 'track', id: '0tyZM3OawPGQc0heX67clL' }, // Crowned (live)
+  { kind: 'youtube', videoId: 'a57M7zclUE4' }, // Latest release (video)
+  { kind: 'spotify', embedType: 'track', id: '6LTsmmbLiocRTRnOVK4tjk' }, // Latest release
 ]

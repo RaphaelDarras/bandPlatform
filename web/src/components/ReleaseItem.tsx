@@ -7,7 +7,7 @@ import YouTubeEmbed from './YouTubeEmbed'
 // is rendered (D-20); the embed itself is the entire card content.
 export default function ReleaseItem({ release }: { release: Release }) {
   return (
-    <div className="border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4">
+    <div>
       {release.kind === 'spotify' ? (
         <SpotifyEmbed embedType={release.embedType} id={release.id} />
       ) : (

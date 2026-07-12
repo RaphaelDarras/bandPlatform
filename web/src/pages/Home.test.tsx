@@ -18,7 +18,7 @@ import { useLoaderData } from 'react-router-dom'
 import { Component as Home } from './Home'
 
 describe('Home page', () => {
-  it('renders "Listen Now" linking to /discography', () => {
+  it('renders "Listen Now" linking to /listen', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     render(
@@ -28,7 +28,7 @@ describe('Home page', () => {
     )
 
     const listenNow = screen.getByRole('link', { name: /listen now/i })
-    expect(listenNow).toHaveAttribute('href', '/discography')
+    expect(listenNow).toHaveAttribute('href', '/listen')
   })
 
   it('shows the next event venue text from nextEvent(events) when events exist', () => {
@@ -87,7 +87,7 @@ describe('Home page', () => {
     expect(href).not.toContain('app_id')
   })
 
-  it('renders a latest-release teaser linking to /discography', () => {
+  it('renders a latest-release teaser linking to /listen', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     render(
@@ -96,7 +96,7 @@ describe('Home page', () => {
       </MemoryRouter>,
     )
 
-    const discographyLinks = screen.getAllByRole('link', { name: /discography|listen/i })
-    expect(discographyLinks.some((l) => l.getAttribute('href') === '/discography')).toBe(true)
+    const listenLinks = screen.getAllByRole('link', { name: /listen/i })
+    expect(listenLinks.some((l) => l.getAttribute('href') === '/listen')).toBe(true)
   })
 })

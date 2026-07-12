@@ -2,6 +2,7 @@ import { Link, useLoaderData } from 'react-router-dom'
 import type { BitEvent } from '../lib/bandsintown'
 import { clean, nextEvent, venueDisplay } from '../lib/bandsintown'
 import { releases } from '../data/releases'
+import ReleaseItem from '../components/ReleaseItem'
 
 // Landing hub (D-25): hero wordmark + next-concert teaser + release teaser +
 // merch teaser (Phase 5, D-20 — extends D-25's original "no merch teaser"
@@ -14,17 +15,53 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-12">
-      <section className="py-16 text-center">
-        <h1 className="font-display text-6xl uppercase tracking-wide text-[var(--color-accent)] sm:text-7xl">
-          Hurakan
-        </h1>
+      <section className="text-center">
+        <img src="/images/BANDCAMP.jpg" alt="Hurakan" className="w-full" />
         <Link
-          to="/discography"
+          to="/listen"
           className="mt-6 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
         >
           Listen Now
         </Link>
       </section>
+
+      <section>
+        <h2 className="font-display text-3xl uppercase text-white">Shop Merch</h2>
+        <p className="mt-2 font-sans text-base text-white/75">
+          Grab official Hurakan merch — apparel and more from the online shop.
+        </p>
+        <a
+          href="https://shop.hurakanband.fr/products/digital-product"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 block"
+        >
+          <img src="/images/Artwork_Final.jpg" alt="Final artwork" className="w-52" />
+        </a>
+        <a
+          href="https://shop.hurakanband.fr/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
+        >
+          Shop Now
+        </a>
+      </section>
+
+      {highlightedRelease && (
+        <section>
+          <h2 className="font-display text-3xl uppercase text-white">Latest Release</h2>
+          <div className="mt-4">
+            <ReleaseItem release={highlightedRelease} />
+          </div>
+          <Link
+            to="/listen"
+            className="mt-2 inline-block text-sm font-semibold uppercase tracking-[0.06em] text-white underline"
+          >
+            Listen
+          </Link>
+        </section>
+      )}
 
       <section>
         <h2 className="font-display text-3xl uppercase text-white">Next Show</h2>
@@ -52,36 +89,6 @@ export function Component() {
           All concerts
         </Link>
       </section>
-
-      <section>
-        <h2 className="font-display text-3xl uppercase text-white">Shop Merch</h2>
-        <p className="mt-2 font-sans text-base text-white/75">
-          Grab official Hurakan merch — apparel and more from the online shop.
-        </p>
-        <a
-          href="https://shop.hurakanband.fr/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
-        >
-          Shop Now
-        </a>
-      </section>
-
-      {highlightedRelease && (
-        <section>
-          <h2 className="font-display text-3xl uppercase text-white">Latest Release</h2>
-          <p className="mt-2 font-sans text-sm text-white/75">
-            Stream the latest track, EP, or video on the Discography page.
-          </p>
-          <Link
-            to="/discography"
-            className="mt-2 inline-block text-sm font-semibold uppercase tracking-[0.06em] text-white underline"
-          >
-            View Discography
-          </Link>
-        </section>
-      )}
     </div>
   )
 }

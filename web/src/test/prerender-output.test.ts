@@ -38,7 +38,7 @@ beforeAll(() => {
 describe('production build output (dist)', () => {
   const routes = [
     'index.html',
-    'discography/index.html',
+    'listen/index.html',
     'concerts/index.html',
     'about/index.html',
     'contact/index.html',

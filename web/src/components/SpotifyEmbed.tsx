@@ -1,11 +1,12 @@
 // Spotify iframe embed (WEB-02). Ported from the production embed in
 // website/crowned/index.html lines 193-201. Always lazy-loaded (Pitfall 6).
-export type SpotifyEmbedType = 'track' | 'album' | 'playlist'
+export type SpotifyEmbedType = 'track' | 'album' | 'playlist' | 'artist'
 
 const HEIGHT_BY_TYPE: Record<SpotifyEmbedType, number> = {
   track: 152,
   album: 352,
   playlist: 352,
+  artist: 352,
 }
 
 export default function SpotifyEmbed({

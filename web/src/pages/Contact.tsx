@@ -1,8 +1,6 @@
 // Contact (WEB-04, D-13/D-14/D-16): static contact info only, no form, no
-// backend. Two clearly-separated channels — general fan contact and
-// booking/press — plus Instagram and Bandsintown. Placeholder addresses are
-// marked with TODO comments below; replace with the real addresses before
-// launch (D-16 — placeholders decided intentionally, not invented copy).
+// backend. One email channel plus the band's external channels — Instagram,
+// Spotify, and the Shopify storefront (matches the footer).
 export function Component() {
   return (
     <section>
@@ -11,24 +9,11 @@ export function Component() {
       <div className="mt-6 flex flex-col gap-8">
         <div>
           <h2 className="font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white">
-            General
+            Email
           </h2>
-          {/* TODO: replace with the real general fan-contact address */}
           <p className="mt-2 font-sans text-white/75">
-            <a href="mailto:hi@hurakanband.fr" rel="noopener" className="underline">
-              hi@hurakanband.fr
-            </a>
-          </p>
-        </div>
-
-        <div>
-          <h2 className="font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white">
-            Booking / Press
-          </h2>
-          {/* TODO: replace with the real booking/press address */}
-          <p className="mt-2 font-sans text-white/75">
-            <a href="mailto:booking@hurakanband.fr" rel="noopener" className="underline">
-              booking@hurakanband.fr
+            <a href="mailto:hurakanband@gmail.com" rel="noopener" className="underline">
+              hurakanband@gmail.com
             </a>
           </p>
         </div>
@@ -39,9 +24,8 @@ export function Component() {
           </h2>
           <ul className="mt-2 flex flex-col gap-2 font-sans text-white/75">
             <li>
-              {/* TODO: replace with the real Instagram handle URL */}
               <a
-                href="https://www.instagram.com/"
+                href="https://www.instagram.com/hurakanband/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline"
@@ -51,12 +35,22 @@ export function Component() {
             </li>
             <li>
               <a
-                href="https://www.bandsintown.com/a/433176"
+                href="https://open.spotify.com/artist/5w35Gt5153qhoSwR4MVtEU"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline"
               >
-                Bandsintown
+                Spotify
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://shop.hurakanband.fr/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Shop
               </a>
             </li>
           </ul>

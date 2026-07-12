@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
-// Main navigation is Home / Discography / Concerts / Shop (D-20/D-24). About
+// Main navigation is Home / Shop / Listen / Concerts (D-20/D-24). About
 // and Contact live in the footer. Desktop shows the full nav inline; mobile
 // uses a hamburger toggle (D-27). Toggle button is a 44x44 tap target
 // (UI-SPEC).
@@ -10,9 +10,9 @@ import { NavLink } from 'react-router-dom'
 // via an external href rather than an in-app route.
 const NAV_LINKS = [
   { to: '/', label: 'Home', end: true },
-  { to: '/discography', label: 'Discography', end: false },
-  { to: '/concerts', label: 'Concerts', end: false },
   { href: 'https://shop.hurakanband.fr/', label: 'Shop' },
+  { to: '/listen', label: 'Listen', end: false },
+  { to: '/concerts', label: 'Concerts', end: false },
 ]
 
 export default function Header() {
@@ -29,7 +29,7 @@ export default function Header() {
       <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <NavLink to="/" end className="flex items-center gap-2">
           <img
-            src="/images/HURAKAN_SLAM_ICON_inverted.png"
+            src="/images/PP_RESEAUX.jpg"
             alt="Hurakan"
             className="h-8 w-8"
           />

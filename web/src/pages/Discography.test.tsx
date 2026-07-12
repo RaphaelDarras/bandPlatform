@@ -13,11 +13,12 @@ vi.mock('../data/releases', () => ({ releases: stubReleases }))
 describe('Discography page', () => {
   it('renders one embed per releases[] entry, in array order (D-21)', async () => {
     const { Component } = await import('./Discography')
-    const { container } = render(<Component />)
+    render(<Component />)
 
-    expect(screen.getByRole('heading', { name: /discography/i })).toBeInTheDocument()
+    const section = screen.getByRole('heading', { name: /latest release/i }).closest('section')
+    expect(section).not.toBeNull()
 
-    const iframes = container.querySelectorAll('iframe')
+    const iframes = section!.querySelectorAll('iframe')
     expect(iframes).toHaveLength(stubReleases.length)
     expect(iframes[0].getAttribute('src')).toContain('open.spotify.com/embed/track/track-1')
     expect(iframes[1].getAttribute('src')).toContain('youtube-nocookie.com/embed/video-1')

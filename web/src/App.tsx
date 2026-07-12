@@ -12,7 +12,7 @@ export const routes: RouteRecord[] = [
     element: <Layout />,
     children: [
       { index: true, lazy: () => import('./pages/Home'), loader: eventsLoader },
-      { path: 'discography', lazy: () => import('./pages/Discography') },
+      { path: 'listen', lazy: () => import('./pages/Discography') },
       { path: 'concerts', lazy: () => import('./pages/Concerts'), loader: eventsLoader },
       { path: 'about', lazy: () => import('./pages/About') },
       { path: 'contact', lazy: () => import('./pages/Contact') },
