@@ -409,11 +409,22 @@ router.post('/restock', async (req, res) => {
  * @swagger
  * /api/inventory/stock:
  *   get:
- *     summary: Get stock summary across all active products
- *     description: Returns a read-only stock summary with grand total, per-product totals, and per-variant breakdown. Only active products are included.
+ *     summary: Get stock summary across products
+ *     description: Returns a read-only stock summary with grand total, per-product totals, and per-variant breakdown. Only active products are included by default.
  *     tags: [Inventory]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: includeInactive
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: >
+ *           When true, includes deactivated (active:false) products in the response.
+ *           Deliberately only implemented here, never on the public GET /api/products
+ *           route, since that endpoint is unauthenticated and also consumed by the
+ *           mobile POS — exposing the retired catalogue there would leak it publicly (D-24).
  *     responses:
  *       200:
  *         description: Stock summary retrieved successfully
@@ -424,10 +435,10 @@ router.post('/restock', async (req, res) => {
  *               properties:
  *                 grandTotal:
  *                   type: number
- *                   description: Total stock units across all active products and variants
+ *                   description: Total stock units across all returned products and variants
  *                 productCount:
  *                   type: number
- *                   description: Number of active products included
+ *                   description: Number of products included
  *                 products:
  *                   type: array
  *                   items:
@@ -439,6 +450,8 @@ router.post('/restock', async (req, res) => {
  *                         type: string
  *                       category:
  *                         type: string
+ *                       active:
+ *                         type: boolean
  *                       productTotal:
  *                         type: number
  *                         description: Sum of stock across all variants for this product
@@ -462,8 +475,11 @@ router.post('/restock', async (req, res) => {
  */
 router.get('/stock', async (req, res) => {
   try {
-    const results = await Product.find({ active: true })
-      .select('name category variants.sku variants.size variants.color variants.stock')
+    const includeInactive = req.query.includeInactive === 'true';
+    const query = includeInactive ? {} : { active: true };
+
+    const results = await Product.find(query)
+      .select('name category active variants.sku variants.size variants.color variants.stock')
       .lean();
 
     const products = results.map(product => {
@@ -478,6 +494,7 @@ router.get('/stock', async (req, res) => {
         productId: product._id,
         name: product.name,
         category: product.category || null,
+        active: product.active,
         productTotal,
         variants
       };
