@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06.1-01-PLAN.md
-last_updated: "2026-08-06T13:25:49.301Z"
+stopped_at: Completed 06.1-02-PLAN.md
+last_updated: "2026-08-06T15:59:56.121Z"
 last_activity: 2026-08-06
 progress:
   total_phases: 12
   completed_phases: 6
   total_plans: 63
-  completed_plans: 43
+  completed_plans: 44
   percent: 50
 ---
 
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 06.1 (rework-stock-web-page-to-have-the-possibility-to-crud-produc) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
 Status: Ready to execute
 Last activity: 2026-08-06
 
 > Note: Shopify pivot (commit b63a205) removed the former Phase 06.1 (Admin panel) and repurposed the old Phase 7 (Shop Enhancements) into "Shopify Integration". Phases 5 (Online Shop Core) and 6 (Payment Processing) shipped fully but are SUPERSEDED — their self-built catalog/checkout/payment code goes dark once /shop redirects to Shopify. The 5-item human-UAT in 06-HUMAN-UAT.md is now moot (close as "superseded").
 
-Progress: [███████░░░] 68%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Progress: [███████░░░] 68%
 | Phase 06 P06 | 5min | 3 tasks | 5 files |
 | 06 | 8 | - | - |
 | Phase 06.1 P01 | 12min | 3 tasks | 3 files |
+| Phase 06.1 P02 | 15min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -239,6 +240,8 @@ Recent decisions affecting current work:
 - [Phase 06.1-01]: POST /api/inventory/restock/batch validates the entire payload before mongoose.startSession() so a client error can never open or abort a transaction
 - [Phase 06.1-01]: Batch handler has no version/elemMatch optimistic-lock guard, mirroring /restock's plain $inc (matches the Phase 02-post fix)
 - [Phase 06.1-01]: includeInactive implemented only on GET /api/inventory/stock; GET /api/products left byte-identical (D-24)
+- [Phase 06.1-02]: findSkuClash checks in-payload duplicates before any DB round trip, and PUT /:id's guard only checks genuinely-new SKUs (not already on the product) so re-submitting an existing SKU never false-positives
+- [Phase 06.1-02]: SKU uniqueness guard hoisted above PUT /:id's $pull/$set/$push so a 409 guarantees zero partial writes; no unique index added to variants.sku (D-14 Pitfall 4)
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -285,8 +288,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-06T13:25:49.281Z
-Stopped at: Completed 06.1-01-PLAN.md
+Last session: 2026-08-06T15:59:56.102Z
+Stopped at: Completed 06.1-02-PLAN.md
 Resume file: None
 Next action: Plan Phase 06.1 with `/gsd:plan-phase 06.1`
 

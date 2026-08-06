@@ -214,7 +214,7 @@ Plans:
 **Requirements**: INV-05, INV-06, INV-07, INV-08
 **UI hint:** yes — frontend phase; see `06.1-UI-SPEC.md` for the design contract
 **Depends on:** Phase 6
-**Plans:** 1/11 plans executed
+**Plans:** 2/11 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -230,7 +230,7 @@ Plans:
 **Wave 1**
 
 - [x] 06.1-01-PLAN.md — Transactional POST /api/inventory/restock/batch + includeInactive/active on GET /stock + MongoMemoryReplSet all-or-nothing test (INV-06/INV-08, D-06/D-24)
-- [ ] 06.1-02-PLAN.md — Application-level SKU uniqueness guard on POST /products and PUT /:id's add-variant path + $pull-safety tests (INV-05/INV-07, D-14/D-17)
+- [x] 06.1-02-PLAN.md — Application-level SKU uniqueness guard on POST /products and PUT /:id's add-variant path + $pull-safety tests (INV-05/INV-07, D-14/D-17)
 - [ ] 06.1-03-PLAN.md — First authenticated web API client web/src/lib/inventory.ts (bearer + 401/403 AuthExpiredError) + unit test (D-29/D-30)
 - [ ] 06.1-04-PLAN.md — Three semantic stock-color tokens + StockQuantityInput (unbounded ±/set-count) + DeactivateDialog (native <dialog>) + tests (D-01/D-07/D-08/D-22/D-23)
 - [ ] 06.1-05-PLAN.md — lib/sku.ts slug scheme + shared VariantGenerator (size×colour, editable SKUs, collision warning) + tests (D-13/D-14/D-15/D-19)
@@ -425,7 +425,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete (superseded by Shopify pivot) | 2026-07-05 |
 | 6. Payment Processing | 8/8 | Complete (superseded by Shopify pivot) | 2026-07-06 |
-| 06.1. /stock product + quantity CRUD | 1/11 | In Progress|  |
+| 06.1. /stock product + quantity CRUD | 2/11 | In Progress|  |
 | 7. Shopify Integration | 0/10 | Planned (verified) | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |
