@@ -4,6 +4,37 @@ const Product = require('../models/Product');
 const { authenticateToken } = require('../middleware/auth');
 
 /**
+ * D-14: application-level SKU uniqueness guard — the real backstop for
+ * variant SKU uniqueness. Deliberately NOT backed by a unique index on
+ * `variants.sku` (see api/models/Product.js): a unique multikey index build
+ * fails outright against pre-existing duplicate values, which CONTEXT.md
+ * warns may already exist. Returns the clashing SKU, or null if none.
+ *
+ * @param {string[]} skus - candidate SKUs to check for a clash
+ * @param {string} [excludeProductId] - when checking an existing product's
+ *   own new variants, exclude that product from the lookup
+ * @returns {Promise<string|null>}
+ */
+async function findSkuClash(skus, excludeProductId) {
+  // A payload can collide with itself before it ever reaches the database.
+  const seen = new Set();
+  for (const sku of skus) {
+    if (seen.has(sku)) return sku;
+    seen.add(sku);
+  }
+
+  const query = { 'variants.sku': { $in: skus } };
+  if (excludeProductId) {
+    query._id = { $ne: excludeProductId };
+  }
+  const existing = await Product.findOne(query).select('variants.sku').lean();
+  if (!existing) return null;
+
+  const clashVariant = existing.variants.find((v) => skus.includes(v.sku));
+  return clashVariant ? clashVariant.sku : null;
+}
+
+/**
  * @swagger
  * /api/products:
  *   get:
@@ -112,6 +143,8 @@ router.get('/:id', async (req, res) => {
  *         description: Validation error
  *       401:
  *         description: Unauthorized
+ *       409:
+ *         description: SKU already in use
  *       500:
  *         description: Internal server error
  */
@@ -133,6 +166,12 @@ router.post('/', authenticateToken, async (req, res) => {
           error: 'Each variant must have sku and either size or color'
         });
       }
+    }
+
+    // D-14: application-level SKU uniqueness guard — runs before any write.
+    const clash = await findSkuClash(variants.map((v) => v.sku));
+    if (clash) {
+      return res.status(409).json({ error: `SKU already in use: ${clash}` });
     }
 
     const product = await Product.create(req.body);
@@ -215,6 +254,8 @@ router.post('/', authenticateToken, async (req, res) => {
  *         description: Unauthorized
  *       404:
  *         description: Product not found
+ *       409:
+ *         description: SKU already in use
  *       500:
  *         description: Internal server error
  */
@@ -258,6 +299,21 @@ router.put('/:id', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'Product not found' });
       }
       const existingSkus = new Set(product.variants.map((v) => v.sku));
+
+      // D-14: SKU uniqueness guard for newly-added variants, hoisted above
+      // the $pull and update loop below. A rejected request must perform no
+      // $pull, no $set, and no $push — PUT is not transactional, and a
+      // partially-applied variant sync is exactly the failure D-17 warns
+      // about.
+      const newSkus = req.body.variants
+        .map((v) => v.sku)
+        .filter((sku) => sku && !existingSkus.has(sku));
+      if (newSkus.length > 0) {
+        const clash = await findSkuClash(newSkus, req.params.id);
+        if (clash) {
+          return res.status(409).json({ error: `SKU already in use: ${clash}` });
+        }
+      }
 
       // Remove variants not present in the payload
       const incomingSkus = new Set(req.body.variants.map((v) => v.sku).filter(Boolean));
