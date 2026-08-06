@@ -207,6 +207,52 @@ Plans:
 
 - [x] 06-06-PLAN.md — Webhooks (raw-body mount, signature verify, atomic idempotent paid + stock $inc + emails) + go-live checklist (AUTH-03, D-07/D-08/D-09/D-10/D-19)
 
+### Phase 06.1: rework /stock web page to have the possibility to CRUD products and quantities rather than just display (INSERTED)
+
+**Goal:** The band can manage its own catalogue and stock from the website without touching the database or the API by hand. The existing read-only `/stock` page becomes an authenticated admin surface where a product can be created with its variants and opening stock, per-variant quantities can be adjusted in bulk with every change recorded in the inventory audit trail, variants can be added to an existing product, and products can be deactivated, viewed in an archive, and restored.
+
+**Requirements**: INV-05, INV-06, INV-07, INV-08
+**UI hint:** yes — frontend phase; see `06.1-UI-SPEC.md` for the design contract
+**Depends on:** Phase 6
+**Plans:** 1/11 plans executed
+
+**Success Criteria** (what must be TRUE):
+
+  1. A product with multiple size/colour variants can be created from `/stock` and immediately appears in the mobile POS catalogue
+  2. Per-variant quantities can be edited across multiple products and committed as a single all-or-nothing save, with an `InventoryAdjustment` record per changed variant
+  3. A variant can be added to an existing product and given a quantity in one action
+  4. A product can be deactivated, found again in the Archived view, and restored
+  5. Product *content* editing (name, description, price, images) is deliberately NOT delivered — Shopify becomes the content master in Phase 7 (see 06.1-CONTEXT.md D-10)
+
+**Scope note:** the authoritative phase boundary is `06.1-CONTEXT.md` `<domain>`, which also records 33 locked implementation decisions (D-01..D-33). Two carry cross-phase consequences: the all-or-nothing batch save (D-06) adds a fourth Mongo stock write path that Phase 7 plan 07-07 must hook, and it requires confirming Atlas M0 supports multi-document transactions.
+
+Plans:
+**Wave 1**
+
+- [x] 06.1-01-PLAN.md — Transactional POST /api/inventory/restock/batch + includeInactive/active on GET /stock + MongoMemoryReplSet all-or-nothing test (INV-06/INV-08, D-06/D-24)
+- [ ] 06.1-02-PLAN.md — Application-level SKU uniqueness guard on POST /products and PUT /:id's add-variant path + $pull-safety tests (INV-05/INV-07, D-14/D-17)
+- [ ] 06.1-03-PLAN.md — First authenticated web API client web/src/lib/inventory.ts (bearer + 401/403 AuthExpiredError) + unit test (D-29/D-30)
+- [ ] 06.1-04-PLAN.md — Three semantic stock-color tokens + StockQuantityInput (unbounded ±/set-count) + DeactivateDialog (native <dialog>) + tests (D-01/D-07/D-08/D-22/D-23)
+- [ ] 06.1-05-PLAN.md — lib/sku.ts slug scheme + shared VariantGenerator (size×colour, editable SKUs, collision warning) + tests (D-13/D-14/D-15/D-19)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 06.1-06-PLAN.md — CreateProductPanel: name/basePrice/category + generator + create-with-opening-stock (INV-05, D-10/D-11/D-12)
+- [ ] 06.1-07-PLAN.md — AddVariantPanel: full-array PUT then chained stock write + D-18 partial-failure hand-off (INV-07, D-16/D-17/D-18)
+- [ ] 06.1-08-PLAN.md — Stock.tsx shell rewrite: preserved login, noindex, Active/Archived toggle, deactivate/restore (INV-08, D-21/D-25..D-33)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 06.1-09-PLAN.md — Stock.tsx inline quantity editing + sticky Save-all all-or-nothing batch + inline size/colour edit (INV-06, D-01..D-09/D-20)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 06.1-10-PLAN.md — Stock.tsx wiring of both panels + D-18 pre-dirty recovery seeding + D-10/D-16 negative boundaries (INV-05/INV-07)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 06.1-11-PLAN.md — Manual verification checkpoints: live Atlas transaction smoke test (Assumption A2), mobile POS round trip, phone-tolerance check, Phase 7 07-07 follow-up note
+
 ### Phase 7: Shopify Integration
 
 **Goal**: The band keeps its own website, but the shop entry redirects to a Shopify storefront, and the existing Mongo DB is linked to Shopify via bidirectional product + inventory sync so the mobile POS (Mongo) and the Shopify storefront never oversell or drift.
@@ -247,6 +293,7 @@ Plans:
 
 - [ ] 07-06-PLAN.md — Inbound webhook route: HMAC gate + orders/refunds/products handlers (D-07/D-10/D-14/D-17)
 - [ ] 07-07-PLAN.md — Outbound push triggers in products.js + inventory.js (D-04/D-05)
+  - ⚠ **Revision required after Phase 06.1 ships:** 06.1 adds `POST /api/inventory/restock/batch`, a fourth Mongo stock write path. 07-07 currently hooks `products.js`, `inventory.js` and `sales.js` only, so its plan-checker verification is stale until the batch endpoint is hooked too (06.1-CONTEXT.md cross-phase impact 1).
 
 **Wave 5** *(blocked on Wave 4)*
 
@@ -378,6 +425,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Showcase Website | 5/5 | Complete   | 2026-07-03 |
 | 5. Online Shop Core | 11/11 | Complete (superseded by Shopify pivot) | 2026-07-05 |
 | 6. Payment Processing | 8/8 | Complete (superseded by Shopify pivot) | 2026-07-06 |
+| 06.1. /stock product + quantity CRUD | 1/11 | In Progress|  |
 | 7. Shopify Integration | 0/10 | Planned (verified) | - |
 | 8. Immutable sale line snapshots | 0/TBD | Not started | - |
 | 9. Concert-first selling UX | 0/TBD | Not started | - |
@@ -388,3 +436,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 *Created: 2026-02-13*
 *Last updated: 2026-04-19 — Phase 11 added (multi-tenant band-agnostic platform; scope may warrant promotion to milestone)*
 *Last updated: 2026-07-07 — Shopify pivot: removed Phase 06.1 (Admin panel) and the old Phase 7 (Shop Enhancements); repurposed Phase 7 as "Shopify Integration" (redirect + bidirectional Mongo↔Shopify sync); annotated Phases 5 & 6 as superseded.*
+*Last updated: 2026-08-06 — Phase 06.1 planned: 11 plans in 5 waves (INV-05..08, 33 locked decisions covered); flagged Phase 7 07-07 for revision once the batch stock endpoint ships.*

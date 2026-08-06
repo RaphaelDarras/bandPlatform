@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 7 planned (10 plans, verified) — ready to execute
-stopped_at: Phase 7 planned and plan-checker verified
-last_updated: "2026-07-09T21:06:02.000Z"
-last_activity: 2026-07-09
+status: executing
+stopped_at: Completed 06.1-01-PLAN.md
+last_updated: "2026-08-06T13:25:49.301Z"
+last_activity: 2026-08-06
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 6
-  total_plans: 52
-  completed_plans: 42
-  percent: 55
+  total_plans: 63
+  completed_plans: 43
+  percent: 50
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Band members can record merchandise sales at concerts quickly and reliably, with stock automatically synchronized across online and physical sales channels, preventing overselling and lost revenue.
-**Current focus:** Phase 7 — Shopify Integration (website /shop redirects to Shopify storefront + bidirectional Mongo↔Shopify product/inventory sync)
+**Current focus:** Phase 06.1 — rework-stock-web-page-to-have-the-possibility-to-crud-produc
 
 ## Current Position
 
-Phase: 7
-Plan: 10 plans written (07-01…07-10), plan-checker VERIFICATION PASSED (2026-07-09)
-Status: Planned — ready to execute
-Last activity: 2026-07-09
+Phase: 06.1 (rework-stock-web-page-to-have-the-possibility-to-crud-produc) — EXECUTING
+Plan: 2 of 11
+Status: Ready to execute
+Last activity: 2026-08-06
 
 > Note: Shopify pivot (commit b63a205) removed the former Phase 06.1 (Admin panel) and repurposed the old Phase 7 (Shop Enhancements) into "Shopify Integration". Phases 5 (Online Shop Core) and 6 (Payment Processing) shipped fully but are SUPERSEDED — their self-built catalog/checkout/payment code goes dark once /shop redirects to Shopify. The 5-item human-UAT in 06-HUMAN-UAT.md is now moot (close as "superseded").
 
-Progress: [██████░░░░] 55% (6/11 phases)
+Progress: [███████░░░] 68%
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Progress: [██████░░░░] 55% (6/11 phases)
 | Phase 06 P08 | 6min | 3 tasks | 5 files |
 | Phase 06 P06 | 5min | 3 tasks | 5 files |
 | 06 | 8 | - | - |
+| Phase 06.1 P01 | 12min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Progress: [██████░░░░] 55% (6/11 phases)
 - 2026-04-19: Phase 11 added: Multi-tenant band-agnostic platform (convert single-tenant Hurakan product into a platform any band can sign up for). Driven by user intent to make the platform available to other bands. ⚠ Scope almost certainly milestone-sized (touches DB schema, API auth, mobile app, upcoming e-shop, provisioning, domain routing, possibly billing) — discuss-phase should either aggressively cut scope or promote to v2.0 milestone. Critical open question: retrofit multi-tenancy after Phase 7 online-shop work ships, OR block Phases 4-7 and build them multi-tenant from day one (likely cheaper long-term but delays first online-shop value).
 - Phase 06.1 inserted after Phase 6: Admin panel. The Stock page is currently gated behind a login; KEEP that login but move it to /admin. The /admin page gives access to: /stock (existing stock page), a new /orders page listing all orders sorted by 'sent' vs 'to-be-sent' status, and a new /products page for full product CRUD (D-25 admin-UI gap from Phase 5). Sequenced after Phase 6 because /orders needs persisted orders that only exist once checkout/payment (Phase 6) writes Order records. (URGENT)
 - Phase 7 edited: Shopify pivot: Phase 7 repurposed from Shop Enhancements to Shopify Integration (website shop-entry redirect + bidirectional Mongo<->Shopify product/inventory sync). Removed Phase 06.1 (Admin panel) and old Phase 7 scope. Phases 5 & 6 superseded.
+- Phase 06.1 inserted after Phase 6: rework /stock web page to have the possibility to CRUD products and quantities rather than just display (URGENT)
+- Phase 06.1 edited: Filled in the Goal (was the [Urgent work - to be planned] stub), added success criteria, UI hint, scope note, and mapped requirements INV-05/06/07/08 (added to REQUIREMENTS.md). The TBD requirements had been silently disabling the plan-phase Requirements Coverage Gate.
 
 ### Decisions
 
@@ -233,6 +236,9 @@ Recent decisions affecting current work:
 - [Phase 06-08]: CheckoutSuccess.test.tsx spies on the real useCartStore.getState().clearCart instead of mocking the module, to assert lines are actually emptied
 - [Phase 06-06]: webhooks.js's stock-mutation shape is a hybrid unique to the online channel: inventory.js's $elemMatch floor-guard without its 409-reject/version-guard, and explicitly NOT sales.js's bare allow-negative $inc (D-08)
 - [Phase 06-06]: webhooks-paypal.test.js mocks stripeClient.js even though only the PayPal path is exercised, because webhooks.js requires both provider clients at module load and the real Stripe SDK throws synchronously without STRIPE_SECRET_KEY set
+- [Phase 06.1-01]: POST /api/inventory/restock/batch validates the entire payload before mongoose.startSession() so a client error can never open or abort a transaction
+- [Phase 06.1-01]: Batch handler has no version/elemMatch optimistic-lock guard, mirroring /restock's plain $inc (matches the Phase 02-post fix)
+- [Phase 06.1-01]: includeInactive implemented only on GET /api/inventory/stock; GET /api/products left byte-identical (D-24)
 
 ### New Features Added Post-Phase 2 (2026-03-18)
 
@@ -279,10 +285,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-09T21:06:02.000Z
-Stopped at: Phase 7 planned and plan-checker verified (10 plans, PASSED)
-Resume file: .planning/phases/07-shopify-integration/07-01-PLAN.md
-Next action: Execute Phase 7 (Shopify Integration) with `/gsd:execute-phase 7`
+Last session: 2026-08-06T13:25:49.281Z
+Stopped at: Completed 06.1-01-PLAN.md
+Resume file: None
+Next action: Plan Phase 06.1 with `/gsd:plan-phase 06.1`
 
 > Planning note (2026-07-09): plan-checker found 1 blocker (07-07 outbound Shopify push was hooked to products.js/inventory.js only, missing the dominant POS path `POST /api/sales/batch` in sales.js + void/unvoid) + 4 warnings; all fixed in a revision pass and re-verified PASSED. Requirements SHOP-17/18/19 covered.
 

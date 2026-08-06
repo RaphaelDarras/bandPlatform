@@ -53,6 +53,10 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **INV-02**: System prevents overselling when both channels are active
 - [x] **INV-03**: System updates stock in real-time after each sale
 - [x] **INV-04**: System maintains inventory transaction logs for auditing
+- [ ] **INV-05** *(new, Phase 06.1)*: Admin can create a product with its variants and opening stock from the web admin page
+- [x] **INV-06** *(new, Phase 06.1)*: Admin can adjust per-variant stock quantities from the web admin page, with every adjustment recorded in the inventory audit trail
+- [ ] **INV-07** *(new, Phase 06.1)*: Admin can add variants to an existing product from the web admin page
+- [x] **INV-08** *(new, Phase 06.1)*: Admin can deactivate a product, view deactivated products, and restore them
 
 ### Showcase Website
 
@@ -147,13 +151,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-14 | — | Dropped (Shopify pivot) |
 | SHOP-15 | — | Dropped (Shopify pivot) |
 | SHOP-16 | — | Dropped (Shopify pivot) |
+| INV-05 | Phase 06.1 | Pending |
+| INV-06 | Phase 06.1 | Complete |
+| INV-07 | Phase 06.1 | Pending |
+| INV-08 | Phase 06.1 | Complete |
 | SHOP-17 | Phase 7 | Pending |
 | SHOP-18 | Phase 7 | Pending |
 | SHOP-19 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 35 active (32 delivered + 3 new for Phase 7); 6 dropped in the Shopify pivot (SHOP-09/10/12/14/15/16)
-- Mapped to phases: 35 (100% of active)
+- v1 requirements: 39 active (32 delivered + 4 new for Phase 06.1 + 3 new for Phase 7); 6 dropped in the Shopify pivot (SHOP-09/10/12/14/15/16)
+- Mapped to phases: 39 (100% of active)
 - Unmapped: 0
 - Note: SHOP-04/05/06 (payments) and the Phase 5 shop requirements were delivered but are superseded going forward by the Shopify storefront.
 
@@ -161,3 +169,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 *Requirements defined: 2026-02-13*
 *Last updated: 2026-02-13 after roadmap creation with traceability mappings*
 *Last updated: 2026-07-07 — Shopify pivot: dropped SHOP-09/10/12/14/15/16 (Shopify-native); added SHOP-17/18/19 for Phase 7 Shopify Integration; annotated SHOP-04/05/06 + Phase 5 shop requirements as superseded.*
+*Last updated: 2026-08-06 — added INV-05/06/07/08 for inserted Phase 06.1 (/stock admin product + quantity CRUD); previously the phase had `Requirements: TBD`, which silently disabled the plan-phase Requirements Coverage Gate.*
