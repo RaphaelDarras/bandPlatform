@@ -20,9 +20,15 @@ const mockProductModule = {
   find: jest.fn(),
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
+  findOne: jest.fn(),
   create: jest.fn(),
   updateOne: jest.fn(),
 };
+
+// Helper to build the chainable .select().lean() stub findSkuClash expects
+function chainableFindOneResult(doc) {
+  return { select: () => ({ lean: () => Promise.resolve(doc) }) };
+}
 jest.mock('../models/Product', () => mockProductModule);
 
 // Mock JWT so authenticateToken passes
@@ -173,6 +179,7 @@ describe('POST /api/products', () => {
 
   it('creates product with valid data and auth', async () => {
     const created = { ...sampleProduct, _id: 'new1' };
+    mockProductModule.findOne.mockReturnValue(chainableFindOneResult(null));
     mockProductModule.create.mockResolvedValue(created);
 
     const res = await request(app)
@@ -183,6 +190,62 @@ describe('POST /api/products', () => {
     expect(res.status).toBe(201);
     expect(mockProductModule.create).toHaveBeenCalled();
     expect(res.body.name).toBe('Test Shirt');
+  });
+
+  it('rejects a create whose variant SKU already exists on another product', async () => {
+    mockProductModule.findOne.mockReturnValue(
+      chainableFindOneResult({ _id: 'other1', variants: [{ sku: 'S-BLK' }] })
+    );
+
+    const res = await request(app)
+      .post('/api/products')
+      .set('Authorization', AUTH_HEADER)
+      .send({ name: 'Test Shirt', basePrice: 25, variants: [{ sku: 'S-BLK', size: 'S', color: 'Black' }] });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/S-BLK/);
+    expect(mockProductModule.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a create whose payload contains the same SKU twice', async () => {
+    const res = await request(app)
+      .post('/api/products')
+      .set('Authorization', AUTH_HEADER)
+      .send({
+        name: 'Test Shirt',
+        basePrice: 25,
+        variants: [
+          { sku: 'S-BLK', size: 'S', color: 'Black' },
+          { sku: 'S-BLK', size: 'M', color: 'Black' },
+        ],
+      });
+
+    expect(res.status).toBe(409);
+    expect(mockProductModule.findOne).not.toHaveBeenCalled();
+    expect(mockProductModule.create).not.toHaveBeenCalled();
+  });
+
+  it('creates with opening stock when no SKU clashes (D-11/INV-05)', async () => {
+    mockProductModule.findOne.mockReturnValue(chainableFindOneResult(null));
+    const created = { ...sampleProduct, _id: 'new2' };
+    mockProductModule.create.mockResolvedValue(created);
+
+    const res = await request(app)
+      .post('/api/products')
+      .set('Authorization', AUTH_HEADER)
+      .send({
+        name: 'Test Shirt',
+        basePrice: 25,
+        variants: [
+          { sku: 'S-BLK', size: 'S', color: 'Black', stock: 7 },
+          { sku: 'M-BLK', size: 'M', color: 'Black', stock: 0 },
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockProductModule.create).toHaveBeenCalled();
+    const createArg = mockProductModule.create.mock.calls[0][0];
+    expect(createArg.variants[0].stock).toBe(7);
   });
 });
 

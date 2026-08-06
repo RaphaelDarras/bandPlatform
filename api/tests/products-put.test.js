@@ -36,7 +36,13 @@ const mockProductModule = {
   findByIdAndUpdate: jest.fn(),
   updateOne: jest.fn(),
   findById: jest.fn(),
+  findOne: jest.fn(),
 };
+
+// Helper to build the chainable .select().lean() stub findSkuClash expects
+function chainableFindOneResult(doc) {
+  return { select: () => ({ lean: () => Promise.resolve(doc) }) };
+}
 
 jest.mock('../models/Product', () => mockProductModule);
 
@@ -72,6 +78,8 @@ describe('PUT /api/products/:id — safe field whitelisting', () => {
     mockProductModule.findById.mockResolvedValue({ ...mockProduct, variants: mockProduct.variants.map(v => ({ ...v })) });
     mockProductModule.findByIdAndUpdate.mockResolvedValue({ ...mockProduct });
     mockProductModule.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    // Default: no SKU clash found for any new-variant guard check
+    mockProductModule.findOne.mockReturnValue(chainableFindOneResult(null));
   });
 
   beforeAll(() => {
@@ -205,5 +213,97 @@ describe('PUT /api/products/:id — safe field whitelisting', () => {
     expect(pushed.sku).toBe('NONEXISTENT');
     expect(pushed.color).toBe('Blue');
     expect(pushed.stock).toBe(0);
+  });
+
+  // Test 7: a new variant whose SKU already exists on another product is
+  // rejected with 409, and the guard's hoist above $pull/update means no
+  // updateOne call happens at all (D-14/D-17 safety).
+  it('Test 7: rejects a new variant whose SKU already exists on another product', async () => {
+    mockProductModule.findOne.mockReturnValue(
+      chainableFindOneResult({ _id: 'otherProduct', variants: [{ sku: 'NEW-SKU' }] })
+    );
+
+    const res = await request(app)
+      .put('/api/products/prod123')
+      .set('Authorization', AUTH_HEADER)
+      .send({
+        variants: [
+          { sku: 'S-BLK', color: 'Black' },
+          { sku: 'M-BLK', color: 'Black' },
+          { sku: 'NEW-SKU', size: 'L', color: 'Black' },
+        ],
+      });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/NEW-SKU/);
+    expect(mockProductModule.updateOne).not.toHaveBeenCalled();
+  });
+
+  // Test 8: $pull removes nothing when the payload carries the full existing
+  // variant array (D-17) — pins the non-destructive direction.
+  it('Test 8: $pull removes nothing when the payload carries the full existing variant array (D-17)', async () => {
+    mockProductModule.findById.mockResolvedValue({
+      ...mockProduct,
+      variants: [
+        { sku: 'S-BLK', size: 'S', color: 'Black', stock: 10, version: 2, priceAdjustment: 0 },
+        { sku: 'M-BLK', size: 'M', color: 'Black', stock: 5, version: 1, priceAdjustment: 0 },
+        { sku: 'L-BLK', size: 'L', color: 'Black', stock: 3, version: 0, priceAdjustment: 0 },
+      ],
+    });
+
+    const res = await request(app)
+      .put('/api/products/prod123')
+      .set('Authorization', AUTH_HEADER)
+      .send({
+        variants: [
+          { sku: 'S-BLK', color: 'Black' },
+          { sku: 'M-BLK', color: 'Black' },
+          { sku: 'L-BLK', color: 'Black' },
+          { sku: 'XL-BLK', size: 'XL', color: 'Black' },
+        ],
+      });
+
+    expect(res.status).toBe(200);
+    const pullCalls = mockProductModule.updateOne.mock.calls.filter(
+      (c) => c[1] && c[1].$pull
+    );
+    expect(pullCalls).toHaveLength(0);
+
+    const pushCall = mockProductModule.updateOne.mock.calls.find(
+      (c) => c[1] && c[1].$push
+    );
+    expect(pushCall).toBeDefined();
+    expect(pushCall[1].$push.variants.stock).toBe(0);
+  });
+
+  // Test 9: $pull IS issued when the payload omits an existing SKU — pins
+  // the destructive direction so it cannot silently be "fixed" (D-17).
+  it('Test 9: $pull is issued when the payload omits an existing SKU', async () => {
+    mockProductModule.findById.mockResolvedValue({
+      ...mockProduct,
+      variants: [
+        { sku: 'S-BLK', size: 'S', color: 'Black', stock: 10, version: 2, priceAdjustment: 0 },
+        { sku: 'M-BLK', size: 'M', color: 'Black', stock: 5, version: 1, priceAdjustment: 0 },
+        { sku: 'L-BLK', size: 'L', color: 'Black', stock: 3, version: 0, priceAdjustment: 0 },
+      ],
+    });
+
+    const res = await request(app)
+      .put('/api/products/prod123')
+      .set('Authorization', AUTH_HEADER)
+      .send({
+        // L-BLK omitted on purpose
+        variants: [
+          { sku: 'S-BLK', color: 'Black' },
+          { sku: 'M-BLK', color: 'Black' },
+        ],
+      });
+
+    expect(res.status).toBe(200);
+    const pullCalls = mockProductModule.updateOne.mock.calls.filter(
+      (c) => c[1] && c[1].$pull
+    );
+    expect(pullCalls).toHaveLength(1);
+    expect(pullCalls[0][1].$pull.variants.sku.$in).toContain('L-BLK');
   });
 });
