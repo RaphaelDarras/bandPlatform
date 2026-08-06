@@ -16,6 +16,13 @@
      --color-white recolors every text-white / text-white/N utility at once. */
   --color-white: #c8bc86;
 
+  /* Semantic stock colors (D-08). Replace the hex literals previously
+     inlined in Stock.tsx; the low-stock threshold is <5 in exactly one
+     place, the stockColorClass helper in StockQuantityInput.tsx. */
+  --color-stock-danger: #ef4444;
+  --color-stock-warning: #f59e0b;
+  --color-stock-normal: #22c55e;
+
   /* Typography */
   --font-display: "Bebas Neue", "Oswald", sans-serif; /* headings / wordmark */
   --font-sans: "Inter", system-ui, sans-serif;         /* body / labels */
