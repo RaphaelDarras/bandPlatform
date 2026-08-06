@@ -10,6 +10,22 @@ const { authenticateToken } = require('../middleware/auth');
 // All routes require authentication
 router.use(authenticateToken);
 
+// Maximum number of adjustments accepted in a single POST /restock/batch call.
+// This bound is a denial-of-service mitigation: the Atlas M0 free tier's
+// transactionLifetimeLimitSeconds (60s) cannot be raised, so batches must stay
+// far below whatever could plausibly exceed that window.
+const MAX_BATCH_ADJUSTMENTS = 100;
+
+// Signals that a targeted product/variant in a batch adjustment does not exist.
+// Thrown inside the transaction callback below so the whole transaction
+// aborts (D-06's all-or-nothing guarantee), and caught below to map to a 409.
+class BatchAdjustmentError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'BatchAdjustmentError';
+  }
+}
+
 /**
  * @swagger
  * /api/inventory/deduct:
@@ -402,6 +418,169 @@ router.post('/restock', async (req, res) => {
   } catch (error) {
     console.error('Restock error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/inventory/restock/batch:
+ *   post:
+ *     summary: Apply a batch of stock adjustments atomically
+ *     description: >
+ *       Applies N stock adjustments as one all-or-nothing Mongo transaction (D-06):
+ *       either every adjustment's $inc and paired InventoryAdjustment record commits,
+ *       or a mid-batch failure aborts the whole batch and nothing is written.
+ *     tags: [Inventory]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [adjustments]
+ *             properties:
+ *               adjustments:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 100
+ *                 items:
+ *                   type: object
+ *                   required: [productId, variantSku, quantity]
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                     variantSku:
+ *                       type: string
+ *                     quantity:
+ *                       type: integer
+ *     responses:
+ *       200:
+ *         description: All adjustments applied successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       productId:
+ *                         type: string
+ *                       variantSku:
+ *                         type: string
+ *                       stockBefore:
+ *                         type: number
+ *                       stockAfter:
+ *                         type: number
+ *       400:
+ *         description: Validation error — payload rejected before any session was opened
+ *       401:
+ *         description: Unauthorized — missing or invalid token
+ *       409:
+ *         description: A targeted product/variant was not found — nothing was written
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/restock/batch', async (req, res) => {
+  const { adjustments } = req.body;
+
+  // --- Validate the whole payload BEFORE opening a session (ASVS V5) ---
+  // A client error must never open, hold, or abort a transaction.
+  if (!Array.isArray(adjustments)) {
+    return res.status(400).json({ error: 'adjustments array is required' });
+  }
+
+  if (adjustments.length < 1 || adjustments.length > MAX_BATCH_ADJUSTMENTS) {
+    return res.status(400).json({
+      error: 'adjustments must contain between 1 and 100 items'
+    });
+  }
+
+  const seenPairs = new Set();
+  for (const adjustment of adjustments) {
+    const { productId, variantSku, quantity } = adjustment || {};
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'productId must be a valid id' });
+    }
+
+    if (typeof variantSku !== 'string' || variantSku.length === 0 || variantSku.length > 64) {
+      return res.status(400).json({ error: 'variantSku is required' });
+    }
+
+    if (!Number.isInteger(quantity) || quantity === 0) {
+      return res.status(400).json({ error: 'quantity must be a non-zero integer' });
+    }
+
+    const pairKey = `${productId}:${variantSku}`;
+    if (seenPairs.has(pairKey)) {
+      return res.status(400).json({ error: `duplicate adjustment for variant ${variantSku}` });
+    }
+    seenPairs.add(pairKey);
+  }
+
+  const session = await mongoose.startSession();
+  let results = [];
+
+  try {
+    await session.withTransaction(async () => {
+      // Reset in case the transaction retries this callback after a
+      // TransientTransactionError, so a retry never double-appends.
+      results.length = 0;
+
+      for (const { productId, variantSku, quantity } of adjustments) {
+        const product = await Product.findOne(
+          { _id: productId, 'variants.sku': variantSku },
+          null,
+          { session }
+        );
+
+        if (!product) {
+          throw new BatchAdjustmentError(`Product or variant not found: ${variantSku}`);
+        }
+
+        const variant = product.variants.find(v => v.sku === variantSku);
+        const stockBefore = variant.stock;
+        const stockAfter = stockBefore + quantity;
+
+        await Product.updateOne(
+          { _id: productId, 'variants.sku': variantSku },
+          { $inc: { 'variants.$.stock': quantity } },
+          { session }
+        );
+
+        await InventoryAdjustment.create(
+          [{
+            productId,
+            variantSku,
+            type: quantity > 0 ? 'restock' : 'removal',
+            quantity,
+            stockBefore,
+            stockAfter,
+            createdBy: req.user.userId
+          }],
+          { session }
+        );
+
+        results.push({ productId, variantSku, stockBefore, stockAfter });
+      }
+    });
+
+    res.status(200).json({ success: true, results });
+  } catch (error) {
+    if (error.name === 'BatchAdjustmentError') {
+      return res.status(409).json({ error: error.message });
+    }
+    console.error('Batch restock error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await session.endSession();
   }
 });
 
