@@ -222,4 +222,54 @@ describe('GET /api/inventory/stock', () => {
     expect(res.body.productCount).toBe(0);
     expect(res.body.products).toEqual([]);
   });
+
+  // Test 8 (D-24): default request queries only active products
+  it('Test 8: default request calls Product.find with { active: true }', async () => {
+    mockProductFind.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue(mockProducts),
+    });
+
+    const res = await request(app)
+      .get('/api/inventory/stock')
+      .set('Authorization', AUTH_HEADER);
+
+    expect(res.status).toBe(200);
+    expect(mockProductFind).toHaveBeenCalledWith({ active: true });
+  });
+
+  // Test 9 (D-24): includeInactive=true queries all products, no active filter
+  it('Test 9: ?includeInactive=true calls Product.find with {}', async () => {
+    mockProductFind.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue(mockProducts),
+    });
+
+    const res = await request(app)
+      .get('/api/inventory/stock?includeInactive=true')
+      .set('Authorization', AUTH_HEADER);
+
+    expect(res.status).toBe(200);
+    expect(mockProductFind).toHaveBeenCalledWith({});
+  });
+
+  // Test 10 (D-24): mapped response includes active for each product
+  it('Test 10: each product in the response includes an active field', async () => {
+    const productsWithActive = [
+      { ...mockProducts[0], active: true },
+      { ...mockProducts[1], active: false },
+    ];
+    mockProductFind.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue(productsWithActive),
+    });
+
+    const res = await request(app)
+      .get('/api/inventory/stock?includeInactive=true')
+      .set('Authorization', AUTH_HEADER);
+
+    expect(res.status).toBe(200);
+    expect(res.body.products[0]).toHaveProperty('active', true);
+    expect(res.body.products[1]).toHaveProperty('active', false);
+  });
 });
