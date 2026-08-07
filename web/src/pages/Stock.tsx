@@ -9,8 +9,14 @@ import {
   type StockData,
   type StockProduct,
 } from '../lib/inventory'
-import { stockColorClass } from '../components/StockQuantityInput'
+import { StockQuantityInput, stockColorClass } from '../components/StockQuantityInput'
 import { DeactivateDialog } from '../components/DeactivateDialog'
+
+// `${productId}:${sku}` — exported so plan 06.1-10 can seed a pre-marked
+// dirty row into `pending` after a D-18 partial add-variant failure.
+export function rowKey(productId: string, sku: string): string {
+  return `${productId}:${sku}`
+}
 
 // Stock (D-05 origin, reworked in Phase 06.1): this is now the authenticated
 // admin surface for product and stock CRUD (INV-08). The login flow below is
@@ -35,6 +41,13 @@ export function Component() {
   // from DeactivateDialog's confirm handler, never from the bare click.
   const [pendingDeactivation, setPendingDeactivation] = useState<StockProduct | null>(null)
   const [actionInFlight, setActionInFlight] = useState(false)
+  // D-04: no reason field, note field, adjustment-type selector or preset
+  // picker exists anywhere on this page, and no adjustment-history or
+  // audit-trail view is built here either — a deliberate exclusion per the
+  // user's outright rejection of structured reasons. InventoryAdjustment's
+  // reason column stays unwritten from this page.
+  const [pending, setPending] = useState<Record<string, number>>({})
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -62,6 +75,22 @@ export function Component() {
     sessionStorage.removeItem('token')
     setToken(null)
     setData(null)
+  }
+
+  // D-07: no bound is enforced on the value — negative stock is reachable
+  // by design. Only client-side rule: a non-integer/NaN typed value blocks
+  // Save-all for this one row until corrected.
+  function setPendingValue(key: string, next: number) {
+    setPending((prev) => ({ ...prev, [key]: next }))
+    setRowErrors((prev) => {
+      const copy = { ...prev }
+      if (!Number.isInteger(next)) {
+        copy[key] = 'Quantity must be a whole number.'
+      } else {
+        delete copy[key]
+      }
+      return copy
+    })
   }
 
   async function login(e: FormEvent) {
@@ -283,24 +312,50 @@ export function Component() {
                     </tr>
                   </thead>
                   <tbody>
-                    {p.variants.map((v) => (
-                      <tr key={v.sku} className="border-t border-white/10">
-                        <td className="p-2 font-sans text-sm text-white hidden md:table-cell">
-                          {v.sku}
-                        </td>
-                        <td className="p-2 font-sans text-sm text-white">{v.size || '—'}</td>
-                        <td className="p-2 font-sans text-sm text-white">{v.color || '—'}</td>
-                        {/* D-21: a 0-stock row gets no muting, collapsing, or
-                            grouping — only the shared <5 threshold colour
-                            below applies. Retired sizes therefore accumulate
-                            as permanent 0 rows; variant removal is out of
-                            scope until Phase 7 D-15 adds a variant `active`
-                            flag. */}
-                        <td className={`p-2 font-sans text-sm ${stockColorClass(v.stock)}`}>
-                          {v.stock}
-                        </td>
-                      </tr>
-                    ))}
+                    {p.variants.map((v) => {
+                      const key = rowKey(p.productId, v.sku)
+                      const dirty = view === 'active' && pending[key] !== undefined && pending[key] !== v.stock
+                      return (
+                        <tr
+                          key={v.sku}
+                          className={`border-t border-white/10 ${
+                            dirty
+                              ? 'border-l-[3px] border-l-[var(--color-accent)] bg-[rgba(200,188,134,0.06)]'
+                              : ''
+                          }`}
+                        >
+                          <td className="p-2 font-sans text-sm text-white hidden md:table-cell">
+                            {v.sku}
+                          </td>
+                          <td className="p-2 font-sans text-sm text-white">{v.size || '—'}</td>
+                          <td className="p-2 font-sans text-sm text-white">{v.color || '—'}</td>
+                          {/* D-21: a 0-stock row gets no muting, collapsing, or
+                              grouping — only the shared <5 threshold colour
+                              below applies. Retired sizes therefore accumulate
+                              as permanent 0 rows; variant removal is out of
+                              scope until Phase 7 D-15 adds a variant `active`
+                              flag. */}
+                          {view === 'archived' ? (
+                            <td className={`p-2 font-sans text-sm ${stockColorClass(v.stock)}`}>
+                              {v.stock}
+                            </td>
+                          ) : (
+                            <td className="p-2">
+                              <StockQuantityInput
+                                productName={p.name}
+                                sku={v.sku}
+                                size={v.size}
+                                color={v.color}
+                                value={pending[key] ?? v.stock}
+                                serverValue={v.stock}
+                                onChange={(next) => setPendingValue(key, next)}
+                                error={rowErrors[key]}
+                              />
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
