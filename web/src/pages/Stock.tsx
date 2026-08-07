@@ -17,6 +17,7 @@ import {
 import { StockQuantityInput, stockColorClass } from '../components/StockQuantityInput'
 import { DeactivateDialog } from '../components/DeactivateDialog'
 import { CreateProductPanel } from '../components/CreateProductPanel'
+import { AddVariantPanel, type PendingVariantSeed } from '../components/AddVariantPanel'
 
 // `${productId}:${sku}` — exported so plan 06.1-10 can seed a pre-marked
 // dirty row into `pending` after a D-18 partial add-variant failure.
@@ -66,6 +67,9 @@ export function Component() {
   // trigger's own comment below for the boundary this deliberately does not
   // cross.
   const [createOpen, setCreateOpen] = useState(false)
+  // Holds the productId whose add-variant panel is open, at most one at a
+  // time (D-16's sibling boundary comment lives on the trigger below).
+  const [addVariantFor, setAddVariantFor] = useState<string | null>(null)
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -116,6 +120,41 @@ export function Component() {
     setRowErrors({})
     setRowWarnings({})
     setSaveError('')
+  }
+
+  // D-18 (binding, this plan's single most important contract): the
+  // add-variant PUT already succeeded, so the seeded variant(s) exist
+  // server-side at stock 0 -- this refetches so they appear as normal rows,
+  // then pre-marks each one dirty with its INTENDED count and attaches the
+  // SKU-specific amber warning, so the fix is one existing Save-all click
+  // away. Recovery routes through that same transactional batch; it is never
+  // a bespoke retry and never the generic D-06 "nothing was saved" banner
+  // (RESEARCH Pitfall 2: the two failure vocabularies must stay separate).
+  // `message` is deliberately unused/unsurfaced -- the row-scoped warning is
+  // the only required user-facing signal for this path.
+  async function handleAddVariantPartialFailure(
+    productId: string,
+    seeds: PendingVariantSeed[],
+    _message: string,
+  ) {
+    setAddVariantFor(null)
+    if (!token) return
+    await loadStock(token)
+    setPending((prev) => {
+      const next = { ...prev }
+      for (const seed of seeds) {
+        next[rowKey(productId, seed.sku)] = seed.intendedStock
+      }
+      return next
+    })
+    setRowWarnings((prev) => {
+      const next = { ...prev }
+      for (const seed of seeds) {
+        next[rowKey(productId, seed.sku)] =
+          `Variant ${seed.sku} was created at 0 — its starting quantity wasn't saved. Enter the correct count below and save.`
+      }
+      return next
+    })
   }
 
   // D-05/D-06: one POST commits the whole sweep, all-or-nothing. D-03
@@ -607,6 +646,50 @@ export function Component() {
                     })}
                   </tbody>
                 </table>
+                {view === 'active' && (
+                  <div className="pt-2">
+                    {/* D-16 (binding): this trigger only ever ADDS new
+                        variants to this already-saved product. There is no
+                        remove/delete control anywhere on a saved variant
+                        row -- Orders and Sales reference variants by
+                        variantSku (Phase 8 exists to protect exactly that
+                        history), and Phase 7 D-15 will add the
+                        variant-level `active` flag that makes soft-removal
+                        correct. The generator's own prune "x" (inside the
+                        panel below) only removes an unsaved preview row,
+                        which is a different operation. */}
+                    <button
+                      type="button"
+                      aria-label={`Add variant to ${p.name}`}
+                      onClick={() =>
+                        setAddVariantFor((current) => (current === p.productId ? null : p.productId))
+                      }
+                      className="h-11 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-[var(--color-accent)]"
+                    >
+                      + Add variant
+                    </button>
+                    {addVariantFor === p.productId && (
+                      <div className="pt-2">
+                        <AddVariantPanel
+                          token={token}
+                          productId={p.productId}
+                          productName={p.name}
+                          existingVariants={p.variants}
+                          existingSkus={allSkus}
+                          onAdded={() => {
+                            setAddVariantFor(null)
+                            void loadStock(token)
+                          }}
+                          onPartialFailure={(seeds, message) =>
+                            void handleAddVariantPartialFailure(p.productId, seeds, message)
+                          }
+                          onCancel={() => setAddVariantFor(null)}
+                          onAuthExpired={handleAuthExpired}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
