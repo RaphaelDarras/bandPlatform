@@ -15,6 +15,7 @@ vi.mock('../lib/inventory', async (importOriginal) => ({
   restoreProduct: vi.fn(),
   batchAdjustStock: vi.fn(),
   putProductVariants: vi.fn(),
+  createProduct: vi.fn(),
 }))
 
 import {
@@ -24,6 +25,7 @@ import {
   restoreProduct,
   batchAdjustStock,
   putProductVariants,
+  createProduct,
   AuthExpiredError,
 } from '../lib/inventory'
 
@@ -72,6 +74,7 @@ beforeEach(() => {
   vi.mocked(restoreProduct).mockReset()
   vi.mocked(batchAdjustStock).mockReset()
   vi.mocked(putProductVariants).mockReset()
+  vi.mocked(createProduct).mockReset()
 
   // jsdom does not implement HTMLDialogElement.prototype.showModal/close
   // (same shim as DeactivateDialog.test.tsx).
@@ -469,5 +472,205 @@ describe('Stock page', () => {
     expect(screen.queryByRole('button', { name: /save all/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^Set stock for/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^Size for/)).not.toBeInTheDocument()
+  })
+
+  it('+ Add product reveals the create panel and toggles its own label to Cancel', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    expect(screen.queryByText('New Product')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add product' }))
+    expect(screen.getByText('New Product')).toBeInTheDocument()
+    // The trigger's own label became "Cancel"; the panel also has its own
+    // Cancel button, so two "Cancel" buttons now exist -- the trigger is the
+    // first in document order.
+    const cancelButtons = screen.getAllByRole('button', { name: 'Cancel' })
+    expect(cancelButtons).toHaveLength(2)
+
+    fireEvent.click(cancelButtons[0])
+    expect(screen.queryByText('New Product')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Add product' })).toBeInTheDocument()
+  })
+
+  it('INV-05: creating a product through the page adds it to the Active list without a reload', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(createProduct).mockResolvedValueOnce({})
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add product' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Cap' } })
+    fireEvent.change(screen.getByLabelText(/base price/i), { target: { value: '20' } })
+    fireEvent.change(screen.getByLabelText('Sizes'), { target: { value: 'One Size' } })
+
+    const newStockData: StockData = {
+      ...mockStockData,
+      products: [
+        ...mockStockData.products,
+        {
+          productId: 'prod-3',
+          name: 'Cap',
+          category: null,
+          active: true,
+          productTotal: 0,
+          variants: [{ sku: 'CAP-ONES', size: 'One Size', color: null, stock: 0 }],
+        },
+      ],
+    }
+    vi.mocked(fetchStock).mockResolvedValueOnce(newStockData)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create product' }))
+
+    await waitFor(() => expect(createProduct).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(fetchStock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByText('Cap')).toBeInTheDocument())
+    expect(screen.queryByText('New Product')).not.toBeInTheDocument()
+  })
+
+  it('+ Add variant is scoped to one product and moves rather than opening two', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    const twoActiveStockData: StockData = {
+      ...mockStockData,
+      products: mockStockData.products.map((p) => ({ ...p, active: true })),
+    }
+    vi.mocked(fetchStock).mockResolvedValueOnce(twoActiveStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expect(screen.getByText('Hoodie')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
+    expect(screen.getAllByText('Add Variant')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant to Hoodie' }))
+    expect(screen.getAllByText('Add Variant')).toHaveLength(1)
+  })
+
+  it('INV-07: adding a variant calls putProductVariants then batchAdjustStock, refetches, and closes the panel', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(putProductVariants).mockResolvedValueOnce({})
+    vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
+    fireEvent.change(screen.getByLabelText('Sizes'), { target: { value: 'XL' } })
+    fireEvent.change(screen.getByLabelText(/^Opening stock/), { target: { value: '4' } })
+
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant(s)' }))
+
+    await waitFor(() => expect(putProductVariants).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(batchAdjustStock).toHaveBeenCalledWith('existing-token', [
+        { productId: 'prod-1', variantSku: 'TSHIRT-XL', quantity: 4 },
+      ]),
+    )
+    await waitFor(() => expect(fetchStock).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Add Variant')).not.toBeInTheDocument()
+  })
+
+  it('D-18: a failed follow-up stock write leaves a pre-dirty row with the exact SKU-specific warning, recoverable via Save all', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(putProductVariants).mockResolvedValueOnce({})
+    vi.mocked(batchAdjustStock).mockRejectedValueOnce(new Error('Batch save failed'))
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
+    fireEvent.change(screen.getByLabelText('Sizes'), { target: { value: 'XL' } })
+    fireEvent.change(screen.getByLabelText(/^Opening stock/), { target: { value: '4' } })
+
+    const stockWithNewVariant: StockData = {
+      ...mockStockData,
+      products: mockStockData.products.map((p) =>
+        p.productId === 'prod-1'
+          ? { ...p, variants: [...p.variants, { sku: 'TSHIRT-XL', size: 'XL', color: null, stock: 0 }] }
+          : p,
+      ),
+    }
+    vi.mocked(fetchStock).mockResolvedValueOnce(stockWithNewVariant)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant(s)' }))
+
+    await waitFor(() => expect(fetchStock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText('Add Variant')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('TSHIRT-XL')).toBeInTheDocument())
+
+    const newRowInput = await screen.findByLabelText(/^Set stock for T-Shirt, XL \/ — \(TSHIRT-XL\)/)
+    expect(newRowInput).toHaveValue(4)
+
+    expect(
+      screen.getByText(
+        "Variant TSHIRT-XL was created at 0 — its starting quantity wasn't saved. Enter the correct count below and save.",
+      ),
+    ).toBeInTheDocument()
+
+    expect(screen.getByRole('button', { name: /save all changes \(1\)/i })).toBeInTheDocument()
+    expect(screen.queryByText(/nothing was saved/i)).not.toBeInTheDocument()
+
+    vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
+    vi.mocked(fetchStock).mockResolvedValueOnce(stockWithNewVariant)
+    fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
+
+    await waitFor(() =>
+      expect(batchAdjustStock).toHaveBeenCalledWith('existing-token', [
+        { productId: 'prod-1', variantSku: 'TSHIRT-XL', quantity: 4 },
+      ]),
+    )
+
+    await waitFor(() => expect(screen.queryByText(/was created at 0/)).not.toBeInTheDocument())
+  })
+
+  it('D-10: with the create panel closed, no control anywhere edits a saved product\'s content', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    expect(screen.queryByLabelText(/description/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/base price/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/image/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit product/i })).not.toBeInTheDocument()
+  })
+
+  it('D-16: with panels closed, no control removes a saved variant', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    expect(screen.queryByRole('button', { name: /remove.*variant/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /from preview/ })).not.toBeInTheDocument()
+  })
+
+  it('D-19: both the create panel and the add-variant panel expose a Sizes control from the shared generator', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add product' }))
+    expect(screen.getByLabelText(/^sizes$/i)).toBeInTheDocument()
+    const cancelButtons = screen.getAllByRole('button', { name: 'Cancel' })
+    fireEvent.click(cancelButtons[0])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
+    expect(screen.getByLabelText(/^sizes$/i)).toBeInTheDocument()
   })
 })
