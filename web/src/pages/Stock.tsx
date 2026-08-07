@@ -1,7 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Head } from 'vite-react-ssg'
-import { AuthExpiredError, fetchStock, loginAdmin, type StockData } from '../lib/inventory'
+import {
+  AuthExpiredError,
+  deactivateProduct,
+  fetchStock,
+  loginAdmin,
+  restoreProduct,
+  type StockData,
+  type StockProduct,
+} from '../lib/inventory'
 import { stockColorClass } from '../components/StockQuantityInput'
+import { DeactivateDialog } from '../components/DeactivateDialog'
 
 // Stock (D-05 origin, reworked in Phase 06.1): this is now the authenticated
 // admin surface for product and stock CRUD (INV-08). The login flow below is
@@ -22,6 +31,10 @@ export function Component() {
   // D-25: Active/Archived is a whole-view toggle over the single fetched
   // response, split client-side — not a second request, not a tab/panel.
   const [view, setView] = useState<'active' | 'archived'>('active')
+  // D-22: the header-row button only ever sets this; DELETE fires solely
+  // from DeactivateDialog's confirm handler, never from the bare click.
+  const [pendingDeactivation, setPendingDeactivation] = useState<StockProduct | null>(null)
+  const [actionInFlight, setActionInFlight] = useState(false)
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -74,6 +87,43 @@ export function Component() {
         return
       }
       setLoadError('Failed to load stock')
+    }
+  }
+
+  // D-22: fires only from DeactivateDialog's confirm action.
+  async function confirmDeactivate() {
+    if (!token || !pendingDeactivation || actionInFlight) return
+    setActionInFlight(true)
+    try {
+      await deactivateProduct(token, pendingDeactivation.productId)
+      setPendingDeactivation(null)
+      await loadStock(token)
+    } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        handleAuthExpired()
+      } else {
+        setLoadError(err instanceof Error ? err.message : 'Failed to deactivate product')
+      }
+    } finally {
+      setActionInFlight(false)
+    }
+  }
+
+  // D-27: restore is non-destructive, no confirmation dialog.
+  async function handleRestore(product: StockProduct) {
+    if (!token || actionInFlight) return
+    setActionInFlight(true)
+    try {
+      await restoreProduct(token, product.productId)
+      await loadStock(token)
+    } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        handleAuthExpired()
+      } else {
+        setLoadError(err instanceof Error ? err.message : 'Failed to restore product')
+      }
+    } finally {
+      setActionInFlight(false)
     }
   }
 
@@ -180,7 +230,7 @@ export function Component() {
           <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4">
             {visibleProducts.map((p) => (
               <div key={p.productId}>
-                <div className="flex justify-between border-b border-[var(--color-hairline)] py-2">
+                <div className="flex items-center justify-between border-b border-[var(--color-hairline)] py-2">
                   <span className="flex items-center gap-2">
                     <span className="font-display text-xl uppercase text-white">{p.name}</span>
                     {view === 'archived' && (
@@ -189,7 +239,31 @@ export function Component() {
                       </span>
                     )}
                   </span>
-                  <span className="font-normal text-white/50">{p.productTotal} units</span>
+                  <span className="flex items-center gap-4">
+                    <span className="font-normal text-white/50">{p.productTotal} units</span>
+                    {view === 'active' && (
+                      <button
+                        type="button"
+                        aria-label={`Deactivate ${p.name}`}
+                        disabled={actionInFlight}
+                        onClick={() => setPendingDeactivation(p)}
+                        className="h-11 px-2 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-white/50 hover:text-[#ef4444] disabled:text-white/20"
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                    {view === 'archived' && (
+                      <button
+                        type="button"
+                        aria-label={`Restore ${p.name}`}
+                        disabled={actionInFlight}
+                        onClick={() => void handleRestore(p)}
+                        className="h-11 px-2 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-[var(--color-accent)] disabled:text-white/20"
+                      >
+                        Restore
+                      </button>
+                    )}
+                  </span>
                 </div>
                 <table className="mt-1 w-full">
                   <thead>
@@ -234,6 +308,13 @@ export function Component() {
           </div>
         </>
       )}
+      <DeactivateDialog
+        open={pendingDeactivation !== null}
+        productName={pendingDeactivation?.name ?? ''}
+        productTotal={pendingDeactivation?.productTotal ?? 0}
+        onConfirm={() => void confirmDeactivate()}
+        onCancel={() => setPendingDeactivation(null)}
+      />
     </section>
   )
 }
