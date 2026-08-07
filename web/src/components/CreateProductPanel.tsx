@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent, type FocusEvent, type FormEvent } from 'react'
 import { VariantGenerator, type GeneratedVariantRow } from './VariantGenerator'
+import { createProduct, AuthExpiredError, type CreateProductInput } from '../lib/inventory'
 
 // Create-product panel (INV-05, UI-SPEC §4). Inline collapsible panel — NOT
 // a modal — mounted by Stock.tsx (plan 06.1-10) only while open; this
@@ -50,10 +51,12 @@ export function CreateProductPanel(props: CreateProductPanelProps) {
   const [basePrice, setBasePrice] = useState('')
   const [category, setCategory] = useState('')
   const [rows, setRows] = useState<GeneratedVariantRow[]>([])
+  const [generatorKey, setGeneratorKey] = useState(0)
   const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({})
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
   const canSubmit =
     name.trim() !== '' && basePrice.trim() !== '' && Number(basePrice) >= 0 && rows.length > 0 && !submitting
@@ -87,11 +90,57 @@ export function CreateProductPanel(props: CreateProductPanelProps) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    // Task 2 (06.1-06) wires the createProduct call and success/failure
-    // handling in here.
     setSubmitError('')
+    setSuccessMessage('')
     setSubmitting(true)
-    setSubmitting(false)
+    try {
+      const payload: CreateProductInput = {
+        name: name.trim(),
+        basePrice: Number(basePrice),
+        category: category.trim() || undefined,
+        variants: rows.map((row) => ({
+          sku: row.sku,
+          size: row.size ?? undefined,
+          color: row.color ?? undefined,
+          // The opening stock rides in this same create call (D-11):
+          // POST /api/products has no field whitelist, so Product.create()
+          // honours variants[].stock and the admin never needs a second save.
+          stock: row.stock,
+          // priceAdjustment is never exposed for editing on this page (D-20)
+          // -- always sent as zero, matching the mobile app's documented
+          // create/edit convention (STATE.md [Phase 02-post]).
+          priceAdjustment: 0,
+        })),
+      }
+
+      // D-11's discretion item, decided here: no InventoryAdjustment record
+      // is written for this opening balance. Writing one would require a
+      // second, non-transactional call after create, reintroducing exactly
+      // the chained-write failure mode D-18 exists to handle -- for no
+      // requirement CONTEXT.md actually makes. The trail's inability to
+      // explain the first N units is an accepted consequence.
+      await createProduct(props.token, payload)
+
+      setName('')
+      setBasePrice('')
+      setCategory('')
+      setRows([])
+      setGeneratorKey((k) => k + 1)
+      setTouched({})
+      setErrors({})
+      setSuccessMessage('Product created.')
+      props.onCreated()
+    } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        // D-30 (binding): drop straight to the parent's logout path. No
+        // retry, no draft preservation, no unsaved-changes warning.
+        props.onAuthExpired()
+        return
+      }
+      setSubmitError(err instanceof Error ? err.message : 'Failed to create product. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -145,7 +194,12 @@ export function CreateProductPanel(props: CreateProductPanelProps) {
             />
           </div>
 
-          <VariantGenerator productName={name} existingSkus={props.existingSkus} onRowsChange={setRows} />
+          <VariantGenerator
+            key={generatorKey}
+            productName={name}
+            existingSkus={props.existingSkus}
+            onRowsChange={setRows}
+          />
 
           <div className="flex gap-3">
             <button
@@ -170,6 +224,9 @@ export function CreateProductPanel(props: CreateProductPanelProps) {
             <p role="alert" className={errorClassName}>
               {submitError}
             </p>
+          )}
+          {successMessage && (
+            <p className="font-sans text-sm text-[var(--color-accent)]">{successMessage}</p>
           )}
         </fieldset>
       </form>
