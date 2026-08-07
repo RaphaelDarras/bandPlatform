@@ -6,10 +6,13 @@ import {
   deactivateProduct,
   fetchStock,
   loginAdmin,
+  putProductVariants,
   restoreProduct,
   type BatchAdjustment,
   type StockData,
   type StockProduct,
+  type StockVariant,
+  type VariantPayload,
 } from '../lib/inventory'
 import { StockQuantityInput, stockColorClass } from '../components/StockQuantityInput'
 import { DeactivateDialog } from '../components/DeactivateDialog'
@@ -56,6 +59,8 @@ export function Component() {
   const [rowWarnings, setRowWarnings] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [labelErrors, setLabelErrors] = useState<Record<string, string>>({})
+  const [labelSaving, setLabelSaving] = useState<Record<string, boolean>>({})
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -159,6 +164,116 @@ export function Component() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // D-20 (binding): size/colour edits go through the existing
+  // non-transactional PUT /api/products/:id and are deliberately DECOUPLED
+  // from the Save-all stock batch — they never count toward dirtyCount,
+  // never block Save-all, and never flip the footer to its dirty state.
+  // D-06's all-or-nothing language is specific to the new transactional
+  // stock endpoint; folding labels into it would overstate an atomicity
+  // guarantee that does not exist for them. `priceAdjustment` is never
+  // rendered as an editable field anywhere on this page — Phase 7 D-02/D-12
+  // hands price to Shopify and splits it back on pull.
+  async function handleLabelBlur(
+    product: StockProduct,
+    variant: StockVariant,
+    field: 'size' | 'color',
+    nextValue: string,
+  ) {
+    if (!token) return
+    const current = (field === 'size' ? variant.size : variant.color) ?? ''
+    if (nextValue === current) return
+    const cellKey = `${rowKey(product.productId, variant.sku)}:${field}`
+
+    // D-17 (binding): PUT /api/products/:id $pulls every variant missing
+    // from the payload, so this must be the product's FULL variant array
+    // with only the edited field replaced on the matching SKU — never a
+    // partial array.
+    const fullArray: VariantPayload[] = product.variants.map((vv) => ({
+      sku: vv.sku,
+      size: vv.sku === variant.sku && field === 'size' ? nextValue || null : vv.size,
+      color: vv.sku === variant.sku && field === 'color' ? nextValue || null : vv.color,
+    }))
+
+    setLabelSaving((prev) => ({ ...prev, [cellKey]: true }))
+    setLabelErrors((prev) => {
+      const copy = { ...prev }
+      delete copy[cellKey]
+      return copy
+    })
+    try {
+      await putProductVariants(token, product.productId, fullArray)
+      // A background refresh can never be allowed to wipe an in-progress
+      // stock sweep, so only re-fetch when nothing is pending; otherwise
+      // update this one field optimistically in local state.
+      if (Object.keys(pending).length === 0) {
+        await loadStock(token)
+      } else {
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                products: prev.products.map((pp) =>
+                  pp.productId === product.productId
+                    ? {
+                        ...pp,
+                        variants: pp.variants.map((vv) =>
+                          vv.sku === variant.sku ? { ...vv, [field]: nextValue || null } : vv,
+                        ),
+                      }
+                    : pp,
+                ),
+              }
+            : prev,
+        )
+      }
+    } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        handleAuthExpired()
+      } else {
+        setLabelErrors((prev) => ({ ...prev, [cellKey]: "Couldn't save this change — try again." }))
+      }
+    } finally {
+      setLabelSaving((prev) => ({ ...prev, [cellKey]: false }))
+    }
+  }
+
+  // Shared by both the Size and Color columns (Active view only) so the
+  // failure copy exists exactly once in source. Row-scoped, never a
+  // page-wide banner.
+  function renderLabelCell(product: StockProduct, variant: StockVariant, field: 'size' | 'color') {
+    const cellKey = `${rowKey(product.productId, variant.sku)}:${field}`
+    const fieldLabel = field === 'size' ? 'Size' : 'Color'
+    const currentValue = (field === 'size' ? variant.size : variant.color) ?? ''
+    const inputId = `label-${field}-${product.productId}-${variant.sku}`
+    const errId = `label-err-${field}-${product.productId}-${variant.sku}`
+    const isSaving = labelSaving[cellKey] ?? false
+    const error = labelErrors[cellKey]
+
+    return (
+      <td className="p-2">
+        <label htmlFor={inputId} className="sr-only">
+          {`${fieldLabel} for ${product.name} (${variant.sku})`}
+        </label>
+        <input
+          id={inputId}
+          type="text"
+          defaultValue={currentValue}
+          onBlur={(e) => void handleLabelBlur(product, variant, field, e.target.value)}
+          disabled={isSaving}
+          aria-describedby={error ? errId : undefined}
+          className={`h-11 w-full border-b bg-transparent px-1 font-sans text-sm text-white focus:border-white/40 ${
+            isSaving ? 'animate-pulse border-[var(--color-accent)]' : 'border-transparent'
+          }`}
+        />
+        {error && (
+          <p role="alert" id={errId} className="font-sans text-xs text-[#ef4444]">
+            {error}
+          </p>
+        )}
+      </td>
+    )
   }
 
   async function login(e: FormEvent) {
@@ -408,8 +523,16 @@ export function Component() {
                           <td className="p-2 font-sans text-sm text-white hidden md:table-cell">
                             {v.sku}
                           </td>
-                          <td className="p-2 font-sans text-sm text-white">{v.size || '—'}</td>
-                          <td className="p-2 font-sans text-sm text-white">{v.color || '—'}</td>
+                          {view === 'archived' ? (
+                            <td className="p-2 font-sans text-sm text-white">{v.size || '—'}</td>
+                          ) : (
+                            renderLabelCell(p, v, 'size')
+                          )}
+                          {view === 'archived' ? (
+                            <td className="p-2 font-sans text-sm text-white">{v.color || '—'}</td>
+                          ) : (
+                            renderLabelCell(p, v, 'color')
+                          )}
                           {/* D-21: a 0-stock row gets no muting, collapsing, or
                               grouping — only the shared <5 threshold colour
                               below applies. Retired sizes therefore accumulate

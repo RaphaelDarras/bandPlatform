@@ -13,9 +13,19 @@ vi.mock('../lib/inventory', async (importOriginal) => ({
   fetchStock: vi.fn(),
   deactivateProduct: vi.fn(),
   restoreProduct: vi.fn(),
+  batchAdjustStock: vi.fn(),
+  putProductVariants: vi.fn(),
 }))
 
-import { loginAdmin, fetchStock, deactivateProduct, restoreProduct, AuthExpiredError } from '../lib/inventory'
+import {
+  loginAdmin,
+  fetchStock,
+  deactivateProduct,
+  restoreProduct,
+  batchAdjustStock,
+  putProductVariants,
+  AuthExpiredError,
+} from '../lib/inventory'
 
 // D-33: vite-react-ssg's <Head> renders react-helmet-async's <Helmet>, which
 // requires a <HelmetProvider> ancestor (normally supplied by ViteReactSSG()
@@ -60,6 +70,8 @@ beforeEach(() => {
   vi.mocked(fetchStock).mockReset()
   vi.mocked(deactivateProduct).mockReset()
   vi.mocked(restoreProduct).mockReset()
+  vi.mocked(batchAdjustStock).mockReset()
+  vi.mocked(putProductVariants).mockReset()
 
   // jsdom does not implement HTMLDialogElement.prototype.showModal/close
   // (same shim as DeactivateDialog.test.tsx).
@@ -237,5 +249,225 @@ describe('Stock page', () => {
     const meta = document.querySelector('meta[name="robots"]')
     expect(meta).not.toBeNull()
     expect(meta).toHaveAttribute('content', 'noindex')
+  })
+
+  it('D-01/D-05: the footer dirty count grows per dirty row and Save all starts disabled', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    const saveButton = screen.getByRole('button', { name: /save all/i })
+    expect(saveButton).toBeDisabled()
+    expect(saveButton).toHaveTextContent('Save all')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
+    expect(screen.getByRole('button', { name: /save all changes \(1\)/i })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-S-BLK' }))
+    expect(screen.getByRole('button', { name: /save all changes \(2\)/i })).toBeEnabled()
+  })
+
+  it('D-06 (companion): the "(was N)" caption appears on a dirty row and clears on Discard changes', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
+    expect(screen.getByText('(was 3)')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /discard changes/i }))
+    expect(screen.queryByText('(was 3)')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^save all$/i })).toBeDisabled()
+  })
+
+  it('D-03: sends the delta (pending - displayed), not the absolute value, with no submit-time re-read', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/^Set stock for T-Shirt, M \/ Black \(TS-M-BLK\)/), {
+      target: { value: '10' },
+    })
+
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
+
+    expect(batchAdjustStock).toHaveBeenCalledTimes(1)
+    expect(batchAdjustStock).toHaveBeenCalledWith('existing-token', [
+      { productId: 'prod-1', variantSku: 'TS-M-BLK', quantity: 7 },
+    ])
+    // No submit-time re-read (D-03): fetchStock has not been called again yet.
+    expect(fetchStock).toHaveBeenCalledTimes(1)
+
+    await waitFor(() => expect(fetchStock).toHaveBeenCalledTimes(2))
+  })
+
+  it('D-07: three decrements from server stock 2 send quantity: -3, going below zero', async () => {
+    const twoStockData: StockData = {
+      ...mockStockData,
+      products: mockStockData.products.map((p) =>
+        p.productId === 'prod-1'
+          ? { ...p, variants: p.variants.map((v) => (v.sku === 'TS-M-BLK' ? { ...v, stock: 2 } : v)) }
+          : p,
+      ),
+    }
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(twoStockData)
+    vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    const decreaseButton = screen.getByRole('button', { name: 'Decrease stock for TS-M-BLK' })
+    fireEvent.click(decreaseButton)
+    fireEvent.click(decreaseButton)
+    fireEvent.click(decreaseButton)
+
+    vi.mocked(fetchStock).mockResolvedValueOnce(twoStockData)
+    fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
+
+    expect(batchAdjustStock).toHaveBeenCalledWith('existing-token', [
+      { productId: 'prod-1', variantSku: 'TS-M-BLK', quantity: -3 },
+    ])
+  })
+
+  it('D-06: an all-or-nothing batch failure preserves the typed value, the dirty count, and shows "nothing was saved"', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(batchAdjustStock).mockRejectedValueOnce(
+      new Error('Product or variant not found: TS-M-BLK'),
+    )
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/^Set stock for T-Shirt, M \/ Black \(TS-M-BLK\)/), {
+      target: { value: '10' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent('nothing was saved')
+      expect(alert).toHaveTextContent('Product or variant not found: TS-M-BLK')
+      expect(alert).toHaveTextContent('Your changes are still here.')
+    })
+
+    expect(screen.getByLabelText(/^Set stock for T-Shirt, M \/ Black \(TS-M-BLK\)/)).toHaveValue(10)
+    expect(screen.getByRole('button', { name: /save all changes \(1\)/i })).toBeInTheDocument()
+  })
+
+  it('on success, pending clears and the footer returns to the disabled idle state', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^save all$/i })).toBeDisabled()
+    })
+    expect(fetchStock).toHaveBeenCalledTimes(2)
+  })
+
+  it('D-30: an AuthExpiredError from batchAdjustStock clears the token and shows no unsaved-changes prompt', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(batchAdjustStock).mockRejectedValueOnce(new AuthExpiredError('Session expired'))
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
+    fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/username/i)).toBeInTheDocument()
+    })
+    expect(sessionStorage.getItem('token')).toBeNull()
+    expect(screen.queryByText(/unsaved/i)).not.toBeInTheDocument()
+  })
+
+  it('D-04: no control or text anywhere in the Active view names or mentions "reason"', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    expect(screen.queryByLabelText(/reason/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/reason/i)).not.toBeInTheDocument()
+  })
+
+  it('D-20: editing a Size input on blur sends the full variant array via putProductVariants without touching dirtyCount', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(putProductVariants).mockResolvedValueOnce({})
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: /^save all$/i })).toBeDisabled()
+
+    const sizeInput = screen.getByLabelText('Size for T-Shirt (TS-M-BLK)')
+    fireEvent.change(sizeInput, { target: { value: 'ML' } })
+    // No stock edits are pending, so a successful label save re-runs
+    // loadStock (queue the refresh response before triggering the blur).
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    fireEvent.blur(sizeInput)
+
+    await waitFor(() => expect(putProductVariants).toHaveBeenCalledTimes(1))
+    const [, , variantsArg] = vi.mocked(putProductVariants).mock.calls[0]
+    expect(variantsArg).toHaveLength(3)
+    expect(variantsArg).toContainEqual(expect.objectContaining({ sku: 'TS-M-BLK', size: 'ML' }))
+
+    await waitFor(() => expect(fetchStock).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('button', { name: /^save all$/i })).toBeDisabled()
+    expect(screen.queryByLabelText(/price adjustment/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/price adjustment/i)).not.toBeInTheDocument()
+  })
+
+  it('a putProductVariants rejection shows the row-scoped label error, not the batch banner', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+    vi.mocked(putProductVariants).mockRejectedValueOnce(new Error('Update failed'))
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+
+    const colorInput = screen.getByLabelText('Color for T-Shirt (TS-M-BLK)')
+    fireEvent.change(colorInput, { target: { value: 'Navy' } })
+    fireEvent.blur(colorInput)
+
+    await waitFor(() => {
+      expect(screen.getByText("Couldn't save this change — try again.")).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/nothing was saved/i)).not.toBeInTheDocument()
+  })
+
+  it('D-26: the Archived view has no sticky footer, no stock-set controls, and no size inputs', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archived' }))
+
+    expect(screen.queryByRole('button', { name: /save all/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Set stock for/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Size for/)).not.toBeInTheDocument()
   })
 })
