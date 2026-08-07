@@ -16,6 +16,7 @@ import {
 } from '../lib/inventory'
 import { StockQuantityInput, stockColorClass } from '../components/StockQuantityInput'
 import { DeactivateDialog } from '../components/DeactivateDialog'
+import { CreateProductPanel } from '../components/CreateProductPanel'
 
 // `${productId}:${sku}` — exported so plan 06.1-10 can seed a pre-marked
 // dirty row into `pending` after a D-18 partial add-variant failure.
@@ -61,6 +62,10 @@ export function Component() {
   const [saveError, setSaveError] = useState('')
   const [labelErrors, setLabelErrors] = useState<Record<string, string>>({})
   const [labelSaving, setLabelSaving] = useState<Record<string, boolean>>({})
+  // D-10/D-12: the ONE content-writing surface on this page -- see the
+  // trigger's own comment below for the boundary this deliberately does not
+  // cross.
+  const [createOpen, setCreateOpen] = useState(false)
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -401,6 +406,10 @@ export function Component() {
       )
     : 0
   const hasRowError = Object.values(rowErrors).some((e) => e.length > 0)
+  // Every SKU across every loaded product, active AND archived, so the
+  // generator's D-14 client warning also catches a clash against an
+  // archived product's SKU.
+  const allSkus = data ? data.products.flatMap((p) => p.variants.map((v) => v.sku)) : []
 
   return (
     <section>
@@ -432,6 +441,40 @@ export function Component() {
           Archived
         </button>
       </div>
+      {view === 'active' && data && (
+        <div className="mx-auto max-w-2xl px-4 pt-6">
+          {/* D-10 (binding): this trigger only ever mounts CreateProductPanel,
+              which CREATES a brand-new product. There is no control anywhere
+              on this page -- here or in the per-product rows below -- that
+              edits a saved product's name, description, base price or
+              images. Creation is deliberately the only content-writing path
+              in this phase: Phase 7 D-02 makes Shopify the content master,
+              so an editor built here would just be a form whose edits the
+              Shopify pull silently overwrites. Accepted consequence: until
+              Phase 7 ships, a typo in a product name has no in-app fix. */}
+          <button
+            type="button"
+            onClick={() => setCreateOpen((open) => !open)}
+            className="h-11 w-full rounded-md border border-[var(--color-hairline)] bg-transparent px-4 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-[var(--color-accent)]"
+          >
+            {createOpen ? 'Cancel' : '+ Add product'}
+          </button>
+          {createOpen && (
+            <div className="pt-4">
+              <CreateProductPanel
+                token={token}
+                existingSkus={allSkus}
+                onCreated={() => {
+                  setCreateOpen(false)
+                  void loadStock(token)
+                }}
+                onCancel={() => setCreateOpen(false)}
+                onAuthExpired={handleAuthExpired}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {loadError && (
         <p className="pt-4 text-center font-sans text-sm text-[#ef4444]">{loadError}</p>
       )}
