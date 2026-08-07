@@ -2,10 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Head } from 'vite-react-ssg'
 import {
   AuthExpiredError,
+  batchAdjustStock,
   deactivateProduct,
   fetchStock,
   loginAdmin,
   restoreProduct,
+  type BatchAdjustment,
   type StockData,
   type StockProduct,
 } from '../lib/inventory'
@@ -48,6 +50,12 @@ export function Component() {
   // reason column stays unwritten from this page.
   const [pending, setPending] = useState<Record<string, number>>({})
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
+  // Set by plan 06.1-10 (D-18 partial add-variant failure). Declared here so
+  // it can be threaded into StockQuantityInput's `warning` prop and cleared
+  // alongside a successful Save-all or a discard-changes click.
+  const [rowWarnings, setRowWarnings] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -91,6 +99,66 @@ export function Component() {
       }
       return copy
     })
+  }
+
+  function handleDiscard() {
+    setPending({})
+    setRowErrors({})
+    setRowWarnings({})
+    setSaveError('')
+  }
+
+  // D-05/D-06: one POST commits the whole sweep, all-or-nothing. D-03
+  // (binding, counter-intuitive by design): the delta for each dirty row is
+  // computed HERE, at click time, from whatever `pending`/`v.stock` already
+  // hold in memory — never re-fetched, never version-checked. A concurrent
+  // POS sale landing between load and this click silently produces a wrong
+  // count; that risk was spelled out and accepted (single admin, roughly
+  // 400 POS sales/year in known post-concert bursts). Do not add a
+  // re-fetch-before-save, a staleness guard, or a reconciliation step here.
+  async function handleSaveAll() {
+    if (!token || saving) return
+    const dirtyRows = (data?.products ?? []).flatMap((p) =>
+      p.variants
+        .map((v) => ({ productId: p.productId, sku: v.sku, serverStock: v.stock, key: rowKey(p.productId, v.sku) }))
+        .filter((r) => pending[r.key] !== undefined && pending[r.key] !== r.serverStock)
+        .map((r) => ({ productId: r.productId, sku: r.sku, serverStock: r.serverStock, pendingStock: pending[r.key] })),
+    )
+    const hasRowError = Object.values(rowErrors).some((e) => e.length > 0)
+    if (dirtyRows.length === 0 || hasRowError) return
+
+    if (dirtyRows.length > 100) {
+      setSaveError('Too many changes to save at once (max 100). Save some and try again.')
+      return
+    }
+
+    const adjustments: BatchAdjustment[] = dirtyRows
+      .map((r) => ({ productId: r.productId, variantSku: r.sku, quantity: r.pendingStock - r.serverStock }))
+      .filter((a) => a.quantity !== 0)
+
+    setSaving(true)
+    setSaveError('')
+    try {
+      await batchAdjustStock(token, adjustments)
+      setPending({})
+      setRowErrors({})
+      setRowWarnings({})
+      setSaveError('')
+      await loadStock(token)
+    } catch (err) {
+      if (err instanceof AuthExpiredError) {
+        handleAuthExpired()
+      } else {
+        // D-06 (binding): never clear `pending`/`rowErrors` and never
+        // re-run loadStock here — a failed batch wrote nothing, so every
+        // dirty row, its highlight and its typed number must survive
+        // untouched so the admin can retry without redoing work.
+        const message = err instanceof Error ? err.message : ''
+        setSaveError(`Save failed — nothing was saved. ${message || 'Please try again.'} Your changes are still here.`)
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function login(e: FormEvent) {
@@ -205,6 +273,19 @@ export function Component() {
     ? data.products.filter((p) => (view === 'active' ? p.active : !p.active))
     : []
   const visibleUnitTotal = visibleProducts.reduce((sum, p) => sum + p.productTotal, 0)
+
+  const dirtyCount = data
+    ? data.products.reduce(
+        (count, p) =>
+          count +
+          p.variants.filter((v) => {
+            const key = rowKey(p.productId, v.sku)
+            return pending[key] !== undefined && pending[key] !== v.stock
+          }).length,
+        0,
+      )
+    : 0
+  const hasRowError = Object.values(rowErrors).some((e) => e.length > 0)
 
   return (
     <section>
@@ -350,6 +431,8 @@ export function Component() {
                                 serverValue={v.stock}
                                 onChange={(next) => setPendingValue(key, next)}
                                 error={rowErrors[key]}
+                                warning={rowWarnings[key]}
+                                disabled={saving}
                               />
                             </td>
                           )}
@@ -362,6 +445,40 @@ export function Component() {
             ))}
           </div>
         </>
+      )}
+      {/* D-26: the sticky Save-all footer renders in the Active view only,
+          and only once product data has loaded — never in Archived. */}
+      {data && view === 'active' && (
+        <div className="sticky bottom-0 z-40 border-t border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-2">
+          {saveError && (
+            <p role="alert" className="pb-2 text-center font-sans text-sm text-[#ef4444]">
+              {saveError}
+            </p>
+          )}
+          <div className="flex h-11 items-center justify-end gap-4">
+            {dirtyCount > 0 && !saving && (
+              <button
+                type="button"
+                onClick={handleDiscard}
+                className="font-sans text-sm text-white/50 underline"
+              >
+                Discard changes
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={saving || dirtyCount === 0 || hasRowError}
+              onClick={() => void handleSaveAll()}
+              className={`flex h-11 items-center gap-2 px-6 font-sans text-sm font-semibold uppercase tracking-[0.06em] ${
+                saving || dirtyCount === 0 || hasRowError
+                  ? 'bg-white/20 text-white/40'
+                  : 'bg-[var(--color-accent)] text-black'
+              }`}
+            >
+              {saving ? 'Saving…' : dirtyCount > 0 ? `Save all changes (${dirtyCount})` : 'Save all'}
+            </button>
+          </div>
+        </div>
       )}
       <DeactivateDialog
         open={pendingDeactivation !== null}
