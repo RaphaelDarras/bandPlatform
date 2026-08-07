@@ -19,6 +19,9 @@ export function Component() {
   const [loginError, setLoginError] = useState('')
   const [data, setData] = useState<StockData | null>(null)
   const [loadError, setLoadError] = useState('')
+  // D-25: Active/Archived is a whole-view toggle over the single fetched
+  // response, split client-side — not a second request, not a tab/panel.
+  const [view, setView] = useState<'active' | 'archived'>('active')
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -119,17 +122,57 @@ export function Component() {
     )
   }
 
-  const visibleProducts = data ? data.products.filter((p) => p.active) : []
+  const visibleProducts = data
+    ? data.products.filter((p) => (view === 'active' ? p.active : !p.active))
+    : []
   const visibleUnitTotal = visibleProducts.reduce((sum, p) => sum + p.productTotal, 0)
 
   return (
     <section>
       {noindexTag}
       <h1 className="font-display text-3xl uppercase text-white">Stock</h1>
+      <div className="flex justify-center gap-8 pt-4">
+        <button
+          type="button"
+          aria-pressed={view === 'active'}
+          onClick={() => setView('active')}
+          className={`flex h-11 items-center border-b-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] ${
+            view === 'active'
+              ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+              : 'border-transparent text-white/50'
+          }`}
+        >
+          Active
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === 'archived'}
+          onClick={() => setView('archived')}
+          className={`flex h-11 items-center border-b-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] ${
+            view === 'archived'
+              ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+              : 'border-transparent text-white/50'
+          }`}
+        >
+          Archived
+        </button>
+      </div>
       {loadError && (
         <p className="pt-4 text-center font-sans text-sm text-[#ef4444]">{loadError}</p>
       )}
-      {data && (
+      {data && visibleProducts.length === 0 && (
+        <div className="mx-auto max-w-md px-4 pt-8 text-center">
+          <h2 className="font-display text-xl uppercase text-white">
+            {view === 'active' ? 'No products yet.' : 'No archived products.'}
+          </h2>
+          <p className="pt-2 font-sans text-sm text-white/50">
+            {view === 'active'
+              ? 'Create your first product to start tracking stock.'
+              : 'Deactivated products will appear here — restore them any time.'}
+          </p>
+        </div>
+      )}
+      {data && visibleProducts.length > 0 && (
         <>
           <p className="pb-6 pt-2 text-center font-sans text-sm text-white/50">
             {visibleUnitTotal} units across {visibleProducts.length} products
@@ -138,7 +181,14 @@ export function Component() {
             {visibleProducts.map((p) => (
               <div key={p.productId}>
                 <div className="flex justify-between border-b border-[var(--color-hairline)] py-2">
-                  <span className="font-display text-xl uppercase text-white">{p.name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-display text-xl uppercase text-white">{p.name}</span>
+                    {view === 'archived' && (
+                      <span className="rounded bg-white/10 px-2 py-0.5 font-sans text-xs uppercase text-white/60">
+                        Archived
+                      </span>
+                    )}
+                  </span>
                   <span className="font-normal text-white/50">{p.productTotal} units</span>
                 </div>
                 <table className="mt-1 w-full">
