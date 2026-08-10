@@ -84,11 +84,3 @@ export interface Order {
   shippingAddress: ShippingAddress;
   paymentMethod?: 'stripe' | 'paypal';
 }
-
-/**
- * Response shape from POST /api/orders (see api/routes/orders.js, D-02/D-05).
- */
-export interface CreateOrderResponse {
-  orderNumber: string;
-  redirectUrl: string;
-}
