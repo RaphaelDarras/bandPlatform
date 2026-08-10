@@ -6,12 +6,12 @@ const { swaggerUi, swaggerSpec } = require('./config/swagger');
 
 const app = express();
 
-// 1. Webhook routes FIRST -- raw body required for Stripe/PayPal signature
-// verification (AUTH-03). Must be mounted BEFORE express.json() below:
+// 1. Webhook routes FIRST -- raw body required for Shopify HMAC signature
+// verification (Pitfall 4). Must be mounted BEFORE express.json() below:
 // otherwise Express parses+re-serializes the body, destroying the exact
-// bytes the provider's signature was computed over (webhooks.js scopes
+// bytes the provider's HMAC was computed over (shopifyWebhooks.js scopes
 // express.raw() per-route internally).
-app.use('/api/webhooks', require('./routes/webhooks'));
+app.use('/api/shopify/webhooks', require('./routes/shopifyWebhooks'));
 
 // 2. THEN the global JSON parser for every other route.
 app.use(express.json());
@@ -40,7 +40,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/concerts', require('./routes/concerts'));
 app.use('/api/sales', require('./routes/sales'));
-app.use('/api/orders', require('./routes/orders'));
+app.use('/api/shopify', require('./routes/shopify'));
 
 // Start server
 const PORT = process.env.PORT || 5000;
