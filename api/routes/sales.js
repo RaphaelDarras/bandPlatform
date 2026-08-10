@@ -3,6 +3,12 @@ const router = express.Router();
 const Product = require('../models/Product');
 const Sale = require('../models/Sale');
 const { authenticateToken } = require('../middleware/auth');
+// Outbound Shopify mirror (07-07): this POS path is the DOMINANT stock-changing
+// event (D-01 criterion 3), not inventory.js. Pushes are best-effort,
+// config-guarded, fire-and-forget — they must NEVER change the batch/void/unvoid
+// response, idempotency-skip behaviour, or the "stock can go negative — concert
+// sales never rejected" contract. No-ops when Shopify is unconfigured.
+const shopifyOutbound = require('../services/shopifyOutbound');
 
 // All routes require authentication
 router.use(authenticateToken);
@@ -70,6 +76,10 @@ router.post('/batch', async (req, res) => {
           stockBefore,
           stockAfter,
         });
+
+        // Mirror the new absolute count for this changed variant to Shopify
+        // (fire-and-forget, D-06) — fired once per deducted line item.
+        shopifyOutbound.syncInventoryOut(productId, variantSku).catch(() => {});
       }
 
       // Normalise paymentMethod to backend enum
@@ -174,6 +184,9 @@ router.post('/:id/void', async (req, res) => {
         { _id: item.productId, 'variants.sku': item.variantSku },
         { $inc: { 'variants.$.stock': item.quantity } }
       );
+
+      // Mirror the restored absolute count to Shopify (fire-and-forget, D-06).
+      shopifyOutbound.syncInventoryOut(item.productId, item.variantSku).catch(() => {});
     }
 
     sale.voidedAt = new Date();
@@ -212,6 +225,9 @@ router.post('/:id/unvoid', async (req, res) => {
         { _id: item.productId, 'variants.sku': item.variantSku },
         { $inc: { 'variants.$.stock': -item.quantity } }
       );
+
+      // Mirror the re-deducted absolute count to Shopify (fire-and-forget, D-06).
+      shopifyOutbound.syncInventoryOut(item.productId, item.variantSku).catch(() => {});
     }
 
     sale.voidedAt = undefined;

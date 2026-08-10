@@ -24,21 +24,42 @@ jest.mock('../services/shopifySync', () => ({
   pushInventory: jest.fn(),
 }));
 
-// Product model mock — only findOne/updateOne are used by syncInventoryOut.
+// Product model mock — findOne/updateOne are used by syncInventoryOut;
+// findOneAndUpdate is used by the sales.js router exercised in the POS section.
 const mockProduct = {
   findOne: jest.fn(),
   updateOne: jest.fn(),
+  findOneAndUpdate: jest.fn(),
 };
 jest.mock('../models/Product', () => mockProduct);
 
+// Sale model mock — used only by the sales.js router in the POS section below.
+const mockSale = {
+  findOne: jest.fn(),
+  create: jest.fn(),
+  find: jest.fn(),
+  findById: jest.fn(),
+};
+jest.mock('../models/Sale', () => mockSale);
+
+// JWT mock so sales.js's authenticateToken passes with any Bearer token.
+jest.mock('jsonwebtoken', () => ({
+  verify: jest.fn().mockReturnValue({ userId: 'admin1', role: 'admin' }),
+  sign: jest.fn(),
+}));
+
+const express = require('express');
+const request = require('supertest');
+
 const shopifySync = require('../services/shopifySync');
 const Product = require('../models/Product');
+const outbound = require('../services/shopifyOutbound');
 const {
   isShopifyConfigured,
   syncProductOut,
   archiveProductOut,
   syncInventoryOut,
-} = require('../services/shopifyOutbound');
+} = outbound;
 
 const OLD_ENV = process.env;
 
@@ -216,5 +237,88 @@ describe('syncInventoryOut — absolute-count push + syncPending retry marking',
       { _id: 'prod1', 'variants.sku': 'TEE-S' },
       { $set: { 'variants.$.syncPending': true } },
     );
+  });
+});
+
+describe('POS path — sales.js /batch fires syncInventoryOut per changed variant (D-01 criterion 3)', () => {
+  let app;
+
+  function buildSalesApp() {
+    const a = express();
+    a.use(express.json());
+    a.use('/api/sales', require('../routes/sales'));
+    return a;
+  }
+
+  beforeEach(() => {
+    // The dominant stock write must mirror to Shopify even though these tests
+    // run with Shopify UNCONFIGURED — proving the wiring fires the wrapper while
+    // the wrapper itself does zero Shopify work (no-op guard).
+    unconfigure();
+    process.env.JWT_SECRET = 'test-secret';
+    app = buildSalesApp();
+
+    // A product exists for each variant, and the atomic deduct returns the
+    // updated doc — mirroring the real sales.js read+$inc flow.
+    mockProduct.findOne.mockImplementation((query) => {
+      const sku = query['variants.sku'];
+      return Promise.resolve({ variants: [{ sku, stock: 10 }] });
+    });
+    mockProduct.findOneAndUpdate.mockImplementation((query) => {
+      const sku = query['variants.sku'];
+      return Promise.resolve({ variants: [{ sku, stock: 8 }] });
+    });
+    mockSale.findOne.mockResolvedValue(null); // never a duplicate
+    mockSale.create.mockImplementation((doc) => Promise.resolve({ _id: 'sale1', ...doc }));
+  });
+
+  it('fires syncInventoryOut exactly once per changed variant on a /batch sale', async () => {
+    const spy = jest.spyOn(outbound, 'syncInventoryOut');
+
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', 'Bearer test-token')
+      .send([
+        {
+          concertId: '507f1f77bcf86cd799439011',
+          idempotencyKey: 'k-1',
+          totalAmount: 50,
+          paymentMethod: 'cash',
+          items: [
+            { productId: '507f1f77bcf86cd799439012', variantSku: 'TEE-S', quantity: 2, priceAtSale: 25 },
+            { productId: '507f1f77bcf86cd799439013', variantSku: 'HOOD-M', quantity: 1, priceAtSale: 40 },
+          ],
+        },
+      ]);
+
+    // Response contract is unchanged (still a normal 201 created batch).
+    expect(res.status).toBe(201);
+    expect(res.body.created).toBe(1);
+
+    // Once per changed variant — two line items => two pushes.
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy).toHaveBeenCalledWith('507f1f77bcf86cd799439012', 'TEE-S');
+    expect(spy).toHaveBeenCalledWith('507f1f77bcf86cd799439013', 'HOOD-M');
+  });
+
+  it('is a no-op (zero Shopify work) when Shopify is unconfigured', async () => {
+    await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', 'Bearer test-token')
+      .send([
+        {
+          concertId: '507f1f77bcf86cd799439011',
+          idempotencyKey: 'k-2',
+          totalAmount: 50,
+          paymentMethod: 'cash',
+          items: [
+            { productId: '507f1f77bcf86cd799439012', variantSku: 'TEE-S', quantity: 2, priceAtSale: 25 },
+          ],
+        },
+      ]);
+
+    // The wrapper was invoked by sales.js, but its config guard means it made
+    // zero calls into the Shopify sync layer.
+    expect(shopifySync.pushInventory).not.toHaveBeenCalled();
   });
 });
