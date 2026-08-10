@@ -1,0 +1,222 @@
+'use strict';
+
+/**
+ * Integration tests for the inbound Shopify webhook router (Phase 07-06,
+ * SHOP-18/SHOP-19; D-01/D-04/D-06/D-07/D-08/D-10/D-12/D-13/D-14/D-15).
+ *
+ * Uses a REAL MongoMemoryServer (not mocked model methods) so the actual
+ * D-17 optimistic-lock ($elemMatch on version + versioned $inc) deduct/restock
+ * paths and the orderNumber-uniqueness idempotency gate are exercised
+ * end-to-end, mirroring webhooks-stripe.test.js. Only the two Shopify service
+ * boundaries are mocked: shopifyWebhookAuth (the HMAC gate) and shopifySync
+ * (the outbound push fired after each stock mutation) — no live credentials.
+ */
+
+const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
+const express = require('express');
+const request = require('supertest');
+
+jest.mock('../services/shopifyWebhookAuth', () => ({
+  verifyShopifyWebhook: jest.fn(),
+}));
+
+jest.mock('../services/shopifySync', () => ({
+  pushInventory: jest.fn().mockResolvedValue({}),
+  pushProduct: jest.fn().mockResolvedValue({}),
+  archiveProduct: jest.fn().mockResolvedValue({}),
+}));
+
+const { verifyShopifyWebhook } = require('../services/shopifyWebhookAuth');
+const { pushInventory } = require('../services/shopifySync');
+
+let mongoServer;
+let Order;
+let Product;
+let app;
+
+beforeAll(async () => {
+  process.env.SHOPIFY_CLIENT_SECRET = 'test-secret';
+  process.env.SHOPIFY_LOCATION_ID = 'gid://shopify/Location/1';
+
+  mongoServer = await MongoMemoryServer.create();
+  await mongoose.connect(mongoServer.getUri());
+
+  Order = require('../models/Order');
+  Product = require('../models/Product');
+
+  const shopifyWebhooksRouter = require('../routes/shopifyWebhooks');
+  app = express();
+  app.use('/api/shopify/webhooks', shopifyWebhooksRouter);
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
+
+afterEach(async () => {
+  jest.clearAllMocks();
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    await collections[key].deleteMany({});
+  }
+});
+
+// --- payload/product helpers ---------------------------------------------
+
+async function seedProduct({
+  name = 'Band T-Shirt',
+  basePrice = 20,
+  shopifyProductId = 'gid://shopify/Product/999',
+  variants = [
+    {
+      sku: 'S-BLK',
+      size: 'S',
+      color: 'Black',
+      stock: 10,
+      version: 0,
+      shopifyVariantId: '111',
+      shopifyInventoryItemId: 'inv-111',
+    },
+  ],
+} = {}) {
+  return Product.create({ name, basePrice, shopifyProductId, variants });
+}
+
+function ordersPaidPayload({
+  id = 'SHOP-1001',
+  variantId = '111',
+  sku = 'S-BLK',
+  quantity = 2,
+  price = '20.00',
+  email = 'buyer@example.com',
+} = {}) {
+  return {
+    id,
+    email,
+    total_price: String(Number(price) * quantity),
+    line_items: [
+      { variant_id: variantId, sku, quantity, price, title: 'Band T-Shirt' },
+    ],
+  };
+}
+
+function post(path, payload, { hmac = 'valid' } = {}) {
+  const body = JSON.stringify(payload);
+  const req = request(app).post(path).set('Content-Type', 'application/json');
+  if (hmac !== null) req.set('x-shopify-hmac-sha256', hmac);
+  return req.send(body);
+}
+
+// --- Task 1: orders/paid --------------------------------------------------
+
+describe('POST /api/shopify/webhooks/orders-paid', () => {
+  it('returns 401 and mutates no Product/Order on an invalid/missing HMAC', async () => {
+    verifyShopifyWebhook.mockReturnValue(false);
+
+    const product = await seedProduct();
+
+    const res = await post('/api/shopify/webhooks/orders-paid', ordersPaidPayload(), {
+      hmac: 'bad',
+    });
+
+    expect(res.status).toBe(401);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(10); // untouched
+    expect(await Order.countDocuments()).toBe(0); // no audit created
+    expect(pushInventory).not.toHaveBeenCalled();
+  });
+
+  it('deducts via the versioned $elemMatch $inc, writes one Order audit, pushes absolute count', async () => {
+    verifyShopifyWebhook.mockReturnValue(true);
+
+    const product = await seedProduct();
+
+    const res = await post(
+      '/api/shopify/webhooks/orders-paid',
+      ordersPaidPayload({ id: 'SHOP-1001', quantity: 2 })
+    );
+
+    expect(res.status).toBe(200);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(8);
+    expect(reloaded.variants[0].version).toBe(1); // version bumped by the deduct
+
+    const order = await Order.findOne({ orderNumber: 'SHOP-1001' });
+    expect(order).not.toBeNull();
+    expect(order.source).toBe('online');
+    expect(order.shippingAddress).toBeUndefined(); // Shopify owns shipping (Pitfall 2)
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].variantSku).toBe('S-BLK');
+    expect(order.items[0].stockBefore).toBe(10);
+    expect(order.items[0].stockAfter).toBe(8);
+
+    // absolute post-deduct count, NOT a delta
+    expect(pushInventory).toHaveBeenCalledTimes(1);
+    expect(pushInventory).toHaveBeenCalledWith('inv-111', 8);
+  });
+
+  it('is idempotent on replay: no double-decrement and no duplicate Order', async () => {
+    verifyShopifyWebhook.mockReturnValue(true);
+
+    const product = await seedProduct();
+    const payload = ordersPaidPayload({ id: 'SHOP-1001', quantity: 2 });
+
+    const res1 = await post('/api/shopify/webhooks/orders-paid', payload);
+    expect(res1.status).toBe(200);
+
+    const res2 = await post('/api/shopify/webhooks/orders-paid', payload);
+    expect(res2.status).toBe(200);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(8); // not 6 — replay did not double-decrement
+
+    expect(await Order.countDocuments({ orderNumber: 'SHOP-1001' })).toBe(1);
+  });
+
+  it('shortfall: insufficient stock leaves stock non-negative and still acks 200', async () => {
+    verifyShopifyWebhook.mockReturnValue(true);
+
+    const product = await seedProduct({
+      variants: [
+        {
+          sku: 'S-BLK',
+          stock: 1, // less than the ordered quantity of 2
+          version: 0,
+          shopifyVariantId: '111',
+          shopifyInventoryItemId: 'inv-111',
+        },
+      ],
+    });
+
+    const res = await post(
+      '/api/shopify/webhooks/orders-paid',
+      ordersPaidPayload({ id: 'SHOP-1001', quantity: 2 })
+    );
+
+    expect(res.status).toBe(200);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(1); // unchanged, NEVER negative
+
+    const order = await Order.findOne({ orderNumber: 'SHOP-1001' });
+    expect(order.items[0].stockAfter).toBe(order.items[0].stockBefore);
+  });
+
+  it('unknown-SKU payload acks 200 without crashing and creates no stock mutation', async () => {
+    verifyShopifyWebhook.mockReturnValue(true);
+
+    await seedProduct();
+
+    const res = await post(
+      '/api/shopify/webhooks/orders-paid',
+      ordersPaidPayload({ id: 'SHOP-1002', variantId: 'nope', sku: 'DOES-NOT-EXIST' })
+    );
+
+    expect(res.status).toBe(200);
+    expect(pushInventory).not.toHaveBeenCalled();
+  });
+});
