@@ -38,6 +38,25 @@ const PRODUCT_SET_MUTATION = `
   }
 `;
 
+// RESEARCH Pattern 5. Open Q1 / Assumption A3 flagged a possible `@idempotent`
+// directive requirement at API version 2026-04+. That directive is ADDITIVE
+// (safe-retry sugar), not required for the mutation to succeed, and confirming
+// it needs a live-schema introspection against real credentials — which this
+// build path intentionally does not have (config-guarded no-op, all Shopify I/O
+// mocked, per the plan's no-live-credentials constraint). The absolute-count
+// overwrite (D-06) is itself structurally idempotent: re-sending the same
+// authoritative quantity is a no-op. If a live deployment surfaces a version
+// that requires the directive, it can be layered on here without changing the
+// call shape or any caller.
+const INVENTORY_SET_MUTATION = `
+  mutation SetQty($input: InventorySetQuantitiesInput!) {
+    inventorySetQuantities(input: $input) {
+      inventoryAdjustmentGroup { createdAt reason }
+      userErrors { field message code }
+    }
+  }
+`;
+
 /**
  * Throws if a mutation payload carries userErrors, surfacing them so the caller
  * can convert to an HTTP status / retry decision (thin "let it throw" wrapper).
@@ -177,4 +196,36 @@ async function archiveProduct(shopifyProductId) {
   return { shopifyProductId: result.product.id, status: result.product.status };
 }
 
-module.exports = { pushProduct, archiveProduct };
+/**
+ * Pushes a variant's ABSOLUTE post-write stock count to Shopify via
+ * inventorySetQuantities (D-01/D-06). The passed quantity is sent verbatim — no
+ * delta arithmetic anywhere in the call args — with ignoreCompareQuantity:true
+ * so it deliberately overwrites Shopify's own checkout auto-decrement,
+ * preventing the double-count bug (threat T-07-10). Targets the pinned
+ * SHOPIFY_LOCATION_ID.
+ *
+ * @param {string} shopifyInventoryItemId - the Shopify InventoryItem gid.
+ * @param {number} absoluteQuantity - the authoritative absolute available count.
+ * @returns {Promise<object>} the inventoryAdjustmentGroup from the response.
+ */
+async function pushInventory(shopifyInventoryItemId, absoluteQuantity) {
+  const data = await shopifyRequest(INVENTORY_SET_MUTATION, {
+    input: {
+      name: 'available',
+      reason: 'correction',
+      ignoreCompareQuantity: true,
+      quantities: [
+        {
+          inventoryItemId: shopifyInventoryItemId,
+          locationId: process.env.SHOPIFY_LOCATION_ID,
+          quantity: absoluteQuantity,
+        },
+      ],
+    },
+  });
+  const result = data.inventorySetQuantities;
+  throwOnUserErrors('inventorySetQuantities', result);
+  return result.inventoryAdjustmentGroup;
+}
+
+module.exports = { pushProduct, archiveProduct, pushInventory };
