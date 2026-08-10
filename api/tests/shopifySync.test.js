@@ -173,3 +173,75 @@ describe('archiveProduct — soft-delete via status DRAFT (D-14)', () => {
     await expect(archiveProduct('gid://shopify/Product/999')).rejects.toThrow(/userErrors|not found/i);
   });
 });
+
+describe('pushInventory — inventorySetQuantities absolute-count push (D-01/D-06)', () => {
+  const OLD_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...OLD_ENV, SHOPIFY_LOCATION_ID: 'gid://shopify/Location/42' };
+  });
+
+  afterEach(() => {
+    process.env = OLD_ENV;
+  });
+
+  function cannedInventoryResponse() {
+    return {
+      inventorySetQuantities: {
+        inventoryAdjustmentGroup: { createdAt: '2026-08-10T00:00:00Z', reason: 'correction' },
+        userErrors: [],
+      },
+    };
+  }
+
+  it('issues an inventorySetQuantities mutation with name:available and ignoreCompareQuantity:true', async () => {
+    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+
+    await pushInventory('gid://shopify/InventoryItem/300', 12);
+
+    const [mutation, variables] = shopifyRequest.mock.calls[0];
+    expect(mutation).toMatch(/inventorySetQuantities/);
+    expect(variables.input.name).toBe('available');
+    expect(variables.input.ignoreCompareQuantity).toBe(true);
+  });
+
+  it('sends the ABSOLUTE quantity passed in — 12 in, 12 out, no delta arithmetic (D-06)', async () => {
+    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+
+    await pushInventory('gid://shopify/InventoryItem/300', 12);
+
+    const entry = shopifyRequest.mock.calls[0][1].input.quantities[0];
+    expect(entry.quantity).toBe(12);
+    expect(entry.inventoryItemId).toBe('gid://shopify/InventoryItem/300');
+    // Prove no subtraction/delta leaked into the call args: exactly the input value.
+    const serialized = JSON.stringify(shopifyRequest.mock.calls[0][1]);
+    expect(serialized).toContain('"quantity":12');
+  });
+
+  it('sends 0 as an absolute 0 (out-of-stock), not an omission or delta', async () => {
+    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+
+    await pushInventory('gid://shopify/InventoryItem/300', 0);
+
+    expect(shopifyRequest.mock.calls[0][1].input.quantities[0].quantity).toBe(0);
+  });
+
+  it('targets the pinned SHOPIFY_LOCATION_ID', async () => {
+    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+
+    await pushInventory('gid://shopify/InventoryItem/300', 5);
+
+    expect(shopifyRequest.mock.calls[0][1].input.quantities[0].locationId).toBe('gid://shopify/Location/42');
+  });
+
+  it('throws when the response carries userErrors', async () => {
+    shopifyRequest.mockResolvedValue({
+      inventorySetQuantities: {
+        inventoryAdjustmentGroup: null,
+        userErrors: [{ field: ['quantities'], message: 'invalid item', code: 'INVALID' }],
+      },
+    });
+
+    await expect(pushInventory('gid://shopify/InventoryItem/bad', 5)).rejects.toThrow(/userErrors|invalid item/i);
+  });
+});
