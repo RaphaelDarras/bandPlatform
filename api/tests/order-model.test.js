@@ -49,8 +49,9 @@ describe('Order model - shippingAddress + toJSON transform', () => {
     totalAmount: 42,
   });
 
-  it('fails validation when shippingAddress is missing', async () => {
-    await expect(Order.create(baseOrder())).rejects.toThrow(mongoose.Error.ValidationError);
+  it('saves successfully when shippingAddress is missing (Shopify-sourced audit records have none — D-17/Pitfall 2)', async () => {
+    const order = await Order.create(baseOrder());
+    expect(order.shippingAddress).toBeUndefined();
   });
 
   it('fails validation when shippingAddress is missing a required field (city)', async () => {

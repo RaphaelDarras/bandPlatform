@@ -490,3 +490,86 @@ describe('GET /api/inventory/audit', () => {
     expect(res.body[2].source).toBe('restock');
   });
 });
+
+// ---- POST /deduct (source:'online') against the REAL schema (D-17 / Pitfall 2) ----
+//
+// The describes above mock mongoose + the models, so they can never surface a real
+// Mongoose ValidationError. RESEARCH Pitfall 2 flagged that the source:'online'
+// branch calls Order.create() with NO shippingAddress (Shopify owns that data),
+// which the pre-fix Order schema rejected. This block uses a REAL MongoMemoryServer
+// and the REAL models (mirroring api/tests/webhooks-stripe.test.js) so the D-17
+// reuse path is proven end-to-end. jsonwebtoken stays mocked (top-level) so the
+// router-level authenticateToken gate passes.
+describe('POST /api/inventory/deduct - real schema, source:online (D-17/Pitfall 2)', () => {
+  let realMongoose;
+  let Product;
+  let Order;
+  let appReal;
+  let mongoServer;
+
+  beforeAll(async () => {
+    jest.resetModules();
+    jest.unmock('mongoose');
+    jest.unmock('../models/Product');
+    jest.unmock('../models/Order');
+    jest.unmock('../models/Sale');
+    jest.unmock('../models/InventoryAdjustment');
+
+    realMongoose = require('mongoose');
+    const { MongoMemoryServer } = require('mongodb-memory-server');
+    const expressReal = require('express');
+    Product = require('../models/Product');
+    Order = require('../models/Order');
+
+    mongoServer = await MongoMemoryServer.create();
+    await realMongoose.connect(mongoServer.getUri());
+
+    const inventoryRouter = require('../routes/inventory');
+    appReal = expressReal();
+    appReal.use(expressReal.json());
+    appReal.use('/api/inventory', inventoryRouter);
+  });
+
+  afterAll(async () => {
+    await realMongoose.disconnect();
+    await mongoServer.stop();
+    jest.resetModules();
+  });
+
+  afterEach(async () => {
+    const collections = realMongoose.connection.collections;
+    for (const key in collections) {
+      await collections[key].deleteMany({});
+    }
+  });
+
+  it('deducts stock and creates an Order audit record with NO shippingAddress (returns 200)', async () => {
+    const product = await Product.create({
+      name: 'Band T-Shirt',
+      basePrice: 20,
+      variants: [{ sku: 'S-BLK', size: 'S', color: 'Black', stock: 10, version: 0 }],
+    });
+
+    const res = await request(appReal)
+      .post('/api/inventory/deduct')
+      .set('Authorization', AUTH_HEADER)
+      .send({
+        productId: product._id.toString(),
+        variantSku: 'S-BLK',
+        quantity: 2,
+        source: 'online',
+        // metadata deliberately carries NO address — Shopify owns shipping data (D-17).
+        metadata: { customerEmail: 'buyer@example.com', priceAtPurchase: 20, totalAmount: 40 },
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.stockAfter).toBe(8);
+
+    const orders = await Order.find({});
+    expect(orders).toHaveLength(1);
+    expect(orders[0].shippingAddress).toBeUndefined();
+    // Item name is snapshotted from Product.name (CR-01) by the online branch.
+    expect(orders[0].items[0].name).toBe('Band T-Shirt');
+  });
+});
