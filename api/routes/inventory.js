@@ -136,11 +136,17 @@ router.post('/deduct', async (req, res) => {
 
     if (source === 'online') {
       auditRecord = await Order.create({
+        // NOTE: the `ORD-${Date.now()}` fallback risks a rare unique-index
+        // collision under concurrent delivery; the Shopify webhook handler
+        // (plan 07-06) will pass Shopify's own order id as `orderNumber` instead.
         orderNumber: metadata.orderId || `ORD-${Date.now()}`,
         customerEmail: metadata.customerEmail,
         items: [{
           productId,
           variantSku,
+          // Product name snapshot (CR-01) — OrderItem.name is required; snapshot
+          // it from the already-fetched Product so the D-17 online path validates.
+          name: product.name,
           quantity,
           priceAtPurchase: metadata.priceAtPurchase,
           stockBefore,

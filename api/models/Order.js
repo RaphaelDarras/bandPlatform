@@ -91,9 +91,12 @@ const OrderSchema = new mongoose.Schema({
     trim: true
   },
   items: [OrderItemSchema],
+  // Optional (D-17 / RESEARCH Pitfall 2): Shopify-sourced Order audit records
+  // carry NO shipping address — Shopify owns that data. The subdoc's own
+  // field-level requireds (city/postalCode/country) still fire, but only when a
+  // shippingAddress is actually present.
   shippingAddress: {
-    type: ShippingAddressSchema,
-    required: true
+    type: ShippingAddressSchema
   },
   totalAmount: {
     type: Number,
