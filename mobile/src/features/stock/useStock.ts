@@ -7,7 +7,12 @@
 import { useState, useCallback } from 'react';
 
 import { getDb } from '@/db';
-import { getCachedProducts, upsertProducts, type CachedProduct } from '@/db/products';
+import {
+  getCachedProducts,
+  upsertProducts,
+  reconcileActiveProducts,
+  type CachedProduct,
+} from '@/db/products';
 import { getPendingOutboxRows } from '@/db/outbox';
 import { apiGetStock, apiRestock } from '@/api/inventory';
 import { apiGetProducts } from '@/api/products';
@@ -91,6 +96,11 @@ export function useStock() {
       if (merged.length > 0) {
         await upsertProducts(db, merged);
       }
+      // Reconcile against the authoritative active set: products deactivated or
+      // deleted on the server drop out of `stockProducts` (an active-only feed),
+      // so mark any such cached row inactive to remove it from the POS. Reached
+      // only on a successful fetch — the catch below owns the offline path.
+      await reconcileActiveProducts(db, stockProducts.map((p) => p.id));
     } catch (err: unknown) {
       console.error('[useStock] API fetch failed:', err instanceof Error ? err.message : String(err));
     }

@@ -38,6 +38,7 @@ jest.mock('@/db', () => ({
 jest.mock('@/db/products', () => ({
   getCachedProducts: jest.fn(() => Promise.resolve([])),
   upsertProducts: jest.fn(() => Promise.resolve()),
+  reconcileActiveProducts: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('@/api/inventory', () => ({
@@ -56,6 +57,7 @@ jest.mock('@/stores/syncStore', () => ({
 
 const mockGetCachedProducts = productsModule.getCachedProducts as jest.Mock;
 const mockUpsertProducts = productsModule.upsertProducts as jest.Mock;
+const mockReconcileActiveProducts = productsModule.reconcileActiveProducts as jest.Mock;
 const mockApiGetStock = inventoryApiModule.apiGetStock as jest.Mock;
 const mockApiRestock = inventoryApiModule.apiRestock as jest.Mock;
 
@@ -88,6 +90,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetCachedProducts.mockResolvedValue([]);
   mockUpsertProducts.mockResolvedValue(undefined);
+  mockReconcileActiveProducts.mockResolvedValue(undefined);
   mockApiGetStock.mockResolvedValue([]);
   mockApiRestock.mockResolvedValue({ success: true });
   mockSyncStore.isOnline = true;
@@ -205,6 +208,36 @@ describe('useStock — refreshStock', () => {
 
     expect(mockApiGetStock).toHaveBeenCalled();
     expect(mockUpsertProducts).toHaveBeenCalledWith(mockDb, [apiProduct]);
+  });
+
+  it('reconciles the cache against the fetched active ids so deactivated products leave the POS', async () => {
+    const apiProduct = makeProduct({ id: 'prod-1', name: 'Still Active' });
+    mockApiGetStock.mockResolvedValue([apiProduct]);
+    mockGetCachedProducts.mockResolvedValue([apiProduct]);
+    mockSyncStore.isOnline = true;
+
+    const { result } = renderHook(() => useStock());
+
+    await act(async () => {
+      await result.current.refreshStock();
+    });
+
+    // Reconcile must run on a successful fetch, carrying exactly the active ids.
+    expect(mockReconcileActiveProducts).toHaveBeenCalledWith(mockDb, ['prod-1']);
+  });
+
+  it('does not reconcile the cache when offline (would wrongly wipe it)', async () => {
+    const cachedProduct = makeProduct({ id: 'prod-1', name: 'Cached' });
+    mockGetCachedProducts.mockResolvedValue([cachedProduct]);
+    mockSyncStore.isOnline = false;
+
+    const { result } = renderHook(() => useStock());
+
+    await act(async () => {
+      await result.current.refreshStock();
+    });
+
+    expect(mockReconcileActiveProducts).not.toHaveBeenCalled();
   });
 
   it('reads from local cache only when offline (no API call)', async () => {

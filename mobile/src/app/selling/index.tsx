@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/use-theme';
 import { getDb } from '@/db';
-import { getCachedProducts, upsertProducts } from '@/db/products';
+import { getCachedProducts, upsertProducts, reconcileActiveProducts } from '@/db/products';
 import { getConcertPriceOverrides } from '@/db/concerts';
 import { getPendingOutboxRows } from '@/db/outbox';
 import type { CachedProduct } from '@/db/products';
@@ -69,6 +69,11 @@ export default function SellingScreen() {
             })),
           })));
         }
+        // Reconcile against the fetched active set so products deactivated or
+        // deleted on the server leave the POS. Runs whenever the fetch succeeded
+        // — including an empty result (all deactivated) — but not on the network
+        // failure handled below, which must keep the cache intact for offline use.
+        await reconcileActiveProducts(db, apiProducts.map((p) => p.id));
       } catch {
         // Network unavailable — fall through to cache
       }

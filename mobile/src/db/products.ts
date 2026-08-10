@@ -82,6 +82,41 @@ export async function upsertProducts(
 }
 
 /**
+ * Reconciles the local cache against the authoritative set of active product
+ * ids returned by a successful catalog fetch. Any cached product whose id is
+ * NOT in `activeIds` was deactivated or deleted on the server — the active-only
+ * API responses simply stop returning it, so an upsert-only sync never learns
+ * it is gone. This marks such rows inactive so they leave the POS
+ * (getCachedProducts filters on active = 1).
+ *
+ * Marks inactive rather than deleting: the row is preserved so getProductById
+ * still resolves it for any pending outbox sale that references it, and a later
+ * restore re-activates it via upsertProducts.
+ *
+ * MUST be called only after a SUCCESSFUL fetch — never on the offline/error
+ * path — or an empty/failed response would wrongly clear the cache the POS
+ * depends on. An empty `activeIds` from a genuine 200 legitimately means "no
+ * active products" and correctly deactivates every cached row.
+ */
+export async function reconcileActiveProducts(
+  db: SQLite.SQLiteDatabase,
+  activeIds: string[]
+): Promise<void> {
+  const rows = await db.getAllAsync<{ id: string }>(
+    'SELECT id FROM products WHERE active = 1'
+  );
+  const active = new Set(activeIds.map(String));
+  for (const row of rows) {
+    if (!active.has(String(row.id))) {
+      await db.runAsync('UPDATE products SET active = 0, updated_at = ? WHERE id = ?', [
+        Date.now(),
+        row.id,
+      ]);
+    }
+  }
+}
+
+/**
  * Returns a single product by ID, or null if not found.
  */
 export async function getProductById(
