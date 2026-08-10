@@ -6,6 +6,10 @@ const Order = require('../models/Order');
 const Sale = require('../models/Sale');
 const InventoryAdjustment = require('../models/InventoryAdjustment');
 const { authenticateToken } = require('../middleware/auth');
+// Outbound Shopify mirror (07-07): best-effort, config-guarded, never throws.
+// Pushes the ABSOLUTE post-write count (D-06); no-ops when unconfigured so the
+// existing inventory + inventory-batch suites stay green unchanged.
+const shopifyOutbound = require('../services/shopifyOutbound');
 
 // All routes require authentication
 router.use(authenticateToken);
@@ -174,6 +178,9 @@ router.post('/deduct', async (req, res) => {
       });
     }
 
+    // Mirror the new absolute count to Shopify (fire-and-forget, D-06).
+    shopifyOutbound.syncInventoryOut(productId, variantSku).catch(() => {});
+
     res.status(200).json({
       success: true,
       stockAfter,
@@ -292,6 +299,9 @@ router.post('/release', async (req, res) => {
     }
 
     const updatedVariant = updatedProduct.variants.find(v => v.sku === variantSku);
+
+    // Mirror the restored absolute count to Shopify (fire-and-forget, D-06).
+    shopifyOutbound.syncInventoryOut(productId, variantSku).catch(() => {});
 
     res.status(200).json({
       released: true,
@@ -414,6 +424,9 @@ router.post('/restock', async (req, res) => {
       reason,
       createdBy: req.user.userId
     });
+
+    // Mirror the new absolute count to Shopify (fire-and-forget, D-06).
+    shopifyOutbound.syncInventoryOut(productId, variantSku).catch(() => {});
 
     res.status(200).json({
       success: true,
@@ -577,6 +590,15 @@ router.post('/restock/batch', async (req, res) => {
         results.push({ productId, variantSku, stockBefore, stockAfter });
       }
     });
+
+    // The transaction COMMITTED (we are past withTransaction, still in the try
+    // before any catch). Only now mirror each committed variant's new absolute
+    // count to Shopify — fired per adjusted variant, fire-and-forget. An aborted
+    // batch throws out of withTransaction into the catch below and reaches none
+    // of this, so a partial/failed batch (409/500) mirrors nothing (D-06).
+    for (const { productId, variantSku } of results) {
+      shopifyOutbound.syncInventoryOut(productId, variantSku).catch(() => {});
+    }
 
     res.status(200).json({ success: true, results });
   } catch (error) {
