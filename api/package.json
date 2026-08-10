@@ -8,7 +8,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed:admin": "node utils/seedAdmin.js",
-    "seed:shopify": "node scripts/seedShopify.js"
+    "seed:shopify": "node scripts/seedShopify.js",
+    "shopify:setup": "node scripts/shopifySetup.js"
   },
   "jest": {
     "testEnvironment": "node"
