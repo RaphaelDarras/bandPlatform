@@ -130,6 +130,81 @@ async function pushBackAbsolute(productId, variantSku, inventoryItemId, absolute
   }
 }
 
+/**
+ * Restocks one variant by SKU (versioned $inc UP — the reverse of the deduct,
+ * D-07) and pushes the resulting ABSOLUTE count back. A pure increment is
+ * atomically safe without a version guard, but the version is still bumped so
+ * the optimistic-lock counter tracks every stock change. Never fails the ack.
+ */
+async function restockBySku(productId, variantSku, quantity) {
+  const updated = await Product.findOneAndUpdate(
+    { _id: productId, 'variants.sku': variantSku },
+    { $inc: { 'variants.$.stock': quantity, 'variants.$.version': 1 } },
+    { new: true }
+  );
+  if (!updated) {
+    console.error(`Shopify restock: no variant ${variantSku} on product ${productId}`);
+    return;
+  }
+  const variant = updated.variants.find((v) => v.sku === variantSku);
+  await pushBackAbsolute(productId, variantSku, variant.shopifyInventoryItemId, variant.stock);
+}
+
+/**
+ * Shared reversal handler for orders/cancelled and refunds/create (D-07).
+ *
+ * Idempotency (T-07-04): the reversal is gated by an ATOMIC Order status
+ * transition paid -> failed. Only the FIRST delivery finds a `paid` order to
+ * flip; a replay (or a reversal for an order we never deducted) finds nothing
+ * and safely no-ops — no double-restock. This deliberately mirrors webhooks.js's
+ * pending->paid transition gate, reusing the Order document as the reversal
+ * ledger rather than inventing a separate idempotency store.
+ *
+ * @param {(payload, order) => Array<{productId,variantSku,quantity}>} resolveItems
+ */
+async function handleReversal(req, res, resolveOrderNumber, resolveItems) {
+  if (!isAuthentic(req)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(req.body);
+  } catch (err) {
+    console.error('Shopify reversal webhook: malformed JSON body, acking:', err.message);
+    return res.status(200).json({ received: true });
+  }
+
+  try {
+    const orderNumber = resolveOrderNumber(payload);
+
+    // Atomic idempotency gate: flip the previously-deducted order to failed.
+    const order = await Order.findOneAndUpdate(
+      { orderNumber, status: 'paid' },
+      { $set: { status: 'failed' } },
+      { new: true }
+    );
+
+    if (!order) {
+      // Already reversed (replay) or never deducted here — safe no-op.
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+
+    const restockItems = await resolveItems(payload, order);
+    for (const item of restockItems) {
+      const quantity = Number(item.quantity) || 0;
+      if (quantity <= 0) continue;
+      await restockBySku(item.productId, item.variantSku, quantity);
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    // Transient DB error — surface non-200 so Shopify's ~48h retry (D-05) works.
+    console.error('Shopify reversal webhook processing error:', err);
+    return res.status(500).json({ error: 'processing_failed' });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // orders/paid — deduct + Order audit + push-back (D-07 / D-17)
 // ---------------------------------------------------------------------------
@@ -257,5 +332,63 @@ router.post('/orders-paid', rawJson, async (req, res) => {
     return res.status(500).json({ error: 'processing_failed' });
   }
 });
+
+// ---------------------------------------------------------------------------
+// orders/cancelled — restock the whole order (D-07)
+// ---------------------------------------------------------------------------
+
+router.post('/orders-cancelled', rawJson, (req, res) =>
+  handleReversal(
+    req,
+    res,
+    // orders/cancelled body IS the order object; its id is the order id.
+    (payload) => String(payload.id),
+    // Restock exactly what we deducted, from the stored Order audit's items
+    // (reliable productId + variantSku + quantity — no re-matching needed).
+    (_payload, order) =>
+      order.items.map((it) => ({
+        productId: it.productId,
+        variantSku: it.variantSku,
+        quantity: it.quantity,
+      }))
+  )
+);
+
+// ---------------------------------------------------------------------------
+// refunds/create — restock the refunded quantities (D-07)
+// ---------------------------------------------------------------------------
+
+router.post('/refunds-create', rawJson, (req, res) =>
+  handleReversal(
+    req,
+    res,
+    // refunds/create carries the parent order id in order_id.
+    (payload) => String(payload.order_id),
+    // Restock only the refunded line quantities, matched to Mongo variants by
+    // stored shopifyVariantId (SKU fallback), per refund_line_items.
+    async (payload) => {
+      const refundLines = Array.isArray(payload.refund_line_items)
+        ? payload.refund_line_items
+        : [];
+      const items = [];
+      for (const line of refundLines) {
+        const lineItem = line.line_item || {};
+        const match = await matchVariant(lineItem);
+        if (!match) {
+          console.error(
+            `Shopify refunds/create: no Mongo variant for variant_id=${lineItem.variant_id} sku=${lineItem.sku}`
+          );
+          continue;
+        }
+        items.push({
+          productId: match.product._id,
+          variantSku: match.variant.sku,
+          quantity: line.quantity,
+        });
+      }
+      return items;
+    }
+  )
+);
 
 module.exports = router;
