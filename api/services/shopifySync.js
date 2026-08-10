@@ -19,6 +19,7 @@
  * overwrites Shopify's own checkout auto-decrement to prevent double-counting.
  */
 
+const { randomUUID } = require('node:crypto');
 const { shopifyRequest } = require('./shopifyClient');
 
 // RESEARCH Pattern 4. `synchronous: true` is safe for this small catalog (well
@@ -38,21 +39,32 @@ const PRODUCT_SET_MUTATION = `
   }
 `;
 
-// RESEARCH Pattern 5. Open Q1 / Assumption A3 flagged a possible `@idempotent`
-// directive requirement at API version 2026-04+. That directive is ADDITIVE
-// (safe-retry sugar), not required for the mutation to succeed, and confirming
-// it needs a live-schema introspection against real credentials — which this
-// build path intentionally does not have (config-guarded no-op, all Shopify I/O
-// mocked, per the plan's no-live-credentials constraint). The absolute-count
-// overwrite (D-06) is itself structurally idempotent: re-sending the same
-// authoritative quantity is a no-op. If a live deployment surfaces a version
-// that requires the directive, it can be layered on here without changing the
-// call shape or any caller.
+// RESEARCH Pattern 5 / Open Q1 / Assumption A3, now RESOLVED against the live API
+// (2026-08): as of Admin API 2026-04+, `inventorySetQuantities` REQUIRES the
+// `@idempotent(key:)` directive with a unique key per request (a BAD_REQUEST is
+// returned otherwise). We pass a fresh randomUUID per call. Setting to an absolute
+// value is itself idempotent, so a distinct key per logical set is correct; a true
+// retry layer (if ever added in shopifyClient) would reuse the key to dedupe.
 const INVENTORY_SET_MUTATION = `
-  mutation SetQty($input: InventorySetQuantitiesInput!) {
-    inventorySetQuantities(input: $input) {
+  mutation SetQty($input: InventorySetQuantitiesInput!, $idempotencyKey: String!) {
+    inventorySetQuantities(input: $input) @idempotent(key: $idempotencyKey) {
       inventoryAdjustmentGroup { createdAt reason }
       userErrors { field message code }
+    }
+  }
+`;
+
+// Admin API 2026-07's `inventorySetQuantities` is a compare-and-set: each item
+// must carry `changeFromQuantity` (the expected current value). There is no
+// `ignoreCompareQuantity`, and `inventorySetOnHandQuantities` is deprecated. So we
+// read the current 'available' at the pinned location first, then set absolutely
+// from that baseline. (Verified via live-schema introspection, 2026-08.)
+const INVENTORY_LEVEL_QUERY = `
+  query CurrentLevel($itemId: ID!, $locationId: ID!) {
+    inventoryItem(id: $itemId) {
+      inventoryLevel(locationId: $locationId) {
+        quantities(names: ["available"]) { name quantity }
+      }
     }
   }
 `;
@@ -197,31 +209,48 @@ async function archiveProduct(shopifyProductId) {
 }
 
 /**
- * Pushes a variant's ABSOLUTE post-write stock count to Shopify via
- * inventorySetQuantities (D-01/D-06). The passed quantity is sent verbatim — no
- * delta arithmetic anywhere in the call args — with ignoreCompareQuantity:true
- * so it deliberately overwrites Shopify's own checkout auto-decrement,
- * preventing the double-count bug (threat T-07-10). Targets the pinned
- * SHOPIFY_LOCATION_ID.
+ * Pushes a variant's ABSOLUTE post-write stock count to Shopify (D-01/D-06). The
+ * passed quantity is sent verbatim as the new value — no delta arithmetic. Admin
+ * API 2026-07 makes `inventorySetQuantities` a compare-and-set, so we first read
+ * the current 'available' at the pinned location and pass it as
+ * `changeFromQuantity`; the new absolute count then overwrites Shopify's own
+ * checkout auto-decrement, preventing the double-count bug (threat T-07-10).
+ * Reading the live baseline (rather than a blind overwrite) is in fact the
+ * correct convergence: the orders/paid webhook already decremented both sides.
+ * Targets the pinned SHOPIFY_LOCATION_ID.
  *
  * @param {string} shopifyInventoryItemId - the Shopify InventoryItem gid.
  * @param {number} absoluteQuantity - the authoritative absolute available count.
  * @returns {Promise<object>} the inventoryAdjustmentGroup from the response.
  */
 async function pushInventory(shopifyInventoryItemId, absoluteQuantity) {
+  const locationId = process.env.SHOPIFY_LOCATION_ID;
+
+  // Read current 'available' to satisfy the compare-and-set (defaults to 0 when
+  // the item isn't yet stocked at the location, e.g. a freshly created variant).
+  const current = await shopifyRequest(INVENTORY_LEVEL_QUERY, {
+    itemId: shopifyInventoryItemId,
+    locationId,
+  });
+  const level = current.inventoryItem && current.inventoryItem.inventoryLevel;
+  const availableEntry =
+    level && level.quantities && level.quantities.find((q) => q.name === 'available');
+  const changeFromQuantity = availableEntry ? availableEntry.quantity : 0;
+
   const data = await shopifyRequest(INVENTORY_SET_MUTATION, {
     input: {
       name: 'available',
       reason: 'correction',
-      ignoreCompareQuantity: true,
       quantities: [
         {
           inventoryItemId: shopifyInventoryItemId,
-          locationId: process.env.SHOPIFY_LOCATION_ID,
+          locationId,
           quantity: absoluteQuantity,
+          changeFromQuantity,
         },
       ],
     },
+    idempotencyKey: randomUUID(),
   });
   const result = data.inventorySetQuantities;
   throwOnUserErrors('inventorySetQuantities', result);

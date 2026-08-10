@@ -194,44 +194,97 @@ describe('pushInventory — inventorySetQuantities absolute-count push (D-01/D-0
     };
   }
 
-  it('issues an inventorySetQuantities mutation with name:available and ignoreCompareQuantity:true', async () => {
-    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+  // pushInventory is a read-then-set: call[0] reads the current 'available'
+  // level, call[1] is the inventorySetQuantities mutation. This helper mocks
+  // that two-call sequence with a given current available quantity.
+  function mockReadThenSet(currentAvailable) {
+    shopifyRequest
+      .mockResolvedValueOnce({
+        inventoryItem: {
+          inventoryLevel: { quantities: [{ name: 'available', quantity: currentAvailable }] },
+        },
+      })
+      .mockResolvedValueOnce(cannedInventoryResponse());
+  }
+  const setCall = () => shopifyRequest.mock.calls[1];
+
+  it('issues an inventorySetQuantities mutation with name:available and compare-and-set via changeFromQuantity (no ignoreCompareQuantity)', async () => {
+    mockReadThenSet(3);
 
     await pushInventory('gid://shopify/InventoryItem/300', 12);
 
-    const [mutation, variables] = shopifyRequest.mock.calls[0];
+    const [mutation, variables] = setCall();
     expect(mutation).toMatch(/inventorySetQuantities/);
     expect(variables.input.name).toBe('available');
-    expect(variables.input.ignoreCompareQuantity).toBe(true);
+    // ignoreCompareQuantity is NOT a field on InventorySetQuantitiesInput in Admin API 2026-07.
+    expect(variables.input.ignoreCompareQuantity).toBeUndefined();
+    // The compare baseline is the current 'available' read in the first call.
+    expect(variables.input.quantities[0].changeFromQuantity).toBe(3);
+    // Admin API 2026-04+ requires the @idempotent directive with a per-request key.
+    expect(mutation).toMatch(/@idempotent\(key:\s*\$idempotencyKey\)/);
+    expect(typeof variables.idempotencyKey).toBe('string');
+    expect(variables.idempotencyKey.length).toBeGreaterThan(0);
+  });
+
+  it('uses a distinct idempotency key on each call', async () => {
+    mockReadThenSet(0);
+    await pushInventory('gid://shopify/InventoryItem/300', 1);
+    mockReadThenSet(0);
+    await pushInventory('gid://shopify/InventoryItem/300', 2);
+
+    const firstKey = shopifyRequest.mock.calls[1][1].idempotencyKey;
+    const secondKey = shopifyRequest.mock.calls[3][1].idempotencyKey;
+    expect(firstKey).not.toBe(secondKey);
+  });
+
+  it('reads the current available level first, then sets (two calls)', async () => {
+    mockReadThenSet(3);
+
+    await pushInventory('gid://shopify/InventoryItem/300', 12);
+
+    expect(shopifyRequest).toHaveBeenCalledTimes(2);
+    const [readQuery, readVars] = shopifyRequest.mock.calls[0];
+    expect(readQuery).toMatch(/inventoryLevel/);
+    expect(readVars.itemId).toBe('gid://shopify/InventoryItem/300');
   });
 
   it('sends the ABSOLUTE quantity passed in — 12 in, 12 out, no delta arithmetic (D-06)', async () => {
-    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+    mockReadThenSet(3);
 
     await pushInventory('gid://shopify/InventoryItem/300', 12);
 
-    const entry = shopifyRequest.mock.calls[0][1].input.quantities[0];
+    const entry = setCall()[1].input.quantities[0];
     expect(entry.quantity).toBe(12);
     expect(entry.inventoryItemId).toBe('gid://shopify/InventoryItem/300');
-    // Prove no subtraction/delta leaked into the call args: exactly the input value.
-    const serialized = JSON.stringify(shopifyRequest.mock.calls[0][1]);
-    expect(serialized).toContain('"quantity":12');
+    // Prove no subtraction/delta leaked into the new value: exactly the input.
+    expect(JSON.stringify(setCall()[1])).toContain('"quantity":12');
   });
 
   it('sends 0 as an absolute 0 (out-of-stock), not an omission or delta', async () => {
-    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+    mockReadThenSet(5);
 
     await pushInventory('gid://shopify/InventoryItem/300', 0);
 
-    expect(shopifyRequest.mock.calls[0][1].input.quantities[0].quantity).toBe(0);
+    expect(setCall()[1].input.quantities[0].quantity).toBe(0);
+  });
+
+  it('defaults changeFromQuantity to 0 when the item is not yet stocked at the location', async () => {
+    shopifyRequest
+      .mockResolvedValueOnce({ inventoryItem: { inventoryLevel: null } })
+      .mockResolvedValueOnce(cannedInventoryResponse());
+
+    await pushInventory('gid://shopify/InventoryItem/300', 7);
+
+    expect(setCall()[1].input.quantities[0].changeFromQuantity).toBe(0);
+    expect(setCall()[1].input.quantities[0].quantity).toBe(7);
   });
 
   it('targets the pinned SHOPIFY_LOCATION_ID', async () => {
-    shopifyRequest.mockResolvedValue(cannedInventoryResponse());
+    mockReadThenSet(1);
 
     await pushInventory('gid://shopify/InventoryItem/300', 5);
 
-    expect(shopifyRequest.mock.calls[0][1].input.quantities[0].locationId).toBe('gid://shopify/Location/42');
+    expect(setCall()[1].input.quantities[0].locationId).toBe('gid://shopify/Location/42');
   });
 
   it('throws when the response carries userErrors', async () => {
