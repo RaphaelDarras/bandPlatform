@@ -206,6 +206,127 @@ async function handleReversal(req, res, resolveOrderNumber, resolveItems) {
 }
 
 // ---------------------------------------------------------------------------
+// Content sync helpers (products/* — Shopify is content master, D-02)
+// ---------------------------------------------------------------------------
+
+function parsePrice(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// D-14 status map: Shopify ACTIVE -> Mongo active:true; DRAFT/ARCHIVED -> false.
+function statusToActive(status) {
+  return String(status || '').toLowerCase() === 'active';
+}
+
+/**
+ * Reconciles a Mongo product's embedded variants against a Shopify products/*
+ * payload. Present-in-payload variants are matched by stored shopifyVariantId
+ * (SKU fallback) and their ids / options / D-12 price split refreshed against
+ * the FROZEN basePrice. A variant present in Mongo but absent from the payload
+ * is soft-deleted (D-15): active:false + stock:0 (kept for order/audit history).
+ */
+function reconcileVariants(doc, payload) {
+  const payloadVariants = Array.isArray(payload.variants) ? payload.variants : [];
+  const seenSkus = new Set();
+
+  for (const pv of payloadVariants) {
+    let variant = doc.variants.find(
+      (v) =>
+        (pv.id != null && sameId(v.shopifyVariantId, pv.id)) ||
+        (pv.sku && v.sku === pv.sku)
+    );
+
+    if (!variant) {
+      variant = { sku: pv.sku, stock: 0, version: 0, active: true };
+      doc.variants.push(variant);
+      variant = doc.variants[doc.variants.length - 1];
+    }
+
+    variant.active = true;
+    // D-12 inbound: basePrice stays frozen, adjustment absorbs the delta.
+    variant.priceAdjustment = parsePrice(pv.price) - doc.basePrice;
+    if (pv.id != null) variant.shopifyVariantId = String(pv.id);
+    if (pv.inventory_item_id != null) variant.shopifyInventoryItemId = String(pv.inventory_item_id);
+    if (pv.option1) variant.size = pv.option1;
+    if (pv.option2) variant.color = pv.option2;
+    seenSkus.add(variant.sku);
+  }
+
+  // D-15: variants dropped by Shopify are retired, never removed.
+  for (const v of doc.variants) {
+    if (!seenSkus.has(v.sku)) {
+      v.active = false;
+      v.stock = 0;
+    }
+  }
+}
+
+/**
+ * Applies Shopify-authored content onto a Mongo product doc (D-02 content
+ * master). name<-title, description<-body_html, images[] REPLACED with the
+ * Shopify CDN urls in order (D-13), active<-status (D-14). basePrice is set
+ * ONLY on create (frozen thereafter per D-12) using the minimum variant price
+ * as the base, so every priceAdjustment is a non-negative delta.
+ */
+function applyProductContent(doc, payload, { setBasePrice }) {
+  doc.name = payload.title || doc.name;
+  doc.description = payload.body_html || '';
+  doc.images = (Array.isArray(payload.images) ? payload.images : [])
+    .map((img) => img && img.src)
+    .filter(Boolean);
+  doc.active = statusToActive(payload.status);
+
+  if (setBasePrice) {
+    const prices = (Array.isArray(payload.variants) ? payload.variants : [])
+      .map((v) => parsePrice(v.price))
+      .filter((n) => n > 0);
+    doc.basePrice = prices.length ? Math.min(...prices) : 0;
+  }
+
+  reconcileVariants(doc, payload);
+}
+
+/**
+ * Shared body for products/create and products/update. Matched by the stored
+ * shopifyProductId (steady state, D-08/Pitfall 5). Absent -> insert a new
+ * Product (D-10 Shopify->Mongo create) seeding basePrice from the payload;
+ * present -> overwrite content with basePrice frozen. NO inventory push here —
+ * this is the content path, not the inventory path.
+ */
+async function handleProductUpsert(req, res) {
+  if (!isAuthentic(req)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(req.body);
+  } catch (err) {
+    console.error('Shopify products webhook: malformed JSON body, acking:', err.message);
+    return res.status(200).json({ received: true });
+  }
+
+  try {
+    const shopifyProductId = String(payload.id);
+    let doc = await Product.findOne({ shopifyProductId });
+
+    if (doc) {
+      applyProductContent(doc, payload, { setBasePrice: false });
+    } else {
+      doc = new Product({ shopifyProductId, basePrice: 0, variants: [] });
+      applyProductContent(doc, payload, { setBasePrice: true });
+    }
+
+    await doc.save();
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('Shopify products upsert processing error:', err);
+    return res.status(500).json({ error: 'processing_failed' });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // orders/paid — deduct + Order audit + push-back (D-07 / D-17)
 // ---------------------------------------------------------------------------
 
@@ -390,5 +511,50 @@ router.post('/refunds-create', rawJson, (req, res) =>
     }
   )
 );
+
+// ---------------------------------------------------------------------------
+// products/create + products/update — content sync down (D-02/D-10/D-12/D-13)
+// ---------------------------------------------------------------------------
+
+router.post('/products-create', rawJson, handleProductUpsert);
+router.post('/products-update', rawJson, handleProductUpsert);
+
+// ---------------------------------------------------------------------------
+// products/delete — soft-delete the product (D-14, never hard-delete)
+// ---------------------------------------------------------------------------
+
+router.post('/products-delete', rawJson, async (req, res) => {
+  if (!isAuthentic(req)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(req.body);
+  } catch (err) {
+    console.error('Shopify products/delete: malformed JSON body, acking:', err.message);
+    return res.status(200).json({ received: true });
+  }
+
+  try {
+    const shopifyProductId = String(payload.id);
+    // Soft-delete only (D-14): Orders/Sales still reference this product, and
+    // Phase 8's snapshot goal needs the row preserved. Never hard-delete.
+    const doc = await Product.findOneAndUpdate(
+      { shopifyProductId },
+      { $set: { active: false } },
+      { new: true }
+    );
+
+    if (!doc) {
+      console.error(`Shopify products/delete: no Mongo product for ${shopifyProductId}, acking`);
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('Shopify products/delete processing error:', err);
+    return res.status(500).json({ error: 'processing_failed' });
+  }
+});
 
 module.exports = router;
