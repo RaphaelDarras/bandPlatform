@@ -1,0 +1,51 @@
+# Shopify reconcile — scheduled backstop (Phase 07-08, SHOP-19; D-05, T-07-02/T-07-14).
+#
+# Purpose: an infrequent, FREE external trigger that POSTs the authenticated
+# reconcile endpoint so Shopify converges to Mongo's authoritative inventory
+# (drift repair + syncPending retries, D-05/D-06). Per D-05 reconcile is only a
+# backstop — per-write confirm-and-retry already covers the oversell-critical
+# direction — so a daily cadence is plenty (adjust the `cron` below to weekly,
+# e.g. `0 6 * * 1`, between concert seasons if desired).
+#
+# This call ALSO warms the Render free-tier instance (it spins down after ~15 min
+# idle); the reconcile POST doubles as a keep-alive ping.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   - RECONCILE_URL              The Render API base URL, e.g. https://bandplatform-api.onrender.com
+#                                (no trailing slash; the /api/shopify/reconcile path is appended below).
+#   - SHOPIFY_RECONCILE_SECRET   The shared secret. MUST match the SHOPIFY_RECONCILE_SECRET
+#                                env var set on the Render service. Never commit this value;
+#                                it is injected as a header and never echoed (T-07-02).
+#
+# Pitfall 6 (T-07-14, accepted/documented): GitHub Actions scheduled workflows are
+# AUTO-DISABLED after 60 days of repo inactivity (no pushes/commits). If the repo
+# goes dormant between concert seasons the cron will silently stop. Two safeguards:
+#   1. The reconcile response returns `lastReconcileAt` — a stale timestamp is the
+#      signal that the cron has gone dormant.
+#   2. Fallback: configure the same POST on https://cron-job.org (free, no repo
+#      activity dependency) pointing at RECONCILE_URL + /api/shopify/reconcile with
+#      the X-Reconcile-Secret header.
+
+name: shopify-reconcile
+
+on:
+  schedule:
+    # Daily at 06:00 UTC (D-05 default; adjustable to weekly).
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST reconcile endpoint
+        env:
+          RECONCILE_URL: ${{ secrets.RECONCILE_URL }}
+          SHOPIFY_RECONCILE_SECRET: ${{ secrets.SHOPIFY_RECONCILE_SECRET }}
+        run: |
+          # -f fails the step on any non-2xx response; -s/-S keep output quiet but
+          # surface errors. The secret is passed as a header only, never logged.
+          curl -fsS -X POST \
+            -H "X-Reconcile-Secret: ${SHOPIFY_RECONCILE_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${RECONCILE_URL}/api/shopify/reconcile"
