@@ -86,6 +86,24 @@ function sameId(a, b) {
 }
 
 /**
+ * Builds a canonical Shopify GID from a bare numeric id (or passes a GID
+ * through). Outbound (shopifySync) stores and REQUIRES GIDs, so the inbound
+ * webhook path must store/match in the same GID form — REST-style webhook
+ * payloads carry bare numeric ids, which previously mismatched the stored GID
+ * and caused products/* to insert duplicates instead of updating.
+ */
+function toGid(kind, value) {
+  if (value == null) return null;
+  const s = String(value);
+  return s.startsWith('gid://') ? s : `gid://shopify/${kind}/${s}`;
+}
+
+/** The canonical product GID for a webhook payload (admin_graphql_api_id preferred). */
+function productGidFromPayload(payload) {
+  return payload.admin_graphql_api_id || toGid('Product', payload.id);
+}
+
+/**
  * Resolves a webhook line item to its Mongo { product, variant } by the stored
  * shopifyVariantId first (steady state, D-08/Pitfall 5), falling back to SKU
  * only as a bootstrap link. Returns null when nothing matches (unknown id).
@@ -95,7 +113,7 @@ function sameId(a, b) {
  */
 async function matchVariant({ variant_id: variantId, sku }) {
   const or = [];
-  if (variantId != null) or.push({ 'variants.shopifyVariantId': String(variantId) });
+  if (variantId != null) or.push({ 'variants.shopifyVariantId': toGid('ProductVariant', variantId) });
   if (sku) or.push({ 'variants.sku': sku });
   if (or.length === 0) return null;
 
@@ -246,8 +264,14 @@ function reconcileVariants(doc, payload) {
     variant.active = true;
     // D-12 inbound: basePrice stays frozen, adjustment absorbs the delta.
     variant.priceAdjustment = parsePrice(pv.price) - doc.basePrice;
-    if (pv.id != null) variant.shopifyVariantId = String(pv.id);
-    if (pv.inventory_item_id != null) variant.shopifyInventoryItemId = String(pv.inventory_item_id);
+    // Store canonical GIDs so outbound (shopifySync) ids stay valid after an
+    // inbound content webhook touches the same variant.
+    if (pv.id != null) {
+      variant.shopifyVariantId = pv.admin_graphql_api_id || toGid('ProductVariant', pv.id);
+    }
+    if (pv.inventory_item_id != null) {
+      variant.shopifyInventoryItemId = toGid('InventoryItem', pv.inventory_item_id);
+    }
     if (pv.option1) variant.size = pv.option1;
     if (pv.option2) variant.color = pv.option2;
     seenSkus.add(variant.sku);
@@ -308,7 +332,7 @@ async function handleProductUpsert(req, res) {
   }
 
   try {
-    const shopifyProductId = String(payload.id);
+    const shopifyProductId = productGidFromPayload(payload);
     let doc = await Product.findOne({ shopifyProductId });
 
     if (doc) {
@@ -537,7 +561,7 @@ router.post('/products-delete', rawJson, async (req, res) => {
   }
 
   try {
-    const shopifyProductId = String(payload.id);
+    const shopifyProductId = productGidFromPayload(payload);
     // Soft-delete only (D-14): Orders/Sales still reference this product, and
     // Phase 8's snapshot goal needs the row preserved. Never hard-delete.
     const doc = await Product.findOneAndUpdate(

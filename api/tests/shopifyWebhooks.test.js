@@ -393,7 +393,7 @@ describe('POST /api/shopify/webhooks/products-create', () => {
     const res = await post('/api/shopify/webhooks/products-create', productCreatePayload());
     expect(res.status).toBe(200);
 
-    const doc = await Product.findOne({ shopifyProductId: '5001' });
+    const doc = await Product.findOne({ shopifyProductId: 'gid://shopify/Product/5001' });
     expect(doc).not.toBeNull();
     expect(doc.name).toBe('New Tee');
     expect(doc.active).toBe(true);
@@ -402,9 +402,11 @@ describe('POST /api/shopify/webhooks/products-create', () => {
 
     const s = doc.variants.find((v) => v.sku === 'NEW-S');
     const m = doc.variants.find((v) => v.sku === 'NEW-M');
-    expect(s.shopifyVariantId).toBe('900');
-    expect(s.shopifyInventoryItemId).toBe('inv-900');
-    expect(m.shopifyVariantId).toBe('901');
+    // Inbound ids are normalized to canonical GIDs (webhook payloads carry bare
+    // numeric ids; outbound/shopifySync stores + requires GIDs).
+    expect(s.shopifyVariantId).toBe('gid://shopify/ProductVariant/900');
+    expect(s.shopifyInventoryItemId).toBe('gid://shopify/InventoryItem/inv-900');
+    expect(m.shopifyVariantId).toBe('gid://shopify/ProductVariant/901');
 
     // basePrice = min variant price (25); priceAdjustment splits the rest
     expect(doc.basePrice).toBe(25);
@@ -420,7 +422,7 @@ describe('POST /api/shopify/webhooks/products-update', () => {
     await seedProduct({
       name: 'Old Name',
       basePrice: 20,
-      shopifyProductId: '5001',
+      shopifyProductId: 'gid://shopify/Product/5001',
       variants: [
         { sku: 'S-BLK', size: 'S', color: 'Black', stock: 10, version: 0, shopifyVariantId: '111', shopifyInventoryItemId: 'inv-111', priceAdjustment: 0 },
       ],
@@ -438,7 +440,11 @@ describe('POST /api/shopify/webhooks/products-update', () => {
     const res = await post('/api/shopify/webhooks/products-update', payload);
     expect(res.status).toBe(200);
 
-    const doc = await Product.findOne({ shopifyProductId: '5001' });
+    // Regression: a bare-numeric payload id must resolve to the GID-stored
+    // product and UPDATE it in place — not insert a duplicate.
+    expect(await Product.countDocuments()).toBe(1);
+
+    const doc = await Product.findOne({ shopifyProductId: 'gid://shopify/Product/5001' });
     expect(doc.name).toBe('Fresh Name');
     expect(doc.description).toBe('<p>updated</p>');
     expect(doc.images).toEqual(['https://cdn.shopify.com/new.jpg']); // replaced, order preserved
@@ -452,7 +458,7 @@ describe('POST /api/shopify/webhooks/products-update', () => {
 
     await seedProduct({
       basePrice: 20,
-      shopifyProductId: '5001',
+      shopifyProductId: 'gid://shopify/Product/5001',
       variants: [
         { sku: 'S-BLK', stock: 5, version: 0, shopifyVariantId: '111', shopifyInventoryItemId: 'inv-111' },
         { sku: 'M-BLK', stock: 7, version: 0, shopifyVariantId: '112', shopifyInventoryItemId: 'inv-112' },
@@ -470,7 +476,7 @@ describe('POST /api/shopify/webhooks/products-update', () => {
     const res = await post('/api/shopify/webhooks/products-update', payload);
     expect(res.status).toBe(200);
 
-    const doc = await Product.findOne({ shopifyProductId: '5001' });
+    const doc = await Product.findOne({ shopifyProductId: 'gid://shopify/Product/5001' });
     const dropped = doc.variants.find((v) => v.sku === 'M-BLK');
     expect(dropped.active).toBe(false);
     expect(dropped.stock).toBe(0);
@@ -483,7 +489,7 @@ describe('POST /api/shopify/webhooks/products-delete', () => {
   it('soft-deletes the product (active:false) without removing the document (D-14)', async () => {
     verifyShopifyWebhook.mockReturnValue(true);
 
-    const product = await seedProduct({ shopifyProductId: '5001' });
+    const product = await seedProduct({ shopifyProductId: 'gid://shopify/Product/5001' });
 
     const res = await post('/api/shopify/webhooks/products-delete', { id: '5001' });
     expect(res.status).toBe(200);
@@ -496,7 +502,7 @@ describe('POST /api/shopify/webhooks/products-delete', () => {
   it('returns 401 and mutates nothing on a bad HMAC', async () => {
     verifyShopifyWebhook.mockReturnValue(false);
 
-    const product = await seedProduct({ shopifyProductId: '5001' });
+    const product = await seedProduct({ shopifyProductId: 'gid://shopify/Product/5001' });
 
     const res = await post('/api/shopify/webhooks/products-delete', { id: '5001' }, { hmac: 'bad' });
     expect(res.status).toBe(401);
