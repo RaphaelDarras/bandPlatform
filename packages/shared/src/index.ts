@@ -28,6 +28,10 @@ export interface Variant {
   stock: number;
   version: number;
   priceAdjustment: number;
+  shopifyVariantId?: string; // Shopify variant identity (D-08)
+  shopifyInventoryItemId?: string; // Shopify inventory-item id (D-08)
+  active: boolean; // variant-level soft-delete (D-15)
+  syncPending?: boolean; // confirm-and-retry marker (D-05)
 }
 
 /**
@@ -41,6 +45,7 @@ export interface Product {
   basePrice: number;
   images: string[];
   active: boolean;
+  shopifyProductId?: string; // Shopify product identity (D-08)
   variants: Variant[];
 }
 
