@@ -109,6 +109,34 @@ function post(path, payload, { hmac = 'valid' } = {}) {
   return req.send(body);
 }
 
+function ordersCancelledPayload({
+  id = 'SHOP-1001',
+  variantId = '111',
+  sku = 'S-BLK',
+  quantity = 2,
+} = {}) {
+  return {
+    id,
+    line_items: [{ variant_id: variantId, sku, quantity, title: 'Band T-Shirt' }],
+  };
+}
+
+function refundsCreatePayload({
+  id = 'REF-1',
+  orderId = 'SHOP-1001',
+  variantId = '111',
+  sku = 'S-BLK',
+  quantity = 3,
+} = {}) {
+  return {
+    id,
+    order_id: orderId,
+    refund_line_items: [
+      { quantity, line_item: { variant_id: variantId, sku } },
+    ],
+  };
+}
+
 // --- Task 1: orders/paid --------------------------------------------------
 
 describe('POST /api/shopify/webhooks/orders-paid', () => {
@@ -218,5 +246,112 @@ describe('POST /api/shopify/webhooks/orders-paid', () => {
 
     expect(res.status).toBe(200);
     expect(pushInventory).not.toHaveBeenCalled();
+  });
+});
+
+// --- Task 2: orders/cancelled + refunds/create restock -------------------
+
+async function paySeededOrder({ quantity = 2 } = {}) {
+  verifyShopifyWebhook.mockReturnValue(true);
+  const res = await post(
+    '/api/shopify/webhooks/orders-paid',
+    ordersPaidPayload({ id: 'SHOP-1001', quantity })
+  );
+  expect(res.status).toBe(200);
+  jest.clearAllMocks();
+  verifyShopifyWebhook.mockReturnValue(true);
+}
+
+describe('POST /api/shopify/webhooks/orders-cancelled', () => {
+  it('returns 401 and writes nothing on a bad HMAC', async () => {
+    verifyShopifyWebhook.mockReturnValue(false);
+    const product = await seedProduct({
+      variants: [
+        { sku: 'S-BLK', stock: 8, version: 1, shopifyVariantId: '111', shopifyInventoryItemId: 'inv-111' },
+      ],
+    });
+    await Order.create({
+      orderNumber: 'SHOP-1001',
+      customerEmail: 'buyer@example.com',
+      items: [{ productId: product._id, variantSku: 'S-BLK', name: 'Band T-Shirt', quantity: 2, priceAtPurchase: 20, stockBefore: 10, stockAfter: 8 }],
+      totalAmount: 40,
+      status: 'paid',
+      source: 'online',
+    });
+
+    const res = await post('/api/shopify/webhooks/orders-cancelled', ordersCancelledPayload(), { hmac: 'bad' });
+    expect(res.status).toBe(401);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(8); // untouched
+    expect(pushInventory).not.toHaveBeenCalled();
+  });
+
+  it('restocks each line item via versioned $inc up and pushes the absolute count', async () => {
+    const product = await seedProduct(); // stock 10
+    await paySeededOrder({ quantity: 2 }); // -> stock 8, order paid
+
+    const res = await post('/api/shopify/webhooks/orders-cancelled', ordersCancelledPayload({ quantity: 2 }));
+    expect(res.status).toBe(200);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(10); // restocked
+
+    const order = await Order.findOne({ orderNumber: 'SHOP-1001' });
+    expect(order.status).toBe('failed'); // reversal recorded
+
+    expect(pushInventory).toHaveBeenCalledWith('inv-111', 10);
+  });
+
+  it('replay is a safe no-op (no double-restock)', async () => {
+    const product = await seedProduct();
+    await paySeededOrder({ quantity: 2 });
+
+    const res1 = await post('/api/shopify/webhooks/orders-cancelled', ordersCancelledPayload({ quantity: 2 }));
+    expect(res1.status).toBe(200);
+    const res2 = await post('/api/shopify/webhooks/orders-cancelled', ordersCancelledPayload({ quantity: 2 }));
+    expect(res2.status).toBe(200);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(10); // not 12 — replay did not double-restock
+  });
+});
+
+describe('POST /api/shopify/webhooks/refunds-create', () => {
+  it('returns 401 and writes nothing on a bad HMAC', async () => {
+    verifyShopifyWebhook.mockReturnValue(false);
+    const product = await seedProduct({
+      variants: [
+        { sku: 'S-BLK', stock: 7, version: 1, shopifyVariantId: '111', shopifyInventoryItemId: 'inv-111' },
+      ],
+    });
+    await Order.create({
+      orderNumber: 'SHOP-1001',
+      customerEmail: 'buyer@example.com',
+      items: [{ productId: product._id, variantSku: 'S-BLK', name: 'Band T-Shirt', quantity: 3, priceAtPurchase: 20, stockBefore: 10, stockAfter: 7 }],
+      totalAmount: 60,
+      status: 'paid',
+      source: 'online',
+    });
+
+    const res = await post('/api/shopify/webhooks/refunds-create', refundsCreatePayload(), { hmac: 'bad' });
+    expect(res.status).toBe(401);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(7); // untouched
+    expect(pushInventory).not.toHaveBeenCalled();
+  });
+
+  it('restocks the refunded quantities and pushes the absolute count', async () => {
+    const product = await seedProduct(); // stock 10
+    await paySeededOrder({ quantity: 3 }); // -> stock 7, order paid
+
+    const res = await post('/api/shopify/webhooks/refunds-create', refundsCreatePayload({ quantity: 3 }));
+    expect(res.status).toBe(200);
+
+    const reloaded = await Product.findById(product._id);
+    expect(reloaded.variants[0].stock).toBe(10); // restocked
+
+    expect(pushInventory).toHaveBeenCalledWith('inv-111', 10);
   });
 });
