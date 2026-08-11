@@ -70,6 +70,16 @@ export function Component() {
   // Holds the productId whose add-variant panel is open, at most one at a
   // time (D-16's sibling boundary comment lives on the trigger below).
   const [addVariantFor, setAddVariantFor] = useState<string | null>(null)
+  // Per-product collapse state (presentation only). Closed by default — an
+  // absent key reads as collapsed; the header row toggles its variant table
+  // open/closed. Purely visual: it gates NO data write and touches no D-*
+  // contract, so a collapsed product's dirty rows still count toward
+  // dirtyCount and still save with Save-all.
+  const [openProducts, setOpenProducts] = useState<Record<string, boolean>>({})
+
+  function toggleProduct(productId: string) {
+    setOpenProducts((prev) => ({ ...prev, [productId]: !prev[productId] }))
+  }
 
   // Restore session on mount (D-29: matches legacy sessionStorage.getItem('token')).
   useEffect(() => {
@@ -535,43 +545,69 @@ export function Component() {
             {visibleUnitTotal} units across {visibleProducts.length} products
           </p>
           <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4">
-            {visibleProducts.map((p) => (
+            {visibleProducts.map((p) => {
+              const isOpen = openProducts[p.productId] ?? false
+              const panelId = `stock-panel-${p.productId}`
+              return (
               <div key={p.productId}>
-                <div className="flex items-center justify-between border-b border-[var(--color-hairline)] py-2">
-                  <span className="flex items-center gap-2">
-                    <span className="font-display text-xl uppercase text-white">{p.name}</span>
-                    {view === 'archived' && (
-                      <span className="rounded bg-white/10 px-2 py-0.5 font-sans text-xs uppercase text-white/60">
-                        Archived
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-4">
+                <div className="flex items-center gap-2 border-b border-[var(--color-hairline)] py-2">
+                  {/* The whole name+units line is the collapse toggle. The
+                      Deactivate/Restore control is a SIBLING, never nested, so
+                      clicking it acts on the product without also toggling the
+                      panel (and stays valid — no button inside a button). */}
+                  <button
+                    type="button"
+                    aria-label={`Toggle variants for ${p.name}`}
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={() => toggleProduct(p.productId)}
+                    className="flex flex-1 items-center justify-between gap-2 text-left"
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className={`h-4 w-4 shrink-0 text-white/50 transition-transform ${
+                          isOpen ? 'rotate-90' : ''
+                        }`}
+                      >
+                        <path d="M7 5l6 5-6 5V5z" />
+                      </svg>
+                      <span className="font-display text-xl uppercase text-white">{p.name}</span>
+                      {view === 'archived' && (
+                        <span className="rounded bg-white/10 px-2 py-0.5 font-sans text-xs uppercase text-white/60">
+                          Archived
+                        </span>
+                      )}
+                    </span>
                     <span className="font-normal text-white/50">{p.productTotal} units</span>
-                    {view === 'active' && (
-                      <button
-                        type="button"
-                        aria-label={`Deactivate ${p.name}`}
-                        disabled={actionInFlight}
-                        onClick={() => setPendingDeactivation(p)}
-                        className="h-11 px-2 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-white/50 hover:text-[#ef4444] disabled:text-white/20"
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                    {view === 'archived' && (
-                      <button
-                        type="button"
-                        aria-label={`Restore ${p.name}`}
-                        disabled={actionInFlight}
-                        onClick={() => void handleRestore(p)}
-                        className="h-11 px-2 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-[var(--color-accent)] disabled:text-white/20"
-                      >
-                        Restore
-                      </button>
-                    )}
-                  </span>
+                  </button>
+                  {view === 'active' && (
+                    <button
+                      type="button"
+                      aria-label={`Deactivate ${p.name}`}
+                      disabled={actionInFlight}
+                      onClick={() => setPendingDeactivation(p)}
+                      className="h-11 shrink-0 px-2 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-white/50 hover:text-[#ef4444] disabled:text-white/20"
+                    >
+                      Deactivate
+                    </button>
+                  )}
+                  {view === 'archived' && (
+                    <button
+                      type="button"
+                      aria-label={`Restore ${p.name}`}
+                      disabled={actionInFlight}
+                      onClick={() => void handleRestore(p)}
+                      className="h-11 shrink-0 px-2 font-sans text-xs font-semibold uppercase tracking-[0.06em] text-[var(--color-accent)] disabled:text-white/20"
+                    >
+                      Restore
+                    </button>
+                  )}
                 </div>
+                {isOpen && (
+                <div id={panelId}>
                 <table className="mt-1 w-full">
                   <thead>
                     <tr>
@@ -690,8 +726,11 @@ export function Component() {
                     )}
                   </div>
                 )}
+                </div>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}

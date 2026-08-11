@@ -87,6 +87,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+// Products render collapsed (closed) by default; click a product's header row
+// to reveal its variant table / add-variant panel before asserting inner rows.
+function expandProduct(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: `Toggle variants for ${name}` }))
+}
+
 describe('Stock page', () => {
   it('shows the login form when no token is stored', () => {
     render(<Stock />)
@@ -106,13 +112,39 @@ describe('Stock page', () => {
     fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: /login/i }))
 
-    await waitFor(() => {
-      expect(screen.getByText('TS-M-BLK')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
+    expect(screen.getByText('TS-M-BLK')).toBeInTheDocument()
 
     expect(sessionStorage.getItem('token')).toBe('fake-token')
     expect(loginAdmin).toHaveBeenCalledWith('admin', 'secret')
     expect(fetchStock).toHaveBeenCalledWith('fake-token', true)
+  })
+
+  it('renders products collapsed by default with the name, units and Deactivate visible, and toggles open/closed on click', async () => {
+    sessionStorage.setItem('token', 'existing-token')
+    vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
+
+    render(<Stock />)
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+
+    // Closed by default: the header line (name + units + Deactivate) shows,
+    // but the variant rows underneath do not.
+    expect(screen.getByText('12 units')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deactivate T-Shirt' })).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'Toggle variants for T-Shirt' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('TS-M-BLK')).not.toBeInTheDocument()
+
+    // Click opens it.
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('TS-M-BLK')).toBeInTheDocument()
+
+    // Click again closes it.
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('TS-M-BLK')).not.toBeInTheDocument()
   })
 
   it('skips the login form and loads stock when a token is already in sessionStorage', async () => {
@@ -121,9 +153,9 @@ describe('Stock page', () => {
 
     render(<Stock />)
 
-    await waitFor(() => {
-      expect(screen.getByText('TS-M-BLK')).toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
+    expect(screen.getByText('TS-M-BLK')).toBeInTheDocument()
 
     expect(screen.queryByPlaceholderText(/username/i)).not.toBeInTheDocument()
     expect(fetchStock).toHaveBeenCalledWith('existing-token', true)
@@ -135,7 +167,8 @@ describe('Stock page', () => {
 
     render(<Stock />)
 
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     const zeroStockCell = screen.getByText('0')
     const healthyStockCell = screen.getByText('9')
@@ -148,7 +181,8 @@ describe('Stock page', () => {
 
     render(<Stock />)
 
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     const zeroStockCell = screen.getByText('0')
     expect(zeroStockCell.className).not.toMatch(/opacity/)
@@ -259,7 +293,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     const saveButton = screen.getByRole('button', { name: /save all/i })
     expect(saveButton).toBeDisabled()
@@ -277,7 +312,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
     expect(screen.getByText('(was 3)')).toBeInTheDocument()
@@ -293,7 +329,8 @@ describe('Stock page', () => {
     vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.change(screen.getByLabelText(/^Set stock for T-Shirt, M \/ Black \(TS-M-BLK\)/), {
       target: { value: '10' },
@@ -326,7 +363,8 @@ describe('Stock page', () => {
     vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     const decreaseButton = screen.getByRole('button', { name: 'Decrease stock for TS-M-BLK' })
     fireEvent.click(decreaseButton)
@@ -349,7 +387,8 @@ describe('Stock page', () => {
     )
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.change(screen.getByLabelText(/^Set stock for T-Shirt, M \/ Black \(TS-M-BLK\)/), {
       target: { value: '10' },
@@ -373,7 +412,8 @@ describe('Stock page', () => {
     vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
@@ -391,7 +431,8 @@ describe('Stock page', () => {
     vi.mocked(batchAdjustStock).mockRejectedValueOnce(new AuthExpiredError('Session expired'))
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: 'Increase stock for TS-M-BLK' }))
     fireEvent.click(screen.getByRole('button', { name: /save all changes \(1\)/i }))
@@ -408,7 +449,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     expect(screen.queryByLabelText(/reason/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/reason/i)).not.toBeInTheDocument()
@@ -420,7 +462,8 @@ describe('Stock page', () => {
     vi.mocked(putProductVariants).mockResolvedValueOnce({})
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     expect(screen.getByRole('button', { name: /^save all$/i })).toBeDisabled()
 
@@ -448,7 +491,8 @@ describe('Stock page', () => {
     vi.mocked(putProductVariants).mockRejectedValueOnce(new Error('Update failed'))
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     const colorInput = screen.getByLabelText('Color for T-Shirt (TS-M-BLK)')
     fireEvent.change(colorInput, { target: { value: 'Navy' } })
@@ -479,7 +523,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     expect(screen.queryByText('New Product')).not.toBeInTheDocument()
 
@@ -502,7 +547,8 @@ describe('Stock page', () => {
     vi.mocked(createProduct).mockResolvedValueOnce({})
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add product' }))
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Cap' } })
@@ -544,6 +590,8 @@ describe('Stock page', () => {
     render(<Stock />)
     await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
     expect(screen.getByText('Hoodie')).toBeInTheDocument()
+    expandProduct('T-Shirt')
+    expandProduct('Hoodie')
 
     fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
     expect(screen.getAllByText('Add Variant')).toHaveLength(1)
@@ -559,7 +607,8 @@ describe('Stock page', () => {
     vi.mocked(batchAdjustStock).mockResolvedValueOnce({ success: true, results: [] })
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
     fireEvent.change(screen.getByLabelText('Sizes'), { target: { value: 'XL' } })
@@ -585,7 +634,8 @@ describe('Stock page', () => {
     vi.mocked(batchAdjustStock).mockRejectedValueOnce(new Error('Batch save failed'))
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: 'Add variant to T-Shirt' }))
     fireEvent.change(screen.getByLabelText('Sizes'), { target: { value: 'XL' } })
@@ -637,7 +687,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     expect(screen.queryByLabelText(/description/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^name$/i)).not.toBeInTheDocument()
@@ -651,7 +702,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     expect(screen.queryByRole('button', { name: /remove.*variant/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
@@ -663,7 +715,8 @@ describe('Stock page', () => {
     vi.mocked(fetchStock).mockResolvedValueOnce(mockStockData)
 
     render(<Stock />)
-    await waitFor(() => expect(screen.getByText('TS-M-BLK')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('T-Shirt')).toBeInTheDocument())
+    expandProduct('T-Shirt')
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add product' }))
     expect(screen.getByLabelText(/^sizes$/i)).toBeInTheDocument()
