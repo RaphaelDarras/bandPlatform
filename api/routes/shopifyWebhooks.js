@@ -237,6 +237,54 @@ function statusToActive(status) {
   return String(status || '').toLowerCase() === 'active';
 }
 
+// Shopify's placeholder option value for a variant with no real options — it
+// carries no meaning, so it must never be folded into a generated SKU.
+const DEFAULT_OPTION = 'default title';
+
+/** Uppercases + slugifies a value into a SKU-safe token ('' when empty). */
+function slugForSku(value) {
+  return String(value == null ? '' : value)
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-') // collapse runs of non-alphanumerics to one dash
+    .replace(/^-+|-+$/g, ''); // trim leading/trailing dashes
+}
+
+/**
+ * Builds a human-readable, stable SKU for a Shopify variant that carries none of
+ * its own. A product created natively in Shopify has SKU-less variants, yet Mongo
+ * REQUIRES variants.sku (D-14) — without this the insert fails validation and the
+ * whole products/create webhook 500s, so the product never lands in Mongo (never
+ * appears on /stock or mobile). Derived from the product handle plus the size/
+ * color options (option1/option2/option3), e.g. "tour-tee" + "M" + "Black" ->
+ * "TOUR-TEE-M-BLACK". Falls back to the stable numeric variant id when a product
+ * has no real options (single-variant) and disambiguates against `used` (the SKUs
+ * already claimed within THIS payload) so one product can never emit a duplicate.
+ */
+function generateVariantSku(payload, pv, used) {
+  const base = slugForSku(payload.handle) || slugForSku(payload.title) || 'PRODUCT';
+  const parts = [pv.option1, pv.option2, pv.option3]
+    .map((o) => (String(o == null ? '' : o).toLowerCase() === DEFAULT_OPTION ? '' : slugForSku(o)))
+    .filter(Boolean);
+
+  let candidate = [base, ...parts].filter(Boolean).join('-');
+  // No options to differentiate (single-variant product): the numeric variant id
+  // is the only stable, unique discriminator available.
+  if (!parts.length) {
+    const idSuffix = normId(pv.id);
+    candidate = idSuffix ? `${base}-${idSuffix}` : base;
+  }
+
+  // Final guard: an in-payload clash (or an empty candidate) gets an incrementing
+  // suffix so the returned SKU is always non-empty and unique for this product.
+  let unique = candidate || base || 'SKU';
+  let n = 2;
+  while (used.has(unique)) {
+    unique = `${candidate}-${n++}`;
+  }
+  return unique;
+}
+
 /**
  * Reconciles a Mongo product's embedded variants against a Shopify products/*
  * payload. Present-in-payload variants are matched by stored shopifyVariantId
@@ -247,6 +295,9 @@ function statusToActive(status) {
 function reconcileVariants(doc, payload) {
   const payloadVariants = Array.isArray(payload.variants) ? payload.variants : [];
   const seenSkus = new Set();
+  // Every SKU already live on the doc (or claimed earlier in this pass) — so a
+  // SKU synthesized for a SKU-less new variant can never collide within the product.
+  const usedSkus = new Set(doc.variants.map((v) => v.sku).filter(Boolean));
 
   for (const pv of payloadVariants) {
     let variant = doc.variants.find(
@@ -256,7 +307,12 @@ function reconcileVariants(doc, payload) {
     );
 
     if (!variant) {
-      variant = { sku: pv.sku, stock: 0, version: 0, active: true };
+      // Shopify's own SKU wins when present; otherwise synthesize one from the
+      // handle + size/color options (a natively-created Shopify variant is
+      // SKU-less, and Mongo requires variants.sku — D-14).
+      const sku = (pv.sku || '').trim() || generateVariantSku(payload, pv, usedSkus);
+      usedSkus.add(sku);
+      variant = { sku, stock: 0, version: 0, active: true };
       doc.variants.push(variant);
       variant = doc.variants[doc.variants.length - 1];
     }

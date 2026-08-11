@@ -254,6 +254,7 @@ describe('POST /api/shopify/webhooks/orders-paid', () => {
 function productCreatePayload({
   id = '5001',
   title = 'New Tee',
+  handle = 'new-tee',
   body_html = '<p>desc</p>',
   status = 'active',
   images = [
@@ -265,7 +266,7 @@ function productCreatePayload({
     { id: '901', sku: 'NEW-M', price: '27.00', inventory_item_id: 'inv-901', option1: 'M', option2: 'Black' },
   ],
 } = {}) {
-  return { id, title, body_html, status, images, variants };
+  return { id, title, handle, body_html, status, images, variants };
 }
 
 // --- Task 2: orders/cancelled + refunds/create restock -------------------
@@ -412,6 +413,62 @@ describe('POST /api/shopify/webhooks/products-create', () => {
     expect(doc.basePrice).toBe(25);
     expect(s.priceAdjustment).toBe(0);
     expect(m.priceAdjustment).toBe(2);
+  });
+
+  it('synthesizes SKUs from handle + size/color when Shopify sends SKU-less variants', async () => {
+    verifyShopifyWebhook.mockReturnValue(true);
+
+    // A product created natively in Shopify: variants carry real size/color
+    // options but blank SKUs. Previously this failed the required-sku validator
+    // and 500'd, so the product never landed in Mongo (never hit /stock).
+    const payload = productCreatePayload({
+      id: '7002',
+      title: 'Tour Tee',
+      handle: 'tour-tee',
+      variants: [
+        { id: '910', sku: '', price: '25.00', inventory_item_id: 'inv-910', option1: 'M', option2: 'Black' },
+        { id: '911', sku: '', price: '25.00', inventory_item_id: 'inv-911', option1: 'L', option2: 'Black' },
+      ],
+    });
+
+    const res = await post('/api/shopify/webhooks/products-create', payload);
+    expect(res.status).toBe(200);
+
+    const doc = await Product.findOne({ shopifyProductId: 'gid://shopify/Product/7002' });
+    expect(doc).not.toBeNull();
+    expect(doc.variants).toHaveLength(2);
+
+    const skus = doc.variants.map((v) => v.sku).sort();
+    expect(skus).toEqual(['TOUR-TEE-L-BLACK', 'TOUR-TEE-M-BLACK']);
+
+    // Every variant persisted with the Shopify identity intact (so subsequent
+    // updates match by id, not the synthesized SKU).
+    const m = doc.variants.find((v) => v.sku === 'TOUR-TEE-M-BLACK');
+    expect(m.shopifyVariantId).toBe('gid://shopify/ProductVariant/910');
+    expect(m.size).toBe('M');
+    expect(m.color).toBe('Black');
+  });
+
+  it('falls back to the variant id for a single-variant SKU-less product', async () => {
+    verifyShopifyWebhook.mockReturnValue(true);
+
+    // Default single variant: Shopify sends option1 "Default Title" and no SKU.
+    const payload = productCreatePayload({
+      id: '7003',
+      title: 'Sticker',
+      handle: 'logo-sticker',
+      variants: [
+        { id: '920', sku: '', price: '3.00', inventory_item_id: 'inv-920', option1: 'Default Title' },
+      ],
+    });
+
+    const res = await post('/api/shopify/webhooks/products-create', payload);
+    expect(res.status).toBe(200);
+
+    const doc = await Product.findOne({ shopifyProductId: 'gid://shopify/Product/7003' });
+    expect(doc.variants).toHaveLength(1);
+    // "Default Title" is dropped; the numeric variant id keeps the SKU unique.
+    expect(doc.variants[0].sku).toBe('LOGO-STICKER-920');
   });
 });
 
