@@ -7,7 +7,7 @@
  */
 @theme {
   /* Color roles (UI-SPEC) */
-  --color-bg: #000000;                    /* Dominant 60% — page background */
+  --color-bg: #191919;                    /* Dominant 60% — page background */
   --color-surface: #191919;               /* Secondary 30% — nav/footer/cards */
   --color-accent: #c8bc86;                /* Accent 10% — CTA, active states, hero headline */
   --color-hairline: rgba(255, 255, 255, 0.08); /* 1px card border on black */
