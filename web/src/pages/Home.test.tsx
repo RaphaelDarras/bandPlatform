@@ -51,7 +51,10 @@ describe('Home page', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText(/Gravigny, France/)).toBeInTheDocument()
+    // The venue heading and the city/country line are separate elements now,
+    // and for a festival venueDisplay() includes the location, so this string
+    // legitimately appears in both.
+    expect(screen.getAllByText(/Gravigny, France/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('degrades to "No shows scheduled" linking to /concerts when events is empty', () => {

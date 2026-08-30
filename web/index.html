@@ -7,6 +7,17 @@
     <link rel="icon" type="image/png" href="/images/HURAKAN_ICON.png?v=3" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hurakan</title>
+    <!-- Scroll-revealed sections start at opacity 0 and are un-hidden by JS.
+         Without this, a visitor with JS disabled would see an empty page. The
+         text is in the prerendered HTML either way, so crawlers are unaffected. -->
+    <noscript>
+      <style>
+        .reveal {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      </style>
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

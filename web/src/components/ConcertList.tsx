@@ -4,16 +4,18 @@ import Button from './Button'
 
 // Concert rows + empty state (WEB-03, D-12). All Bandsintown fields render as
 // plain React text nodes — never dangerouslySetInnerHTML (T-04-xss).
-// Rows are already the site's panel treatment (hairline + recessed surface),
-// which <Section surface> now matches.
+//
+// Rows are a two-column layout on anything wider than a phone: the date block
+// in steel on the left, venue and CTA on the right. Dates use tabular-nums so
+// the column stays aligned down the list.
 export default function ConcertList({ events }: { events: BitEvent[] }) {
   if (events.length === 0) {
     return (
       <Section title="No shows scheduled">
-        <p className="font-sans text-base text-white/75">
+        <p className="type-body text-[var(--color-ink-dim)]">
           Follow us on Bandsintown to hear about new dates first.
         </p>
-        <div className="mt-6">
+        <div className="mt-7">
           <Button href="https://www.bandsintown.com/a/433176">Follow on Bandsintown</Button>
         </div>
       </Section>
@@ -22,29 +24,36 @@ export default function ConcertList({ events }: { events: BitEvent[] }) {
 
   return (
     <ul className="flex flex-col gap-3">
-      {events.map((e) => (
-        <li
-          key={e.id}
-          className="border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4"
-        >
-          <time
-            dateTime={e.datetime}
-            className="font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white"
+      {events.map((e) => {
+        const date = new Date(e.datetime)
+        return (
+          <li
+            key={e.id}
+            className="card-hover panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
           >
-            {new Date(e.datetime).toLocaleDateString('en')}
-          </time>
-          <p className="mt-1 font-sans text-sm text-white/75">
-            {venueDisplay(e)} — {e.venue.city}, {e.venue.country}
-          </p>
-          {e.offers.length > 0 && (
-            <div className="mt-4">
+            <div className="flex items-baseline gap-4 sm:gap-6">
+              <time
+                dateTime={e.datetime}
+                className="type-label shrink-0 tabular-nums text-[var(--color-steel)]"
+              >
+                {date.toLocaleDateString('en', { day: '2-digit', month: 'short' })}
+                <span className="ml-2 opacity-70">{date.getFullYear()}</span>
+              </time>
+              <div>
+                <p className="type-h2 text-[var(--color-ink)]">{venueDisplay(e)}</p>
+                <p className="mt-1 font-sans text-sm text-[var(--color-ink-dim)]">
+                  {e.venue.city}, {e.venue.country}
+                </p>
+              </div>
+            </div>
+            {e.offers.length > 0 && (
               <Button variant="secondary" href={clean(e.offers[0].url)}>
                 Get Tickets
               </Button>
-            </div>
-          )}
-        </li>
-      ))}
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }

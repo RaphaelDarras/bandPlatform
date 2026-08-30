@@ -25,7 +25,9 @@ describe('ConcertList — populated (WEB-03)', () => {
     render(<ConcertList events={events} />)
 
     // Festival event: venue.name === title, so we expect location + title, not bare title alone twice.
-    expect(screen.getByText(/Gravigny, France/)).toBeInTheDocument()
+    // Rows now split venue from city/country into separate elements, so
+    // "Gravigny, France" appears both in the venue line and the location line.
+    expect(screen.getAllByText(/Gravigny, France/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/Le Bikini/)).toBeInTheDocument()
     expect(screen.getAllByText(/France/).length).toBeGreaterThanOrEqual(2)
   })

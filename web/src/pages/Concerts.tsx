@@ -10,7 +10,7 @@ export function Component() {
   const { events } = (useLoaderData() as { events?: BitEvent[] }) ?? {}
 
   return (
-    <Section title="Upcoming Shows" as="h1">
+    <Section title="Upcoming Shows" eyebrow="Live" as="h1">
       <ConcertList events={events ?? []} />
     </Section>
   )

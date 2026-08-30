@@ -1,4 +1,5 @@
 import Section, { PageTitle, PAGE_STACK } from '../components/Section'
+import Reveal from '../components/Reveal'
 
 // Contact (WEB-04, D-13/D-14/D-16): static contact info only, no form, no
 // backend. One email channel plus the band's external channels — Instagram,
@@ -12,35 +13,54 @@ const CHANNELS = [
   { label: 'Shop', href: 'https://shop.hurakanband.fr/' },
 ]
 
+// Channel rows: full-width tap targets with a steel arrow that slides on
+// hover, rather than a bullet list of underlined text.
+const rowClass =
+  'group flex items-center justify-between rounded-xl border border-[var(--color-hairline)] ' +
+  'px-4 py-3.5 transition-colors duration-200 hover:border-[var(--color-steel)] ' +
+  'hover:bg-[rgba(94,127,133,0.12)]'
+
 export function Component() {
   return (
     <div className={PAGE_STACK}>
       <PageTitle>Contact</PageTitle>
 
-      <Section title="Email" surface>
-        <p className="font-sans text-white/75">
-          <a href="mailto:hurakanband@gmail.com" rel="noopener" className="underline">
+      <Reveal>
+        <Section title="Email" eyebrow="Booking & press" surface>
+          <a
+            href="mailto:hurakanband@gmail.com"
+            rel="noopener"
+            className="type-h2 text-[var(--color-accent)] underline decoration-1 underline-offset-[6px] transition-colors hover:text-[var(--color-ink)]"
+          >
             hurakanband@gmail.com
           </a>
-        </p>
-      </Section>
+        </Section>
+      </Reveal>
 
-      <Section title="Follow" surface>
-        <ul className="flex flex-col gap-2 font-sans text-white/75">
-          {CHANNELS.map((c) => (
-            <li key={c.label}>
-              <a
-                href={c.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                {c.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </Section>
+      <Reveal>
+        <Section title="Follow" eyebrow="Elsewhere" surface>
+          <ul className="flex flex-col gap-2">
+            {CHANNELS.map((c) => (
+              <li key={c.label}>
+                <a
+                  href={c.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={rowClass}
+                >
+                  <span className="type-label text-[var(--color-ink)]">{c.label}</span>
+                  <span
+                    aria-hidden="true"
+                    className="text-[var(--color-steel)] transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+                  >
+                    →
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      </Reveal>
     </div>
   )
 }

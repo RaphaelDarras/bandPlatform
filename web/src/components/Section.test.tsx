@@ -10,21 +10,22 @@ describe('Section', () => {
     expect(heading.tagName).toBe('H2')
   })
 
-  it('renders an h1 when asked, at a larger size than the h2', () => {
+  it('renders an h1 when asked, on a larger type step than the h2', () => {
     const { container: one } = render(<Section title="About" as="h1">body</Section>)
     const { container: two } = render(<Section title="About" as="h2">body</Section>)
 
-    expect(one.querySelector('h1')!.className).toContain('text-4xl')
-    expect(two.querySelector('h2')!.className).toContain('text-2xl')
+    // Fluid clamp scale lives in styles.css; the components only pick a step.
+    expect(one.querySelector('h1')!.className).toContain('type-h1')
+    expect(two.querySelector('h2')!.className).toContain('type-h2')
   })
 
   it('keeps a single fixed heading-to-body gap', () => {
     const { container } = render(<Section title="Next Show">body</Section>)
 
-    expect(container.querySelector('h2 + div')!.className).toBe('mt-4')
+    expect(container.querySelector('h2 + div')!.className).toBe('mt-5')
   })
 
-  it('is transparent by default and a recessed panel when surface is set', () => {
+  it('is transparent by default and a panel when surface is set', () => {
     const { container: plain } = render(<Section title="A">body</Section>)
     const { container: panel } = render(
       <Section title="A" surface>
@@ -33,8 +34,26 @@ describe('Section', () => {
     )
 
     expect(plain.querySelector('section')!.className).toBe('')
-    expect(panel.querySelector('section')!.className).toContain('bg-[var(--color-surface)]')
-    expect(panel.querySelector('section')!.className).toContain('border')
+    expect(panel.querySelector('section')!.className).toContain('panel')
+  })
+
+  it('renders an optional gold eyebrow above the title, and never as a paragraph', () => {
+    const { container } = render(
+      <Section title="Latest Release" eyebrow="Out now">
+        body
+      </Section>,
+    )
+
+    expect(screen.getByText('Out now')).toBeInTheDocument()
+    // About (D-22/D-23) must contain exactly one <p>; an eyebrow <p> would
+    // silently break that contract on every page carrying one.
+    expect(container.querySelectorAll('p')).toHaveLength(0)
+  })
+
+  it('omits the eyebrow entirely when not given one', () => {
+    const { container } = render(<Section title="A">body</Section>)
+
+    expect(container.querySelector('section')!.firstElementChild!.tagName).toBe('H2')
   })
 
   it('PageTitle renders an h1 matching the Section h1 style', () => {

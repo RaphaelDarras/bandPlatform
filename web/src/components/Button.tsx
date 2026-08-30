@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 
-// Single source of truth for the site's CTA treatments. Replaces the four
-// hand-inlined variants that had accumulated across Home/Concerts (filled
-// px-6 py-3, outlined px-4 py-2, bold-uppercase-underline, plain underline).
+// Single source of truth for the site's CTA treatments.
 //
 // Renders a router <Link> when given `to`, an external <a> when given `href`
 // (target/rel applied automatically), otherwise a plain <button>.
@@ -11,16 +9,26 @@ import type { ReactNode } from 'react'
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet'
 
 const BASE =
-  'inline-block font-sans text-sm font-semibold uppercase tracking-[0.06em] transition-colors'
+  'type-label inline-flex items-center justify-center gap-2 rounded-full ' +
+  'transition-[transform,background-color,border-color,color,box-shadow] duration-200 ' +
+  'motion-reduce:transition-none'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  // Filled accent — one per section, maximum one primary per viewport.
-  primary: 'bg-[var(--color-accent)] px-6 py-3 text-black hover:opacity-85',
-  // Outlined — secondary action sitting next to a primary.
+  // Filled gold. One per section — this is the page's ask.
+  primary:
+    'bg-[var(--color-accent)] px-7 py-3.5 text-[#141414] ' +
+    'shadow-[0_8px_24px_-10px_rgba(200,188,134,0.55)] ' +
+    'hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-10px_rgba(200,188,134,0.7)] ' +
+    'motion-reduce:hover:translate-y-0',
+  // Steel outline — the cold accent, so it reads as clearly subordinate to
+  // gold rather than competing with it.
   secondary:
-    'border border-[var(--color-accent)] px-6 py-3 text-white hover:bg-[var(--color-accent)] hover:text-black',
+    'border border-[var(--color-steel)] px-7 py-3.5 text-[var(--color-ink)] ' +
+    'hover:border-[var(--color-ink)] hover:bg-[rgba(94,127,133,0.16)]',
   // Inline text link — navigational, not an action.
-  quiet: 'text-white/75 underline hover:text-white',
+  quiet:
+    'text-[var(--color-ink-dim)] underline decoration-[var(--color-steel)] decoration-2 ' +
+    'underline-offset-4 hover:text-[var(--color-ink)] hover:decoration-[var(--color-accent)]',
 }
 
 type Props = {
