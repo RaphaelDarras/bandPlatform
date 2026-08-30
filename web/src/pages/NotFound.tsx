@@ -5,7 +5,7 @@ import Button from '../components/Button'
 export function Component() {
   return (
     <section className="py-24 text-center">
-      <p className="type-label text-[var(--color-steel)]">Error 404</p>
+      <p className="type-label text-[var(--color-ink-dim)]">Error 404</p>
       <h1 className="type-display mt-3 text-[var(--color-ink)]">Page not found</h1>
       <p className="type-body mx-auto mt-4 text-[var(--color-ink-dim)]">
         This page doesn&apos;t exist. Head back to the homepage.

@@ -16,7 +16,7 @@ export default function ProductGrid({ products }: { products: ShopProduct[] }) {
             rel="noopener noreferrer"
             className="card-hover group flex h-full flex-col border border-transparent bg-[var(--color-bg)] hover:bg-[var(--color-surface)]"
           >
-            <div className="relative aspect-square overflow-hidden bg-[#101010]">
+            <div className="relative aspect-square overflow-hidden bg-[var(--color-bg)]">
               {p.image && (
                 <img
                   src={p.image}
@@ -26,7 +26,7 @@ export default function ProductGrid({ products }: { products: ShopProduct[] }) {
                 />
               )}
               {!p.available && (
-                <span className="type-label absolute left-0 top-0 bg-[#0b0b0b] px-3 py-1.5 text-[var(--color-steel)]">
+                <span className="type-label absolute left-0 top-0 bg-[var(--color-bg)] px-3 py-1.5 text-[var(--color-ink-dim)]">
                   Sold out
                 </span>
               )}

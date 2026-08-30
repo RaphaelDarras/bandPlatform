@@ -34,7 +34,7 @@ export default function ConcertList({ events }: { events: BitEvent[] }) {
             <div className="flex items-baseline gap-4 sm:gap-6">
               <time
                 dateTime={e.datetime}
-                className="type-label shrink-0 tabular-nums text-[var(--color-steel)]"
+                className="type-label shrink-0 tabular-nums text-[var(--color-ink-dim)]"
               >
                 {date.toLocaleDateString('en', { day: '2-digit', month: 'short' })}
                 <span className="ml-2 opacity-70">{date.getFullYear()}</span>

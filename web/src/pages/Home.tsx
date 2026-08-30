@@ -11,13 +11,14 @@ import Button from '../components/Button'
 import Reveal from '../components/Reveal'
 
 // Landing hub (D-25). Order:
-//   1. full-screen player — the latest release, taking the whole viewport
-//   2. preorder           — the album, expires when the window closes
-//   3. all merch          — the full catalogue
-//   4. next show          — dated
+//   1. player   — the latest release, full-bleed, shown directly
+//   2. preorder — the album; expires when the window closes
+//   3. merch    — the rest of the store (all-no-preorder collection)
+//   4. next show— dated
 //
-// Every product card deep-links to its own Shopify detail page; the only
-// store-root links left are the two "everything" buttons.
+// The two product sections partition the store, so nothing is listed twice.
+// Every card deep-links to its own Shopify detail page; the store root appears
+// once, on "Open the shop".
 //
 // All Bandsintown text renders as escaped React text (T-04-xss).
 
@@ -27,26 +28,14 @@ export function Component() {
   const next = nextEvent(events ?? [])
   const highlightedRelease = releases[0]
   const preorder = catalogue?.preorder ?? []
-  const all = catalogue?.all ?? []
+  const merch = catalogue?.merch ?? []
 
   return (
     <div className={PAGE_STACK}>
-      {/* Full-viewport hero player. The release[0] entry is a YouTube video
-          (D-17), so the hero is the latest release rather than a banner with
-          the player buried in a section below it. */}
+      {/* The release[0] entry is a YouTube video (D-17), so the hero is the
+          release itself — player shown directly, no poster or play overlay. */}
       {highlightedRelease?.kind === 'youtube' && (
-        <FullscreenPlayer
-          videoId={highlightedRelease.videoId}
-          poster="/images/FB_DOGMA.jpg"
-          posterWide="/images/BANDCAMP_DOGMA.avif"
-          title="Dogma"
-          eyebrow="New single — out now"
-          action={
-            <Button variant="secondary" to="/listen">
-              Listen Now
-            </Button>
-          }
-        />
+        <FullscreenPlayer videoId={highlightedRelease.videoId} title="Dogma" />
       )}
 
       {preorder.length > 0 && (
@@ -60,10 +49,10 @@ export function Component() {
         </Reveal>
       )}
 
-      {all.length > 0 ? (
+      {merch.length > 0 ? (
         <Reveal>
-          <Section title="All" eyebrow="Merch">
-            <ProductGrid products={all} />
+          <Section title="Merch" eyebrow="Out now">
+            <ProductGrid products={merch} />
             <div className="mt-8">
               <Button href={STORE_URL}>Open the shop</Button>
             </div>
@@ -85,7 +74,7 @@ export function Component() {
         <Section title="Next Show" eyebrow="On tour">
           {next ? (
             <>
-              <p className="type-label tabular-nums text-[var(--color-steel)]">
+              <p className="type-label tabular-nums text-[var(--color-ink-dim)]">
                 {new Date(next.datetime).toLocaleDateString('en', {
                   day: '2-digit',
                   month: 'short',

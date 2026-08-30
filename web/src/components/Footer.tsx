@@ -11,7 +11,7 @@ const textLinkClass =
 // bare glyphs with no affordance at all.
 const iconLinkClass =
   'flex h-10 w-10 items-center justify-center text-[var(--color-ink-dim)] ' +
-  'transition-colors duration-200 hover:bg-[rgba(94,127,133,0.18)] hover:text-[var(--color-ink)]'
+  'transition-colors duration-200 hover:bg-[rgba(200,188,134,0.14)] hover:text-[var(--color-ink)]'
 
 const SOCIALS = [
   {
@@ -74,7 +74,7 @@ const SOCIALS = [
 
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-[var(--color-hairline)] bg-[rgba(15,15,15,0.6)] backdrop-blur-sm">
+    <footer className="mt-auto border-t border-[var(--color-hairline)] bg-[rgba(25,25,25,0.72)] backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6 px-5 py-8">
         <nav aria-label="Secondary" className="flex items-center gap-6">
           <Link to="/about" className={textLinkClass}>

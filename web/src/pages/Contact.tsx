@@ -17,8 +17,8 @@ const CHANNELS = [
 // hover, rather than a bullet list of underlined text.
 const rowClass =
   'group flex items-center justify-between border border-[var(--color-hairline)] ' +
-  'px-4 py-3.5 transition-colors duration-200 hover:border-[var(--color-steel)] ' +
-  'hover:bg-[rgba(94,127,133,0.12)]'
+  'px-4 py-3.5 transition-colors duration-200 hover:border-[var(--color-ink-dim)] ' +
+  'hover:bg-[rgba(200,188,134,0.10)]'
 
 export function Component() {
   return (
@@ -51,7 +51,7 @@ export function Component() {
                   <span className="type-label text-[var(--color-ink)]">{c.label}</span>
                   <span
                     aria-hidden="true"
-                    className="text-[var(--color-steel)] transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
+                    className="text-[var(--color-ink-dim)] transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transition-none"
                   >
                     →
                   </span>

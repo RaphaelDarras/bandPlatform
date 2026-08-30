@@ -26,11 +26,23 @@ export const STORE_URL = 'https://shop.hurakanband.fr/'
  */
 const MARKET_COUNTRY = 'FR'
 
+/**
+ * Shopify collection that curates everything EXCEPT the preorder items. It is
+ * maintained by the band in the Shopify admin, so what counts as "not a
+ * preorder" is their editorial call, not a string match in our code.
+ */
+export const MERCH_COLLECTION = 'all-no-preorder'
+
 /** Endpoint used at build time. Exported so the market pin is testable. */
 export function productsEndpoint(limit = 250): string {
   // limit=250 is the endpoint maximum and the store holds ~25 products; if it
   // ever outgrows that, this needs `&page=` pagination.
   return `${STORE_URL}products.json?limit=${limit}&country=${MARKET_COUNTRY}`
+}
+
+/** Same, for a single collection. Verified to honour the country pin. */
+export function collectionEndpoint(handle: string, limit = 250): string {
+  return `${STORE_URL}collections/${handle}/products.json?limit=${limit}&country=${MARKET_COUNTRY}`
 }
 
 /** One product, flattened to just what a card renders. */
@@ -43,13 +55,16 @@ export interface ShopProduct {
   price: string
   image: string | null
   available: boolean
-  isPreorder: boolean
 }
 
-/** Both catalogue slices the home page renders. */
+/**
+ * The two catalogue slices the home page renders. They PARTITION the store:
+ * `merch` is the all-no-preorder collection, `preorder` is everything else, so
+ * no product appears in both sections.
+ */
 export interface Catalogue {
   preorder: ShopProduct[]
-  all: ShopProduct[]
+  merch: ShopProduct[]
 }
 
 /** The subset of the products.json payload this module reads. */
@@ -98,11 +113,6 @@ export function displayTitle(title: string): string {
     .trim()
 }
 
-/** A product is a preorder if its handle or title says so. */
-export function isPreorderProduct(p: { handle: string; title: string }): boolean {
-  return /^pre[\s-]?order/i.test(p.handle) || /^\s*pre[\s-]?order/i.test(p.title)
-}
-
 /**
  * Shopify CDN images are served at their upload size unless asked otherwise.
  * Cards render at ~400px, so request 800 for 2x displays. The CDN
@@ -134,20 +144,27 @@ export function toShopProduct(p: ShopifyProduct): ShopProduct {
       : '',
     image: p.images[0] ? sized(p.images[0].src) : null,
     available: p.variants.some((v) => v.available),
-    isPreorder: isPreorderProduct(p),
   }
 }
 
 /**
- * Split the catalogue into the two slices the home page shows. `all` is the
- * complete catalogue in storefront order; `preorder` is the subset flagged as
- * preorder. Preorder items therefore appear in both, which is deliberate —
- * "All" means all, and featuring an item above the full grid is ordinary
- * storefront practice.
+ * Partition the store into its two sections.
+ *
+ * `merch` is exactly the all-no-preorder collection. `preorder` is every other
+ * product in the store — derived by subtraction rather than by matching
+ * "PREORDER" in a title, so the band's own collection is the single source of
+ * truth and a rename in Shopify can't silently drop an item from both grids.
+ * Nothing appears twice.
  */
-export function toCatalogue(products: ShopifyProduct[]): Catalogue {
-  const all = products.map(toShopProduct)
-  return { preorder: all.filter((p) => p.isPreorder), all }
+export function toCatalogue(
+  allProducts: ShopifyProduct[],
+  merchProducts: ShopifyProduct[],
+): Catalogue {
+  const merchHandles = new Set(merchProducts.map((p) => p.handle))
+  return {
+    preorder: allProducts.filter((p) => !merchHandles.has(p.handle)).map(toShopProduct),
+    merch: merchProducts.map(toShopProduct),
+  }
 }
 
 /**
@@ -160,18 +177,30 @@ export function toCatalogue(products: ShopifyProduct[]): Catalogue {
  * fallback rather than making a live call on every page load.
  */
 export async function fetchCatalogue(): Promise<Catalogue> {
-  const empty: Catalogue = { preorder: [], all: [] }
+  const empty: Catalogue = { preorder: [], merch: [] }
   if (!import.meta.env.SSR) return empty // never runs / ships in the client bundle
-  try {
-    const res = await fetch(productsEndpoint())
+
+  const load = async (url: string): Promise<ShopifyProduct[] | null> => {
+    const res = await fetch(url)
     if (!res.ok) {
-      console.warn(`[shopify] products.json failed with status ${res.status}, falling back`)
-      return empty
+      console.warn(`[shopify] ${url} failed with status ${res.status}`)
+      return null
     }
     const body = (await res.json()) as { products?: ShopifyProduct[] }
-    return toCatalogue(body.products ?? [])
+    return body.products ?? []
+  }
+
+  try {
+    const [all, merch] = await Promise.all([
+      load(productsEndpoint()),
+      load(collectionEndpoint(MERCH_COLLECTION)),
+    ])
+    // Both are needed to partition: without the collection we cannot tell which
+    // products are preorders, so fall back rather than guess and mis-file them.
+    if (!all || !merch) return empty
+    return toCatalogue(all, merch)
   } catch (err) {
-    console.warn('[shopify] products.json threw, falling back:', err)
+    console.warn('[shopify] catalogue fetch threw, falling back:', err)
     return empty
   }
 }

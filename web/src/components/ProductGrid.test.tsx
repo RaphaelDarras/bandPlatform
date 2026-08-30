@@ -11,7 +11,6 @@ const products: ShopProduct[] = [
     price: '15,00 €',
     image: 'https://cdn.shopify.com/s/files/1/x/CD_MOCKUP.png?v=1&width=800',
     available: true,
-    isPreorder: true,
   },
   {
     handle: 'parasite-t-shirt',
@@ -20,7 +19,6 @@ const products: ShopProduct[] = [
     price: '20,00 €',
     image: null,
     available: false,
-    isPreorder: false,
   },
 ]
 

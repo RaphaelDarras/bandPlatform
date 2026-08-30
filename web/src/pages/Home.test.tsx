@@ -7,6 +7,7 @@ import fixture from '../lib/__fixtures__/bandsintown-events.json'
 
 const events = fixture as BitEvent[]
 
+// The two slices partition the store — no handle appears in both.
 const catalogue: Catalogue = {
   preorder: [
     {
@@ -16,19 +17,9 @@ const catalogue: Catalogue = {
       price: '15,00 €',
       image: 'https://cdn.shopify.com/s/files/1/x/CD.png?width=800',
       available: true,
-      isPreorder: true,
     },
   ],
-  all: [
-    {
-      handle: 'preorder-cd-eternal-scars',
-      label: 'DIGIPACK - "ETERNAL SCARS"',
-      url: 'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
-      price: '15,00 €',
-      image: 'https://cdn.shopify.com/s/files/1/x/CD.png?width=800',
-      available: true,
-      isPreorder: true,
-    },
+  merch: [
     {
       handle: 'parasite-t-shirt',
       label: 'PARASITE - T-SHIRT',
@@ -36,7 +27,6 @@ const catalogue: Catalogue = {
       price: '20,00 €',
       image: 'https://cdn.shopify.com/s/files/1/x/PARASITE.jpg?width=800',
       available: true,
-      isPreorder: false,
     },
   ],
 }
@@ -60,55 +50,55 @@ const renderHome = () =>
   )
 
 describe('Home page', () => {
-  it('renders "Listen Now" linking to /listen', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
-    renderHome()
-
-    expect(screen.getByRole('link', { name: /listen now/i })).toHaveAttribute('href', '/listen')
-  })
-
-  it('leads with a full-screen deferred player as the page h1', () => {
+  it('leads with the release player itself, no poster or play overlay', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     const { container } = renderHome()
+
+    const iframe = container.querySelector('iframe')!
+    expect(iframe.getAttribute('src')).toContain('youtube-nocookie.com/embed/')
+    expect(screen.queryByRole('button', { name: /play/i })).not.toBeInTheDocument()
 
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s).toHaveLength(1)
     expect(h1s[0]).toHaveTextContent('Dogma')
-
-    // Nothing third-party loads until the visitor asks for it.
-    expect(container.querySelector('iframe')).toBeNull()
-    expect(screen.getByRole('button', { name: /play video/i })).toBeInTheDocument()
   })
 
-  it('splits merch into a Preorder section and an All section', () => {
+  it('splits the store into Preorder and Merch, in that order', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     renderHome()
 
     const sections = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(sections).toEqual(['Preorder', 'All', 'Next Show'])
+    expect(sections).toEqual(['Preorder', 'Merch', 'Next Show'])
+  })
+
+  it('lists no product twice across the two sections', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    const { container } = renderHome()
+
+    const hrefs = [
+      ...container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
+    ].map((a) => a.getAttribute('href'))
+
+    expect(hrefs).toHaveLength(2)
+    expect(new Set(hrefs).size).toBe(hrefs.length)
   })
 
   it('sends every product card to its own Shopify detail page', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     const { container } = renderHome()
 
-    const productLinks = [
-      ...container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
-    ]
-    // 1 in Preorder + 2 in All.
-    expect(productLinks).toHaveLength(3)
-    for (const l of productLinks) {
-      expect(l.getAttribute('href')).toMatch(/\/products\/[a-z0-9-]+$/)
+    for (const a of container.querySelectorAll(
+      'a[href^="https://shop.hurakanband.fr/products/"]',
+    )) {
+      expect(a.getAttribute('href')).toMatch(/\/products\/[a-z0-9-]+$/)
     }
   })
 
-  it('keeps the store root to the single "everything" button', () => {
+  it('keeps the store root to the single "Open the shop" button', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     const { container } = renderHome()
 
-    const rootLinks = [
-      ...container.querySelectorAll('a[href="https://shop.hurakanband.fr/"]'),
-    ]
+    const rootLinks = [...container.querySelectorAll('a[href="https://shop.hurakanband.fr/"]')]
     expect(rootLinks).toHaveLength(1)
     expect(rootLinks[0]).toHaveTextContent(/open the shop/i)
   })
@@ -116,19 +106,18 @@ describe('Home page', () => {
   it('falls back to a plain shop link when the catalogue fetch failed soft', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       events,
-      catalogue: { preorder: [], all: [] },
+      catalogue: { preorder: [], merch: [] },
     })
     const { container } = renderHome()
 
     expect(screen.queryByRole('heading', { name: /^preorder$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: /^all$/i })).not.toBeInTheDocument()
+    expect(
+      container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
+    ).toHaveLength(0)
     expect(screen.getByRole('link', { name: /open the shop/i })).toHaveAttribute(
       'href',
       'https://shop.hurakanband.fr/',
     )
-    expect(
-      container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
-    ).toHaveLength(0)
   })
 
   it('shows the next event venue text from nextEvent(events) when events exist', () => {

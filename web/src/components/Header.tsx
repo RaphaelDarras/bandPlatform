@@ -52,7 +52,7 @@ export default function Header() {
         'sticky top-0 z-50 transition-[background-color,border-color,backdrop-filter] duration-300',
         'border-b',
         scrolled
-          ? 'border-[var(--color-hairline)] bg-[rgba(15,15,15,0.72)] backdrop-blur-xl'
+          ? 'border-[var(--color-hairline)] bg-[rgba(25,25,25,0.85)] backdrop-blur-xl'
           : 'border-transparent bg-transparent',
       ].join(' ')}
     >
@@ -105,7 +105,7 @@ export default function Header() {
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
-            className="flex h-11 w-11 items-center justify-center text-[var(--color-ink)] transition-colors hover:bg-[rgba(245,234,205,0.06)] md:hidden"
+            className="flex h-11 w-11 items-center justify-center text-[var(--color-ink)] transition-colors hover:bg-[rgba(200,188,134,0.08)] md:hidden"
           >
             {open ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -122,7 +122,7 @@ export default function Header() {
 
       {/* Mobile menu panel */}
       {open && (
-        <ul className="flex flex-col border-t border-[var(--color-hairline)] bg-[rgba(15,15,15,0.96)] px-5 py-2 backdrop-blur-xl md:hidden">
+        <ul className="flex flex-col border-t border-[var(--color-hairline)] bg-[rgba(25,25,25,0.97)] px-5 py-2 backdrop-blur-xl md:hidden">
           {NAV_LINKS.map((l) => {
             const mobileClass = (isActive: boolean) =>
               [

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
+  collectionEndpoint,
   displayTitle,
-  isPreorderProduct,
+  MERCH_COLLECTION,
   productsEndpoint,
   sized,
   toCatalogue,
@@ -36,19 +37,18 @@ const products = [
   },
 ]
 
-describe('toCatalogue', () => {
-  it('returns the full catalogue in storefront order', () => {
-    const { all } = toCatalogue(products)
+// The all-no-preorder collection, as Shopify returns it.
+const merchOnly = [products[2]]
 
-    expect(all.map((p) => p.handle)).toEqual([
-      'preorder-cd-eternal-scars',
-      'preorder-vinyl-eternal-scars',
-      'parasite-t-shirt',
-    ])
+describe('toCatalogue', () => {
+  it('uses the collection verbatim as the merch slice', () => {
+    const { merch } = toCatalogue(products, merchOnly)
+
+    expect(merch.map((p) => p.handle)).toEqual(['parasite-t-shirt'])
   })
 
-  it('filters the preorder slice out of the same list', () => {
-    const { preorder } = toCatalogue(products)
+  it('derives preorder by subtracting the collection from the full store', () => {
+    const { preorder } = toCatalogue(products, merchOnly)
 
     expect(preorder.map((p) => p.handle)).toEqual([
       'preorder-cd-eternal-scars',
@@ -56,15 +56,45 @@ describe('toCatalogue', () => {
     ])
   })
 
-  it('keeps preorder items in "all" too — All means all', () => {
-    const { all } = toCatalogue(products)
+  it('partitions: no product appears in both slices', () => {
+    const { preorder, merch } = toCatalogue(products, merchOnly)
+    const overlap = preorder.filter((p) => merch.some((m) => m.handle === p.handle))
 
-    expect(all.some((p) => p.handle === 'preorder-cd-eternal-scars')).toBe(true)
-    expect(all).toHaveLength(3)
+    expect(overlap).toEqual([])
+    expect(preorder.length + merch.length).toBe(products.length)
   })
 
-  it('survives an empty payload', () => {
-    expect(toCatalogue([])).toEqual({ preorder: [], all: [] })
+  it('classifies by collection membership, not by the word PREORDER', () => {
+    // A preorder-titled product that the band HAS put in the collection
+    // belongs to merch — their curation wins over any string match.
+    const { preorder, merch } = toCatalogue(products, [products[0], products[2]])
+
+    expect(merch.map((p) => p.handle)).toContain('preorder-cd-eternal-scars')
+    expect(preorder.map((p) => p.handle)).toEqual(['preorder-vinyl-eternal-scars'])
+  })
+
+  it('puts everything in preorder when the collection is empty', () => {
+    const { preorder, merch } = toCatalogue(products, [])
+
+    expect(merch).toEqual([])
+    expect(preorder).toHaveLength(3)
+  })
+
+  it('survives an empty store', () => {
+    expect(toCatalogue([], [])).toEqual({ preorder: [], merch: [] })
+  })
+})
+
+describe('collectionEndpoint', () => {
+  it('targets the band-maintained all-no-preorder collection', () => {
+    expect(MERCH_COLLECTION).toBe('all-no-preorder')
+    expect(collectionEndpoint(MERCH_COLLECTION)).toContain(
+      'collections/all-no-preorder/products.json',
+    )
+  })
+
+  it('pins the market here too — the collection endpoint localises prices as well', () => {
+    expect(collectionEndpoint(MERCH_COLLECTION)).toContain('country=FR')
   })
 })
 
@@ -119,26 +149,6 @@ describe('displayTitle', () => {
 
   it('normalises curly quotes', () => {
     expect(displayTitle('VINYL “ETERNAL SCARS”')).toBe('VINYL "ETERNAL SCARS"')
-  })
-})
-
-describe('isPreorderProduct', () => {
-  it('flags by handle prefix', () => {
-    expect(isPreorderProduct({ handle: 'preorder-mouthguard', title: 'Mouthguard' })).toBe(true)
-  })
-
-  it('flags by title prefix even when the handle does not say so', () => {
-    expect(isPreorderProduct({ handle: 'cd-eternal-scars', title: 'PREORDER - CD' })).toBe(true)
-  })
-
-  it('does not flag a regular product', () => {
-    expect(isPreorderProduct({ handle: 'parasite-t-shirt', title: 'PARASITE - T-SHIRT' })).toBe(
-      false,
-    )
-  })
-
-  it('does not flag a mid-string match', () => {
-    expect(isPreorderProduct({ handle: 'bundle-preorder', title: 'BUNDLE PREORDER' })).toBe(false)
   })
 })
 

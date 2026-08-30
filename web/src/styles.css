@@ -16,23 +16,30 @@
  *   --color-base-highlight: 255 221 191      -> warm cream
  * So: hard edges, huge tight uppercase type, flat ground, near-white CTAs.
  *
- * PALETTE (three tiers, sampled from the Dogma cover art):
- *   ivory  #f5eacd  headings, emphasis, primary CTA fill
- *   dim    #a9a296  body copy
- *   gold   #c8bc86  accent: eyebrows, active nav, prices
- *   steel  #5e7f85  cold accent: meta, dates, secondary outlines
+ * PALETTE — must stay IDENTICAL to the Shopify storefront so the site and the
+ * shop read as one product. Read from shop.hurakanband.fr's live theme
+ * (color-scheme-4, the store's dark scheme):
+ *   --color-background:  25,25,25     -> #191919
+ *   --color-foreground:  200,188,134  -> #c8bc86   (gold IS the text colour)
+ *   --color-button:      200,188,134  -> #c8bc86
+ *   --color-button-text: 18,18,18     -> #121212
+ * The store's dark scheme defines exactly one foreground, so there is no
+ * second text colour to borrow: hierarchy comes from size, weight, spacing and
+ * opacity tiers of the same gold — never from a hue the shop doesn't have.
+ * Do not reintroduce ivory/steel here without changing the Shopify theme too.
  */
 @theme {
-  /* Surfaces */
-  --color-bg: #191919;                    /* page background (unchanged) */
-  --color-surface: #0f0f0f;               /* recessed panels, nav, footer */
-  --color-hairline: rgba(245, 234, 205, 0.12); /* ivory-tinted 1px border */
+  /* Surfaces — the store's dark scheme has one background, so panels are
+     defined by hairlines rather than by a fill colour that isn't in it. */
+  --color-bg: #191919;                    /* = Shopify --color-background */
+  --color-surface: #191919;               /* same ground; borders do the work */
+  --color-hairline: rgba(200, 188, 134, 0.20); /* gold-tinted 1px border */
 
-  /* Text + accents */
-  --color-ink: #f5eacd;                   /* primary — headings */
-  --color-ink-dim: #a9a296;               /* secondary — body copy */
-  --color-accent: #c8bc86;                /* gold — accent */
-  --color-steel: #5e7f85;                 /* cold accent */
+  /* Text — all one hue, per the store. */
+  --color-ink: #c8bc86;                   /* = Shopify --color-foreground */
+  --color-ink-dim: rgba(200, 188, 134, 0.72); /* same gold, secondary tier */
+  --color-accent: #c8bc86;                /* = Shopify --color-button */
+  --color-on-accent: #121212;             /* = Shopify --color-button-text */
 
   /* DELIBERATELY UNCHANGED: the POS (Stock.tsx and its panels) styles itself
      with text-white utilities. Remapping --color-white would recolour the
@@ -127,7 +134,7 @@ body {
 }
 @media (hover: hover) {
   .card-hover:hover {
-    border-color: rgba(245, 234, 205, 0.55);
+    border-color: rgba(200, 188, 134, 0.70);
   }
   .card-hover:hover .card-zoom {
     transform: scale(1.05);
@@ -185,6 +192,6 @@ body {
 }
 
 ::selection {
-  background: rgba(245, 234, 205, 0.28);
+  background: rgba(200, 188, 134, 0.30);
   color: var(--color-ink);
 }

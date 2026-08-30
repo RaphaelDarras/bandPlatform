@@ -18,14 +18,14 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // --color-base-button 225/225/225 on --color-button-text 0/0/0. Ivory rather
   // than pure white keeps it in the Dogma palette.
   primary:
-    'bg-[var(--color-ink)] px-8 py-4 text-[#141414] hover:bg-[var(--color-accent)]',
+    'bg-[var(--color-ink)] px-8 py-4 text-[var(--color-on-accent)] hover:bg-[var(--color-accent)]',
   // Hard-edged outline in steel.
   secondary:
-    'border border-[var(--color-steel)] px-8 py-4 text-[var(--color-ink)] ' +
-    'hover:border-[var(--color-ink)] hover:bg-[var(--color-ink)] hover:text-[#141414]',
+    'border border-[var(--color-ink-dim)] px-8 py-4 text-[var(--color-ink)] ' +
+    'hover:border-[var(--color-ink)] hover:bg-[var(--color-ink)] hover:text-[var(--color-on-accent)]',
   // Inline text link — navigational, not an action.
   quiet:
-    'text-[var(--color-ink-dim)] underline decoration-[var(--color-steel)] decoration-2 ' +
+    'text-[var(--color-ink-dim)] underline decoration-[var(--color-ink-dim)] decoration-2 ' +
     'underline-offset-4 hover:text-[var(--color-ink)] hover:decoration-[var(--color-accent)]',
 }
 

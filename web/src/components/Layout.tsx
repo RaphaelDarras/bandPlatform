@@ -6,9 +6,6 @@ import { pingHealth } from '../lib/products'
 
 // Page shell: Header + routed content + Footer.
 //
-// `bg-bloom` paints two very low-alpha fixed radial gradients (warm gold top,
-// cold steel bottom) so the page has atmosphere instead of one flat fill. The
-// content sits in a z-10 stacking context above them.
 //
 // Layout is the one component mounted on every route, so it's the single
 // place that fires the D-10 keep-alive /health ping to warm the Render
@@ -19,12 +16,12 @@ export default function Layout() {
   }, [])
 
   return (
-    <div className="bg-bloom relative flex min-h-screen flex-col bg-[var(--color-bg)]">
+    <div className="relative flex min-h-screen flex-col bg-[var(--color-bg)]">
       {/* Keyboard/screen-reader users can jump the nav — there was no way past
           it before. Visually hidden until focused. */}
       <a
         href="#main"
-        className="type-label sr-only focus:not-sr-only focus:absolute focus:left-5 focus:top-5 focus:z-[60] focus:bg-[var(--color-accent)] focus:px-5 focus:py-3 focus:text-[#141414]"
+        className="type-label sr-only focus:not-sr-only focus:absolute focus:left-5 focus:top-5 focus:z-[60] focus:bg-[var(--color-accent)] focus:px-5 focus:py-3 focus:text-[var(--color-on-accent)]"
       >
         Skip to content
       </a>
