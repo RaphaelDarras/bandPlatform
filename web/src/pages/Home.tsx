@@ -2,7 +2,10 @@ import { useLoaderData } from 'react-router-dom'
 import type { BitEvent } from '../lib/bandsintown'
 import { clean, nextEvent, venueDisplay } from '../lib/bandsintown'
 import { releases } from '../data/releases'
+import type { PreorderProduct } from '../lib/shopify'
+import { STORE_URL } from '../lib/shopify'
 import ReleaseItem from '../components/ReleaseItem'
+import PreorderGrid from '../components/PreorderGrid'
 import Section, { PAGE_STACK } from '../components/Section'
 import Button from '../components/Button'
 
@@ -17,17 +20,14 @@ import Button from '../components/Button'
 // root as the preorder, so it added a second ask with nothing new behind it.
 // Merch stays reachable from the nav, the footer icon and /contact.
 //
-// Exactly one primary (filled) CTA per commercial intent: "Listen Now" for
-// the music, "Preorder Now" for the album.
-//
 // All Bandsintown text renders as escaped React text (T-04-xss).
 
-const STORE_URL = 'https://shop.hurakanband.fr/'
-
 export function Component() {
-  const { events } = (useLoaderData() as { events?: BitEvent[] }) ?? {}
+  const { events, preorder } =
+    (useLoaderData() as { events?: BitEvent[]; preorder?: PreorderProduct[] }) ?? {}
   const next = nextEvent(events ?? [])
   const highlightedRelease = releases[0]
+  const preorderProducts = preorder ?? []
 
   return (
     <div className={PAGE_STACK}>
@@ -49,7 +49,9 @@ export function Component() {
         </picture>
         {/* The page's single h1 (text-4xl). Section headings are text-2xl, so
             there is now a clear top to the document. */}
-        <h1 className="mt-8 font-display text-4xl uppercase text-white">Hurakan</h1>
+        {/* Kept as a real h1 for SEO and screen readers — the banner carries
+            the wordmark visually, so showing it twice was redundant. */}
+        <h1 className="sr-only">Hurakan</h1>
       </section>
 
       {highlightedRelease && (
@@ -63,18 +65,32 @@ export function Component() {
         </Section>
       )}
 
-      {/* Preorder points at the store root for now, same as the merch block
-          below. Because both resolve to the same URL, the preorder keeps the
-          page's only primary commerce CTA and merch drops to a quiet link —
-          two gold buttons to one destination would just compete. Swap this
-          href for a deep link once the album has its own product page. */}
+      {/* Featured formats come live from Shopify at build time (thumbnail,
+          price, availability), so each card deep-links to its own product page
+          instead of dumping the visitor on the store root. If that fetch fails
+          soft — or in dev, where it always returns [] — the section degrades to
+          the single storefront button it used to be. */}
       <Section title="Preorder The Album" surface>
         <p className="font-sans text-base text-white/75">
-          The new album is up for preorder — secure your copy from the official shop.
+          <em className="not-italic text-white">Eternal Scars</em> is up for preorder — out
+          October 30th, shipping from November 1st.
         </p>
-        <div className="mt-6">
-          <Button href={STORE_URL}>Preorder Now</Button>
-        </div>
+        {preorderProducts.length > 0 ? (
+          <>
+            <div className="mt-6">
+              <PreorderGrid products={preorderProducts} />
+            </div>
+            <div className="mt-6">
+              <Button variant="quiet" href={STORE_URL}>
+                All preorder items
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="mt-6">
+            <Button href={STORE_URL}>Preorder Now</Button>
+          </div>
+        )}
       </Section>
 
       <Section title="Next Show" surface>

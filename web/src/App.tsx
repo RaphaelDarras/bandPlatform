@@ -1,17 +1,30 @@
 import type { RouteRecord } from 'vite-react-ssg'
 import Layout from './components/Layout'
 import { fetchUpcomingEvents } from './lib/bandsintown'
+import { fetchPreorderProducts } from './lib/shopify'
+import { FEATURED_PREORDERS } from './data/preorder'
 
 // Build-time loader shared by Home (next-show teaser) and Concerts (full list).
 // Runs only during `vite-react-ssg build`; the result is baked into static HTML.
 const eventsLoader = async () => ({ events: await fetchUpcomingEvents() })
+
+// Home additionally bakes in the featured Shopify preorder products. Both
+// fetches are independent, so they run concurrently and one failing soft to []
+// never delays or blocks the other.
+const homeLoader = async () => {
+  const [events, preorder] = await Promise.all([
+    fetchUpcomingEvents(),
+    fetchPreorderProducts(FEATURED_PREORDERS),
+  ])
+  return { events, preorder }
+}
 
 export const routes: RouteRecord[] = [
   {
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, lazy: () => import('./pages/Home'), loader: eventsLoader },
+      { index: true, lazy: () => import('./pages/Home'), loader: homeLoader },
       { path: 'listen', lazy: () => import('./pages/Discography') },
       { path: 'concerts', lazy: () => import('./pages/Concerts'), loader: eventsLoader },
       { path: 'about', lazy: () => import('./pages/About') },

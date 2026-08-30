@@ -6,6 +6,17 @@ import fixture from '../lib/__fixtures__/bandsintown-events.json'
 
 const events = fixture as BitEvent[]
 
+const preorderFixture = [
+  {
+    handle: 'preorder-cd-eternal-scars',
+    label: 'Digipack CD',
+    url: 'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
+    price: '15,00 €',
+    image: 'https://cdn.shopify.com/s/files/1/x/CD_MOCKUP.png?width=600',
+    available: true,
+  },
+]
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
   return {
@@ -116,8 +127,8 @@ describe('Home page', () => {
     expect(sections).toEqual(['Latest Release', 'Preorder The Album', 'Next Show'])
   })
 
-  it('routes every storefront link to the store root, never a deep link', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
+  it('falls back to a single store-root CTA when the preorder fetch failed soft', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, preorder: [] })
 
     const { container } = render(
       <MemoryRouter>
@@ -126,11 +137,33 @@ describe('Home page', () => {
     )
 
     const storeLinks = [...container.querySelectorAll('a[href^="https://shop.hurakanband.fr"]')]
-    expect(storeLinks).toHaveLength(1) // the preorder CTA
+    expect(storeLinks).toHaveLength(1)
     expect(storeLinks[0].getAttribute('href')).toBe('https://shop.hurakanband.fr/')
+    expect(screen.getByRole('link', { name: /preorder now/i })).toBeInTheDocument()
   })
 
-  it('keeps the hero to the banner and the wordmark, with no tagline', () => {
+  it('renders Shopify preorder thumbnails when the loader supplied them', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, preorder: preorderFixture })
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('link', { name: /digipack cd/i })).toHaveAttribute(
+      'href',
+      'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
+    )
+    // The generic store-root button gives way to the per-product cards.
+    expect(screen.queryByRole('link', { name: /preorder now/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /all preorder items/i })).toHaveAttribute(
+      'href',
+      'https://shop.hurakanband.fr/',
+    )
+  })
+
+  it('keeps the hero to the banner alone, with the h1 available only to readers', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     const { container } = render(
@@ -139,7 +172,11 @@ describe('Home page', () => {
       </MemoryRouter>,
     )
 
-    const hero = container.querySelector('h1')!.closest('section')!
+    const h1 = container.querySelector('h1')!
+    expect(h1.className).toContain('sr-only')
+    expect(h1).toHaveTextContent('Hurakan')
+
+    const hero = h1.closest('section')!
     expect(hero.querySelectorAll('p')).toHaveLength(0)
     expect(hero.querySelector('img')).not.toBeNull()
   })
