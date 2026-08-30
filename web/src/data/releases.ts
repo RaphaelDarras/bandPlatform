@@ -8,5 +8,6 @@ export type Release =
   | { kind: 'youtube'; videoId: string }
 
 export const releases: Release[] = [
-  { kind: 'youtube', videoId: 'a57M7zclUE4' }, // Latest release (video)
+  { kind: 'youtube', videoId: 'P5whjxluBpo' }, // Latest release (video)
+  { kind: 'youtube', videoId: 'a57M7zclUE4' }, // Previous release (video)
 ]

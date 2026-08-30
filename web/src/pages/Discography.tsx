@@ -10,7 +10,7 @@ export function Component() {
   return (
     <>
       <section>
-        <h1 className="font-display text-3xl uppercase text-white">Latest Release</h1>
+        <h1 className="font-display text-3xl uppercase text-white">Releases</h1>
         <div className="mt-4 flex flex-col gap-6">
           {releases.map((r, i) => (
             <ReleaseItem key={i} release={r} />

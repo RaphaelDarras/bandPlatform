@@ -15,7 +15,7 @@ describe('Discography page', () => {
     const { Component } = await import('./Discography')
     render(<Component />)
 
-    const section = screen.getByRole('heading', { name: /latest release/i }).closest('section')
+    const section = screen.getByRole('heading', { name: /^releases$/i }).closest('section')
     expect(section).not.toBeNull()
 
     const iframes = section!.querySelectorAll('iframe')
