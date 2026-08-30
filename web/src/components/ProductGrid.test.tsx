@@ -60,6 +60,22 @@ describe('ProductGrid', () => {
     expect(imgs[0]).toHaveAttribute('alt', 'DIGIPACK - "ETERNAL SCARS"')
   })
 
+  it('puts no fill on the grid itself, so an incomplete last row shows nothing', () => {
+    // Regression: the grid used gap-px over a hairline background to fake 1px
+    // separators. With 13 items in a 4-column grid the 3 empty trailing cells
+    // rendered that fill as a visible block in the wrong colour.
+    const { container } = render(<ProductGrid products={products} />)
+
+    const ul = container.querySelector('ul')!
+    expect(ul.className).not.toMatch(/\bbg-/)
+    expect(ul.className).not.toContain('gap-px')
+
+    // The separators come from each card's own border instead.
+    for (const a of container.querySelectorAll('a')) {
+      expect(a.className).toContain('border-[var(--color-hairline)]')
+    }
+  })
+
   it('renders an empty list when given no products', () => {
     const { container } = render(<ProductGrid products={[]} />)
 

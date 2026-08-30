@@ -3,18 +3,24 @@ import type { ShopProduct } from '../lib/shopify'
 // Product cards. Every card is a deep link to that product's own detail page
 // on the Shopify storefront — never the store root.
 //
-// Hard-edged per the reference site (zero radius). Hover scales the artwork
-// inside its clipped frame and takes the border to ivory; no lift, no shadow.
+// Hard-edged (zero radius). Hover scales the artwork inside its clipped frame
+// and takes the border to gold; no lift, no shadow.
+//
+// The grid itself carries NO background. It previously used gap-px over a
+// hairline fill to fake 1px separators, but an incomplete last row left the
+// empty trailing cells showing that fill as a visible block of the wrong
+// colour. Each card carries its own border instead, so the grid looks
+// identical at any item count.
 export default function ProductGrid({ products }: { products: ShopProduct[] }) {
   return (
-    <ul className="grid grid-cols-2 gap-px bg-[var(--color-hairline)] sm:grid-cols-3 lg:grid-cols-4">
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {products.map((p) => (
         <li key={p.handle}>
           <a
             href={p.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="card-hover group flex h-full flex-col border border-transparent bg-[var(--color-bg)] hover:bg-[var(--color-surface)]"
+            className="card-hover group flex h-full flex-col border border-[var(--color-hairline)] bg-[var(--color-bg)]"
           >
             <div className="relative aspect-square overflow-hidden bg-[var(--color-bg)]">
               {p.image && (
