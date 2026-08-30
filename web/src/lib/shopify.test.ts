@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { selectFeatured, sized, STORE_URL } from './shopify'
+import { productsEndpoint, selectFeatured, sized, STORE_URL } from './shopify'
 
 // Shape trimmed from the live shop.hurakanband.fr/products.json payload
 // (verified 2026-08-30): titles are store-facing and shouty, prices are
@@ -99,6 +99,21 @@ describe('selectFeatured', () => {
     )
 
     expect(out[0].image).toBeNull()
+  })
+})
+
+describe('productsEndpoint', () => {
+  // Regression: without an explicit country, products.json prices against the
+  // requesting IP's market. The Vercel build (US region) baked 18,00 € for a
+  // product the FR store sells at 15,00 € — a silent +20% on the live site.
+  it('pins the market so prices do not depend on the build region', () => {
+    expect(productsEndpoint()).toContain('country=FR')
+  })
+
+  it('requests the store-wide product list', () => {
+    const url = new URL(productsEndpoint())
+    expect(url.origin + url.pathname).toBe(`${STORE_URL}products.json`)
+    expect(url.searchParams.get('limit')).toBe('250')
   })
 })
 

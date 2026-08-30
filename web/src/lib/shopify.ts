@@ -13,6 +13,24 @@
 
 export const STORE_URL = 'https://shop.hurakanband.fr/'
 
+/**
+ * The market to price against. This is NOT optional decoration: products.json
+ * localises prices to the *requesting* IP's market when no country is given.
+ * A local fetch from France returned 15.00 while the Vercel build, running in
+ * a US region, got 18.00 for the same product — a silent +20% on every price
+ * baked into the static HTML. Pinning FR makes the build deterministic no
+ * matter which region it runs in, and FR is the right market for a French
+ * band's .fr site quoting EUR.
+ */
+const MARKET_COUNTRY = 'FR'
+
+/** Endpoint used at build time. Exported so the market pin is testable. */
+export function productsEndpoint(limit = 250): string {
+  // limit=250 is the endpoint maximum and the store holds ~25 products; if it
+  // ever outgrows that, this needs `&page=` pagination.
+  return `${STORE_URL}products.json?limit=${limit}&country=${MARKET_COUNTRY}`
+}
+
 /** Prices are EUR and all-inclusive (band is under franchise en base de TVA,
  *  so there is no VAT line to display). */
 const EUR = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
@@ -103,9 +121,7 @@ export async function fetchPreorderProducts(
 ): Promise<PreorderProduct[]> {
   if (!import.meta.env.SSR) return [] // never runs / ships in the client bundle
   try {
-    // limit=250 is the endpoint maximum and the store holds ~25 products; if it
-    // ever outgrows that, this needs `&page=` pagination.
-    const res = await fetch(`${STORE_URL}products.json?limit=250`)
+    const res = await fetch(productsEndpoint())
     if (!res.ok) {
       console.warn(`[shopify] products.json failed with status ${res.status}, falling back to []`)
       return []
