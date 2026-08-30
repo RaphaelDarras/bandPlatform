@@ -87,6 +87,75 @@ describe('Home page', () => {
     expect(href).not.toContain('app_id')
   })
 
+  it('leads with a single h1 and orders sections release -> preorder -> show -> merch', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events })
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    const h1s = screen.getAllByRole('heading', { level: 1 })
+    expect(h1s).toHaveLength(1)
+    expect(h1s[0]).toHaveTextContent('Hurakan')
+
+    const sections = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(sections).toEqual([
+      'Latest Release',
+      'Preorder The Album',
+      'Next Show',
+      'Shop Merch',
+    ])
+  })
+
+  it('routes every storefront link to the store root, never a deep link', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events })
+
+    const { container } = render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    const storeLinks = [...container.querySelectorAll('a[href^="https://shop.hurakanband.fr"]')]
+    expect(storeLinks).toHaveLength(3) // preorder CTA, merch thumbnail, Shop Now
+    for (const l of storeLinks) {
+      expect(l.getAttribute('href')).toBe('https://shop.hurakanband.fr/')
+    }
+  })
+
+  it('gives the album preorder the only primary commerce CTA', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events })
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    // Preorder is filled; the merch link beside it is quiet, so the two asks
+    // to the same URL never compete at equal weight.
+    expect(screen.getByRole('link', { name: /preorder now/i }).className).toContain(
+      'bg-[var(--color-accent)]',
+    )
+    expect(screen.getByRole('link', { name: /shop now/i }).className).not.toContain(
+      'bg-[var(--color-accent)]',
+    )
+  })
+
+  it('offers exactly one path to /listen from the page body (nav owns the other)', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events })
+
+    const { container } = render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    expect(container.querySelectorAll('a[href="/listen"]')).toHaveLength(1)
+  })
+
   it('renders a latest-release teaser linking to /listen', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 

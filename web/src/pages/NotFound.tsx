@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import Button from '../components/Button'
 
-// 404 catch-all (UI-SPEC copywriting contract).
+// 404 catch-all (UI-SPEC copywriting contract). Keeps its oversized h1 — this
+// page has no sections to rank against, so the display size is the whole point.
 export function Component() {
   return (
     <section className="py-16 text-center">
@@ -8,12 +9,9 @@ export function Component() {
       <p className="mt-2 font-sans text-white/75">
         This page doesn&apos;t exist. Head back to the homepage.
       </p>
-      <Link
-        to="/"
-        className="mt-6 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
-      >
-        Back to Home
-      </Link>
+      <div className="mt-6">
+        <Button to="/">Back to Home</Button>
+      </div>
     </section>
   )
 }

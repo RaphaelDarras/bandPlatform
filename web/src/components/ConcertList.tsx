@@ -1,29 +1,27 @@
 import { clean, venueDisplay, type BitEvent } from '../lib/bandsintown'
+import Section from './Section'
+import Button from './Button'
 
 // Concert rows + empty state (WEB-03, D-12). All Bandsintown fields render as
 // plain React text nodes — never dangerouslySetInnerHTML (T-04-xss).
+// Rows are already the site's panel treatment (hairline + recessed surface),
+// which <Section surface> now matches.
 export default function ConcertList({ events }: { events: BitEvent[] }) {
   if (events.length === 0) {
     return (
-      <section>
-        <h2 className="font-display text-3xl uppercase text-white">No shows scheduled</h2>
-        <p className="mt-2 font-sans text-base text-white/75">
+      <Section title="No shows scheduled">
+        <p className="font-sans text-base text-white/75">
           Follow us on Bandsintown to hear about new dates first.
         </p>
-        <a
-          href="https://www.bandsintown.com/a/433176"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-block bg-[var(--color-accent)] px-6 py-3 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-black"
-        >
-          Follow on Bandsintown
-        </a>
-      </section>
+        <div className="mt-6">
+          <Button href="https://www.bandsintown.com/a/433176">Follow on Bandsintown</Button>
+        </div>
+      </Section>
     )
   }
 
   return (
-    <ul className="mt-4 flex flex-col gap-3">
+    <ul className="flex flex-col gap-3">
       {events.map((e) => (
         <li
           key={e.id}
@@ -39,14 +37,11 @@ export default function ConcertList({ events }: { events: BitEvent[] }) {
             {venueDisplay(e)} — {e.venue.city}, {e.venue.country}
           </p>
           {e.offers.length > 0 && (
-            <a
-              href={clean(e.offers[0].url)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-block border border-[var(--color-accent)] px-4 py-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white hover:bg-[var(--color-accent)] hover:text-black"
-            >
-              Get Tickets
-            </a>
+            <div className="mt-4">
+              <Button variant="secondary" href={clean(e.offers[0].url)}>
+                Get Tickets
+              </Button>
+            </div>
           )}
         </li>
       ))}
