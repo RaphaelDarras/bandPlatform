@@ -6,18 +6,19 @@ import ReleaseItem from '../components/ReleaseItem'
 import Section, { PAGE_STACK } from '../components/Section'
 import Button from '../components/Button'
 
-// Landing hub (D-25). Section order runs free -> paid, and within "paid",
-// time-sensitive before evergreen:
+// Landing hub (D-25). Section order runs free -> paid:
 //   1. hero          — who we are + current release artwork
 //   2. latest release— the hook, costs the visitor nothing
 //   3. preorder      — the commercial ask, and it expires when the window
-//                      closes, so it outranks both items below
+//                      closes, so it outranks the dated section below
 //   4. next show     — dated, so it also expires
-//   5. shop merch    — evergreen, lowest urgency
+//
+// There is deliberately no general merch teaser: it pointed at the same store
+// root as the preorder, so it added a second ask with nothing new behind it.
+// Merch stays reachable from the nav, the footer icon and /contact.
 //
 // Exactly one primary (filled) CTA per commercial intent: "Listen Now" for
-// the music, "Preorder Now" for the album. Everything else is secondary or
-// quiet, so the page never presents two equal-weight asks at once.
+// the music, "Preorder Now" for the album.
 //
 // All Bandsintown text renders as escaped React text (T-04-xss).
 
@@ -49,9 +50,6 @@ export function Component() {
         {/* The page's single h1 (text-4xl). Section headings are text-2xl, so
             there is now a clear top to the document. */}
         <h1 className="mt-8 font-display text-4xl uppercase text-white">Hurakan</h1>
-        <p className="mt-2 font-sans text-sm font-semibold uppercase tracking-[0.06em] text-white/75">
-          French metal band
-        </p>
       </section>
 
       {highlightedRelease && (
@@ -100,29 +98,6 @@ export function Component() {
         <div className="mt-6">
           <Button variant="quiet" to="/concerts">
             All concerts
-          </Button>
-        </div>
-      </Section>
-
-      <Section title="Shop Merch" surface>
-        <p className="font-sans text-base text-white/75">
-          Grab official Hurakan merch — apparel and more from the online shop.
-        </p>
-        {/* Thumbnail and link both point at the store root (they used to
-            disagree — the image deep-linked to a single product). 416px
-            derivative sized for the 208px slot. */}
-        <a href={STORE_URL} target="_blank" rel="noopener noreferrer" className="mt-6 block">
-          <img
-            src="/images/Artwork_Final_thumb.jpg"
-            alt="Hurakan merch artwork"
-            width={416}
-            height={416}
-            className="w-52"
-          />
-        </a>
-        <div className="mt-6">
-          <Button variant="quiet" href={STORE_URL}>
-            Shop Now
           </Button>
         </div>
       </Section>

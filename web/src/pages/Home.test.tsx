@@ -57,7 +57,7 @@ describe('Home page', () => {
     expect(concertsLink).toHaveAttribute('href', '/concerts')
   })
 
-  it('renders a "Shop Merch" teaser whose "Shop Now" link opens the Shopify storefront in a new tab', () => {
+  it('carries no general merch teaser — the storefront ask is the preorder alone', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     render(
@@ -66,11 +66,23 @@ describe('Home page', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('Shop Merch')).toBeInTheDocument()
-    const shopNow = screen.getByRole('link', { name: /shop now/i })
-    expect(shopNow).toHaveAttribute('href', 'https://shop.hurakanband.fr/')
-    expect(shopNow).toHaveAttribute('target', '_blank')
-    expect(shopNow).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    expect(screen.queryByText(/shop merch/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /shop now/i })).not.toBeInTheDocument()
+  })
+
+  it('sends its one storefront link to the store root in a new tab', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events })
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    )
+
+    const preorder = screen.getByRole('link', { name: /preorder now/i })
+    expect(preorder).toHaveAttribute('href', 'https://shop.hurakanband.fr/')
+    expect(preorder).toHaveAttribute('target', '_blank')
+    expect(preorder).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
 
   it('renders a "Get Tickets" link for the next event when offers exist, app_id stripped', () => {
@@ -87,7 +99,7 @@ describe('Home page', () => {
     expect(href).not.toContain('app_id')
   })
 
-  it('leads with a single h1 and orders sections release -> preorder -> show -> merch', () => {
+  it('leads with a single h1 and orders sections release -> preorder -> show', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
     render(
@@ -101,12 +113,7 @@ describe('Home page', () => {
     expect(h1s[0]).toHaveTextContent('Hurakan')
 
     const sections = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(sections).toEqual([
-      'Latest Release',
-      'Preorder The Album',
-      'Next Show',
-      'Shop Merch',
-    ])
+    expect(sections).toEqual(['Latest Release', 'Preorder The Album', 'Next Show'])
   })
 
   it('routes every storefront link to the store root, never a deep link', () => {
@@ -119,29 +126,22 @@ describe('Home page', () => {
     )
 
     const storeLinks = [...container.querySelectorAll('a[href^="https://shop.hurakanband.fr"]')]
-    expect(storeLinks).toHaveLength(3) // preorder CTA, merch thumbnail, Shop Now
-    for (const l of storeLinks) {
-      expect(l.getAttribute('href')).toBe('https://shop.hurakanband.fr/')
-    }
+    expect(storeLinks).toHaveLength(1) // the preorder CTA
+    expect(storeLinks[0].getAttribute('href')).toBe('https://shop.hurakanband.fr/')
   })
 
-  it('gives the album preorder the only primary commerce CTA', () => {
+  it('keeps the hero to the banner and the wordmark, with no tagline', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events })
 
-    render(
+    const { container } = render(
       <MemoryRouter>
         <Home />
       </MemoryRouter>,
     )
 
-    // Preorder is filled; the merch link beside it is quiet, so the two asks
-    // to the same URL never compete at equal weight.
-    expect(screen.getByRole('link', { name: /preorder now/i }).className).toContain(
-      'bg-[var(--color-accent)]',
-    )
-    expect(screen.getByRole('link', { name: /shop now/i }).className).not.toContain(
-      'bg-[var(--color-accent)]',
-    )
+    const hero = container.querySelector('h1')!.closest('section')!
+    expect(hero.querySelectorAll('p')).toHaveLength(0)
+    expect(hero.querySelector('img')).not.toBeNull()
   })
 
   it('offers exactly one path to /listen from the page body (nav owns the other)', () => {
