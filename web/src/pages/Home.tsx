@@ -17,10 +17,19 @@ export function Component() {
     <div className="flex flex-col gap-12">
       <section className="text-center">
         <picture>
-          {/* Wide Bandcamp banner on tablet/desktop; the less-extreme FB banner
-              on phones so the hero isn't a thin sliver (< 640px). */}
-          <source media="(min-width: 640px)" srcSet="/images/BANDCAMP.jpg" />
-          <img src="/images/FB.jpg" alt="Hurakan" className="w-full" />
+          {/* Wide Bandcamp-format banner on tablet/desktop; the less-extreme FB
+              format on phones so the hero isn't a thin sliver (< 640px). Both
+              carry the current release artwork ("Dogma"). */}
+          <source
+            media="(min-width: 640px)"
+            srcSet="/images/BANDCAMP_DOGMA.avif"
+            type="image/avif"
+          />
+          <img
+            src="/images/FB_DOGMA.jpg"
+            alt="Hurakan — new single Dogma, out now on all platforms"
+            className="w-full"
+          />
         </picture>
         <Link
           to="/listen"
