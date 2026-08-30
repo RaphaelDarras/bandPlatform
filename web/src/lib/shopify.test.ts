@@ -9,22 +9,22 @@ const products = [
     handle: 'preorder-cd-eternal-scars',
     title: 'PREORDER - DIGIPACK - "ETERNAL SCARS"',
     images: [{ src: 'https://cdn.shopify.com/s/files/1/x/CD_MOCKUP.png?v=123' }],
-    variants: [{ price: '15.00', available: true }],
+    variants: [{ price: '15.00', price_currency: 'EUR', available: true }],
   },
   {
     handle: 'preorder-vinyl-eternal-scars',
     title: 'PREORDER - VINYL - "ETERNAL SCARS" SPLATTER GOLD/BLACK LIMITED',
     images: [{ src: 'https://cdn.shopify.com/s/files/1/x/VINYL.png?v=456' }],
     variants: [
-      { price: '40.00', available: false },
-      { price: '35.00', available: true },
+      { price: '40.00', price_currency: 'EUR', available: false },
+      { price: '35.00', price_currency: 'EUR', available: true },
     ],
   },
   {
     handle: 'parasite-t-shirt',
     title: 'PARASITE - T-SHIRT',
     images: [{ src: 'https://cdn.shopify.com/s/files/1/x/PARASITE.jpg?v=789' }],
-    variants: [{ price: '20.00', available: true }],
+    variants: [{ price: '20.00', price_currency: 'EUR', available: true }],
   },
 ]
 
@@ -102,10 +102,75 @@ describe('selectFeatured', () => {
   })
 })
 
+describe('selectFeatured — currency', () => {
+  // The live bug: the Vercel build fetched from a US region, Shopify returned
+  // 18.00 USD (~15 EUR converted), and the hardcoded EUR formatter rendered it
+  // as "18,00 €". Currency must come from the payload, never be assumed.
+  it('labels a USD payload in USD, never in euros', () => {
+    const usd = [
+      {
+        ...products[0],
+        variants: [{ price: '18.00', price_currency: 'USD', available: true }],
+      },
+    ]
+
+    const [p] = selectFeatured(usd, [
+      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
+    ])
+
+    expect(p.price).not.toContain('€')
+    expect(p.price).toMatch(/\$|USD/)
+  })
+
+  it('honours a zero-decimal currency', () => {
+    const jpy = [
+      {
+        ...products[0],
+        variants: [{ price: '2900', price_currency: 'JPY', available: true }],
+      },
+    ]
+
+    const [p] = selectFeatured(jpy, [
+      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
+    ])
+
+    expect(p.price).toContain('2')
+    expect(p.price).not.toContain(',00')
+  })
+
+  it('assumes EUR only when the field is absent, matching the pinned market', () => {
+    const noCurrency = [
+      { ...products[0], variants: [{ price: '15.00', available: true }] },
+    ]
+
+    const [p] = selectFeatured(noCurrency, [
+      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
+    ])
+
+    expect(p.price).toContain('€')
+  })
+
+  it('shows a bare number rather than a wrong symbol for a bad currency code', () => {
+    const bad = [
+      {
+        ...products[0],
+        variants: [{ price: '15.00', price_currency: 'NOTACURRENCY', available: true }],
+      },
+    ]
+
+    const [p] = selectFeatured(bad, [
+      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
+    ])
+
+    expect(p.price).toBe('15')
+    expect(p.price).not.toContain('€')
+  })
+})
+
 describe('productsEndpoint', () => {
   // Regression: without an explicit country, products.json prices against the
-  // requesting IP's market. The Vercel build (US region) baked 18,00 € for a
-  // product the FR store sells at 15,00 € — a silent +20% on the live site.
+  // requesting IP's market — amount AND currency. The Vercel build (US region)
+  // received 18.00 USD for a product the FR store sells at 15,00 EUR.
   it('pins the market so prices do not depend on the build region', () => {
     expect(productsEndpoint()).toContain('country=FR')
   })

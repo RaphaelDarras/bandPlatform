@@ -15,12 +15,14 @@ export const STORE_URL = 'https://shop.hurakanband.fr/'
 
 /**
  * The market to price against. This is NOT optional decoration: products.json
- * localises prices to the *requesting* IP's market when no country is given.
- * A local fetch from France returned 15.00 while the Vercel build, running in
- * a US region, got 18.00 for the same product — a silent +20% on every price
- * baked into the static HTML. Pinning FR makes the build deterministic no
- * matter which region it runs in, and FR is the right market for a French
- * band's .fr site quoting EUR.
+ * localises prices — including the CURRENCY — to the requesting IP's market
+ * when no country is given. A local fetch from France returned 15.00 EUR while
+ * the Vercel build, running in a US region, got 18.00 USD for the same product
+ * (~the same money, converted). The site then rendered "18,00 €", because the
+ * formatter assumed EUR. Pinning FR makes the build deterministic no matter
+ * which region it runs in, and FR is the right market for a French band's .fr
+ * site. The band collects no VAT in any market, so none of this is tax —
+ * purely currency conversion with Shopify's rounding rules.
  */
 const MARKET_COUNTRY = 'FR'
 
@@ -31,9 +33,24 @@ export function productsEndpoint(limit = 250): string {
   return `${STORE_URL}products.json?limit=${limit}&country=${MARKET_COUNTRY}`
 }
 
-/** Prices are EUR and all-inclusive (band is under franchise en base de TVA,
- *  so there is no VAT line to display). */
-const EUR = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
+/**
+ * Format a price in the currency Shopify actually priced it in, never an
+ * assumed one. The payload's price_currency is the authority: hardcoding EUR
+ * is what turned a USD figure into "18,00 €" on the live site. Falls back to
+ * EUR only when the field is absent, which matches the pinned FR market.
+ *
+ * Prices are all-inclusive — the band is under franchise en base de TVA and
+ * collects no VAT in any market, so there is never a tax line to add.
+ */
+function formatPrice(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(amount)
+  } catch {
+    // Unknown/malformed currency code — show the bare number rather than
+    // labelling it with a symbol that might be wrong.
+    return String(amount)
+  }
+}
 
 /** One featured product, flattened to just what a card renders. */
 export interface PreorderProduct {
@@ -51,7 +68,12 @@ interface ShopifyProduct {
   handle: string
   title: string
   images: { src: string }[]
-  variants: { price: string; available: boolean }[]
+  variants: {
+    price: string
+    /** Currency the price is quoted in — varies with the requesting market. */
+    price_currency?: string
+    available: boolean
+  }[]
 }
 
 export interface FeaturedHandle {
@@ -90,16 +112,17 @@ export function selectFeatured(
     if (!p) return []
 
     const cheapest = p.variants
-      .map((v) => Number(v.price))
-      .filter((n) => Number.isFinite(n))
-      .sort((a, b) => a - b)[0]
+      .filter((v) => Number.isFinite(Number(v.price)))
+      .sort((a, b) => Number(a.price) - Number(b.price))[0]
 
     return [
       {
         handle,
         label,
         url: `${STORE_URL}products/${handle}`,
-        price: cheapest === undefined ? '' : EUR.format(cheapest),
+        price: cheapest
+          ? formatPrice(Number(cheapest.price), cheapest.price_currency ?? 'EUR')
+          : '',
         image: p.images[0] ? sized(p.images[0].src) : null,
         available: p.variants.some((v) => v.available),
       },
