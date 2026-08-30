@@ -5,7 +5,7 @@ import Section from '../components/Section'
 // paragraph. Spacing and heading size come from <Section>.
 export function Component() {
   return (
-    <Section title="About" eyebrow="Hurakan" as="h1">
+    <Section title="About" as="h1">
       <p className="type-body text-[var(--color-ink-dim)]">
         Hurakan is a French metal band forged out of a shared love for heavy
         riffs, cinematic atmosphere, and unapologetic energy. Since forming,

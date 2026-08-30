@@ -40,7 +40,7 @@ export function Component() {
 
       {preorder.length > 0 && (
         <Reveal>
-          <Section title="Preorder" eyebrow="Eternal Scars — 30 October">
+          <Section title="Preorder">
             <p className="type-body mb-7 text-[var(--color-ink-dim)]">
               Out October 30th, shipping from November 1st.
             </p>
@@ -51,7 +51,7 @@ export function Component() {
 
       {merch.length > 0 ? (
         <Reveal>
-          <Section title="Merch" eyebrow="Out now">
+          <Section title="Merch">
             <ProductGrid products={merch} />
             <div className="mt-8">
               <Button href={STORE_URL}>Open the shop</Button>
@@ -61,7 +61,7 @@ export function Component() {
       ) : (
         // Catalogue fetch failed soft, or we are in dev: keep a way to the shop.
         <Reveal>
-          <Section title="Merch" eyebrow="Shop">
+          <Section title="Merch">
             <p className="type-body mb-7 text-[var(--color-ink-dim)]">
               Apparel, vinyl and more from the official shop.
             </p>
@@ -71,7 +71,7 @@ export function Component() {
       )}
 
       <Reveal>
-        <Section title="Next Show" eyebrow="On tour">
+        <Section title="Next Show">
           {next ? (
             <>
               <p className="type-label tabular-nums text-[var(--color-ink-dim)]">

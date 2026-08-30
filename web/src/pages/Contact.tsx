@@ -26,7 +26,7 @@ export function Component() {
       <PageTitle>Contact</PageTitle>
 
       <Reveal>
-        <Section title="Email" eyebrow="Booking & press" surface>
+        <Section title="Email" surface>
           <a
             href="mailto:hurakanband@gmail.com"
             rel="noopener"
@@ -38,7 +38,7 @@ export function Component() {
       </Reveal>
 
       <Reveal>
-        <Section title="Follow" eyebrow="Elsewhere" surface>
+        <Section title="Follow" surface>
           <ul className="flex flex-col gap-2">
             {CHANNELS.map((c) => (
               <li key={c.label}>

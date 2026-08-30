@@ -37,23 +37,14 @@ describe('Section', () => {
     expect(panel.querySelector('section')!.className).toContain('panel')
   })
 
-  it('renders an optional gold eyebrow above the title, and never as a paragraph', () => {
-    const { container } = render(
-      <Section title="Latest Release" eyebrow="Out now">
-        body
-      </Section>,
-    )
+  it('opens with the heading — nothing is rendered above it', () => {
+    const { container } = render(<Section title="Preorder">body</Section>)
 
-    expect(screen.getByText('Out now')).toBeInTheDocument()
-    // About (D-22/D-23) must contain exactly one <p>; an eyebrow <p> would
-    // silently break that contract on every page carrying one.
+    const section = container.querySelector('section')!
+    expect(section.firstElementChild!.tagName).toBe('H2')
+    expect(section.children).toHaveLength(2) // heading + body, nothing else
+    // About (D-22/D-23) must contain exactly one <p>, so Section itself adds none.
     expect(container.querySelectorAll('p')).toHaveLength(0)
-  })
-
-  it('omits the eyebrow entirely when not given one', () => {
-    const { container } = render(<Section title="A">body</Section>)
-
-    expect(container.querySelector('section')!.firstElementChild!.tagName).toBe('H2')
   })
 
   it('PageTitle renders an h1 matching the Section h1 style', () => {

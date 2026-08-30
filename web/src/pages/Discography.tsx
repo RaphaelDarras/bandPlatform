@@ -12,7 +12,7 @@ import Reveal from '../components/Reveal'
 export function Component() {
   return (
     <div className={PAGE_STACK}>
-      <Section title="Releases" eyebrow="Discography" as="h1">
+      <Section title="Releases" as="h1">
         <div className="flex flex-col gap-6">
           {releases.map((r, i) => (
             <Reveal key={i} delay={i * 80}>
@@ -23,7 +23,7 @@ export function Component() {
       </Section>
 
       <Reveal>
-        <Section title="Listen" eyebrow="Everywhere else">
+        <Section title="Listen">
           <div className="flex flex-col gap-6">
             <SpotifyEmbed embedType="artist" id="5w35Gt5153qhoSwR4MVtEU" />
             <AppleMusicEmbed
