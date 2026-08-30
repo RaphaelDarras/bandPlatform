@@ -28,9 +28,13 @@ export default function Header() {
     <header className="sticky top-0 z-50 border-b border-[var(--color-hairline)] bg-[var(--color-surface)]">
       <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <NavLink to="/" end className="flex items-center gap-2">
+          {/* 96px source for a 32px slot (3x displays); shared with the
+              favicon. Was the 2500px / 4.5 MB master. */}
           <img
-            src="/images/PP_RESEAUX.jpg"
+            src="/images/HURAKAN_ICON.png"
             alt="Hurakan"
+            width={96}
+            height={96}
             className="h-8 w-8"
           />
           <span className="font-display text-2xl uppercase tracking-wide text-[var(--color-accent)]">
