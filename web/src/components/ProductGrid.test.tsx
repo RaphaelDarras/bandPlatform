@@ -69,10 +69,13 @@ describe('ProductGrid', () => {
     const ul = container.querySelector('ul')!
     expect(ul.className).not.toMatch(/\bbg-/)
     expect(ul.className).not.toContain('gap-px')
+  })
 
-    // The separators come from each card's own border instead.
+  it('renders cards borderless — the artwork is the card', () => {
+    const { container } = render(<ProductGrid products={products} />)
+
     for (const a of container.querySelectorAll('a')) {
-      expect(a.className).toContain('border-[var(--color-hairline)]')
+      expect(a.className).not.toMatch(/\bborder\b|\bborder-/)
     }
   })
 
