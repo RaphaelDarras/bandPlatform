@@ -2,20 +2,44 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { BitEvent } from '../lib/bandsintown'
+import type { Catalogue } from '../lib/shopify'
 import fixture from '../lib/__fixtures__/bandsintown-events.json'
 
 const events = fixture as BitEvent[]
 
-const preorderFixture = [
-  {
-    handle: 'preorder-cd-eternal-scars',
-    label: 'Digipack CD',
-    url: 'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
-    price: '15,00 €',
-    image: 'https://cdn.shopify.com/s/files/1/x/CD_MOCKUP.png?width=600',
-    available: true,
-  },
-]
+const catalogue: Catalogue = {
+  preorder: [
+    {
+      handle: 'preorder-cd-eternal-scars',
+      label: 'DIGIPACK - "ETERNAL SCARS"',
+      url: 'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
+      price: '15,00 €',
+      image: 'https://cdn.shopify.com/s/files/1/x/CD.png?width=800',
+      available: true,
+      isPreorder: true,
+    },
+  ],
+  all: [
+    {
+      handle: 'preorder-cd-eternal-scars',
+      label: 'DIGIPACK - "ETERNAL SCARS"',
+      url: 'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
+      price: '15,00 €',
+      image: 'https://cdn.shopify.com/s/files/1/x/CD.png?width=800',
+      available: true,
+      isPreorder: true,
+    },
+    {
+      handle: 'parasite-t-shirt',
+      label: 'PARASITE - T-SHIRT',
+      url: 'https://shop.hurakanband.fr/products/parasite-t-shirt',
+      price: '20,00 €',
+      image: 'https://cdn.shopify.com/s/files/1/x/PARASITE.jpg?width=800',
+      available: true,
+      isPreorder: false,
+    },
+  ],
+}
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -28,187 +52,111 @@ vi.mock('react-router-dom', async () => {
 import { useLoaderData } from 'react-router-dom'
 import { Component as Home } from './Home'
 
+const renderHome = () =>
+  render(
+    <MemoryRouter>
+      <Home />
+    </MemoryRouter>,
+  )
+
 describe('Home page', () => {
   it('renders "Listen Now" linking to /listen', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    renderHome()
 
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
+    expect(screen.getByRole('link', { name: /listen now/i })).toHaveAttribute('href', '/listen')
+  })
+
+  it('leads with a full-screen deferred player as the page h1', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    const { container } = renderHome()
+
+    const h1s = screen.getAllByRole('heading', { level: 1 })
+    expect(h1s).toHaveLength(1)
+    expect(h1s[0]).toHaveTextContent('Dogma')
+
+    // Nothing third-party loads until the visitor asks for it.
+    expect(container.querySelector('iframe')).toBeNull()
+    expect(screen.getByRole('button', { name: /play video/i })).toBeInTheDocument()
+  })
+
+  it('splits merch into a Preorder section and an All section', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    renderHome()
+
+    const sections = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(sections).toEqual(['Preorder', 'All', 'Next Show'])
+  })
+
+  it('sends every product card to its own Shopify detail page', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    const { container } = renderHome()
+
+    const productLinks = [
+      ...container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
+    ]
+    // 1 in Preorder + 2 in All.
+    expect(productLinks).toHaveLength(3)
+    for (const l of productLinks) {
+      expect(l.getAttribute('href')).toMatch(/\/products\/[a-z0-9-]+$/)
+    }
+  })
+
+  it('keeps the store root to the single "everything" button', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    const { container } = renderHome()
+
+    const rootLinks = [
+      ...container.querySelectorAll('a[href="https://shop.hurakanband.fr/"]'),
+    ]
+    expect(rootLinks).toHaveLength(1)
+    expect(rootLinks[0]).toHaveTextContent(/open the shop/i)
+  })
+
+  it('falls back to a plain shop link when the catalogue fetch failed soft', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      events,
+      catalogue: { preorder: [], all: [] },
+    })
+    const { container } = renderHome()
+
+    expect(screen.queryByRole('heading', { name: /^preorder$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^all$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open the shop/i })).toHaveAttribute(
+      'href',
+      'https://shop.hurakanband.fr/',
     )
-
-    const listenNow = screen.getByRole('link', { name: /listen now/i })
-    expect(listenNow).toHaveAttribute('href', '/listen')
+    expect(
+      container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
+    ).toHaveLength(0)
   })
 
   it('shows the next event venue text from nextEvent(events) when events exist', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    renderHome()
 
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    // The venue heading and the city/country line are separate elements now,
-    // and for a festival venueDisplay() includes the location, so this string
+    // The venue heading and the city/country line are separate elements, and
+    // for a festival venueDisplay() includes the location, so this string
     // legitimately appears in both.
     expect(screen.getAllByText(/Gravigny, France/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('degrades to "No shows scheduled" linking to /concerts when events is empty', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events: [] })
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
+    vi.mocked(useLoaderData).mockReturnValue({ events: [], catalogue })
+    renderHome()
 
     expect(screen.getByText(/no shows scheduled/i)).toBeInTheDocument()
-    const concertsLink = screen.getByRole('link', { name: /concerts/i })
-    expect(concertsLink).toHaveAttribute('href', '/concerts')
-  })
-
-  it('carries no general merch teaser — the storefront ask is the preorder alone', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
+    expect(screen.getByRole('link', { name: /all concerts/i })).toHaveAttribute(
+      'href',
+      '/concerts',
     )
-
-    expect(screen.queryByText(/shop merch/i)).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /shop now/i })).not.toBeInTheDocument()
-  })
-
-  it('sends its one storefront link to the store root in a new tab', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    const preorder = screen.getByRole('link', { name: /preorder now/i })
-    expect(preorder).toHaveAttribute('href', 'https://shop.hurakanband.fr/')
-    expect(preorder).toHaveAttribute('target', '_blank')
-    expect(preorder).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
 
   it('renders a "Get Tickets" link for the next event when offers exist, app_id stripped', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    renderHome()
 
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    const ticketLink = screen.getByRole('link', { name: /get tickets/i })
-    const href = ticketLink.getAttribute('href') ?? ''
+    const href = screen.getByRole('link', { name: /get tickets/i }).getAttribute('href') ?? ''
     expect(href).not.toContain('app_id')
-  })
-
-  it('leads with a single h1 and orders sections release -> preorder -> show', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    const h1s = screen.getAllByRole('heading', { level: 1 })
-    expect(h1s).toHaveLength(1)
-    expect(h1s[0]).toHaveTextContent('Hurakan')
-
-    const sections = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(sections).toEqual(['Latest Release', 'Preorder The Album', 'Next Show'])
-  })
-
-  it('falls back to a single store-root CTA when the preorder fetch failed soft', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events, preorder: [] })
-
-    const { container } = render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    const storeLinks = [...container.querySelectorAll('a[href^="https://shop.hurakanband.fr"]')]
-    expect(storeLinks).toHaveLength(1)
-    expect(storeLinks[0].getAttribute('href')).toBe('https://shop.hurakanband.fr/')
-    expect(screen.getByRole('link', { name: /preorder now/i })).toBeInTheDocument()
-  })
-
-  it('renders Shopify preorder thumbnails when the loader supplied them', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events, preorder: preorderFixture })
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    expect(screen.getByRole('link', { name: /digipack cd/i })).toHaveAttribute(
-      'href',
-      'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
-    )
-    // The generic store-root button gives way to the per-product cards.
-    expect(screen.queryByRole('link', { name: /preorder now/i })).not.toBeInTheDocument()
-    // Same filled treatment as "Listen Now" — the section's own CTA, not an
-    // afterthought under the cards.
-    const allItems = screen.getByRole('link', { name: /all preorder items/i })
-    expect(allItems).toHaveAttribute('href', 'https://shop.hurakanband.fr/')
-    expect(allItems.className).toBe(
-      screen.getByRole('link', { name: /listen now/i }).className,
-    )
-  })
-
-  it('keeps the hero to the banner alone, with the h1 available only to readers', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
-
-    const { container } = render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    const h1 = container.querySelector('h1')!
-    expect(h1.className).toContain('sr-only')
-    expect(h1).toHaveTextContent('Hurakan')
-
-    const hero = h1.closest('section')!
-    expect(hero.querySelectorAll('p')).toHaveLength(0)
-    expect(hero.querySelector('img')).not.toBeNull()
-  })
-
-  it('offers exactly one path to /listen from the page body (nav owns the other)', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
-
-    const { container } = render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    expect(container.querySelectorAll('a[href="/listen"]')).toHaveLength(1)
-  })
-
-  it('renders a latest-release teaser linking to /listen', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ events })
-
-    render(
-      <MemoryRouter>
-        <Home />
-      </MemoryRouter>,
-    )
-
-    const listenLinks = screen.getAllByRole('link', { name: /listen/i })
-    expect(listenLinks.some((l) => l.getAttribute('href') === '/listen')).toBe(true)
   })
 })

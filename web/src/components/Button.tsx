@@ -8,23 +8,21 @@ import type { ReactNode } from 'react'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet'
 
+// Zero radius, per the reference site (--rounded-button: 0rem).
 const BASE =
-  'type-label inline-flex items-center justify-center gap-2 rounded-full ' +
-  'transition-[transform,background-color,border-color,color,box-shadow] duration-200 ' +
-  'motion-reduce:transition-none'
+  'type-label inline-flex items-center justify-center gap-2 ' +
+  'transition-[background-color,border-color,color] duration-200 motion-reduce:transition-none'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  // Filled gold. One per section — this is the page's ask.
+  // Near-white fill with near-black text, like the reference's
+  // --color-base-button 225/225/225 on --color-button-text 0/0/0. Ivory rather
+  // than pure white keeps it in the Dogma palette.
   primary:
-    'bg-[var(--color-accent)] px-7 py-3.5 text-[#141414] ' +
-    'shadow-[0_8px_24px_-10px_rgba(200,188,134,0.55)] ' +
-    'hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-10px_rgba(200,188,134,0.7)] ' +
-    'motion-reduce:hover:translate-y-0',
-  // Steel outline — the cold accent, so it reads as clearly subordinate to
-  // gold rather than competing with it.
+    'bg-[var(--color-ink)] px-8 py-4 text-[#141414] hover:bg-[var(--color-accent)]',
+  // Hard-edged outline in steel.
   secondary:
-    'border border-[var(--color-steel)] px-7 py-3.5 text-[var(--color-ink)] ' +
-    'hover:border-[var(--color-ink)] hover:bg-[rgba(94,127,133,0.16)]',
+    'border border-[var(--color-steel)] px-8 py-4 text-[var(--color-ink)] ' +
+    'hover:border-[var(--color-ink)] hover:bg-[var(--color-ink)] hover:text-[#141414]',
   // Inline text link — navigational, not an action.
   quiet:
     'text-[var(--color-ink-dim)] underline decoration-[var(--color-steel)] decoration-2 ' +

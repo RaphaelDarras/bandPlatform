@@ -16,7 +16,7 @@ const CHANNELS = [
 // Channel rows: full-width tap targets with a steel arrow that slides on
 // hover, rather than a bullet list of underlined text.
 const rowClass =
-  'group flex items-center justify-between rounded-xl border border-[var(--color-hairline)] ' +
+  'group flex items-center justify-between border border-[var(--color-hairline)] ' +
   'px-4 py-3.5 transition-colors duration-200 hover:border-[var(--color-steel)] ' +
   'hover:bg-[rgba(94,127,133,0.12)]'
 

@@ -1,0 +1,70 @@
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import ProductGrid from './ProductGrid'
+import type { ShopProduct } from '../lib/shopify'
+
+const products: ShopProduct[] = [
+  {
+    handle: 'preorder-cd-eternal-scars',
+    label: 'DIGIPACK - "ETERNAL SCARS"',
+    url: 'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
+    price: '15,00 €',
+    image: 'https://cdn.shopify.com/s/files/1/x/CD_MOCKUP.png?v=1&width=800',
+    available: true,
+    isPreorder: true,
+  },
+  {
+    handle: 'parasite-t-shirt',
+    label: 'PARASITE - T-SHIRT',
+    url: 'https://shop.hurakanband.fr/products/parasite-t-shirt',
+    price: '20,00 €',
+    image: null,
+    available: false,
+    isPreorder: false,
+  },
+]
+
+describe('ProductGrid', () => {
+  it('links every card to its own product detail page, in a new tab', () => {
+    render(<ProductGrid products={products} />)
+
+    const cd = screen.getByRole('link', { name: /digipack/i })
+    expect(cd).toHaveAttribute(
+      'href',
+      'https://shop.hurakanband.fr/products/preorder-cd-eternal-scars',
+    )
+    expect(cd).toHaveAttribute('target', '_blank')
+    expect(cd.getAttribute('rel')).toContain('noopener')
+  })
+
+  it('never links a card to the bare store root', () => {
+    const { container } = render(<ProductGrid products={products} />)
+
+    for (const a of container.querySelectorAll('a')) {
+      expect(a.getAttribute('href')).toContain('/products/')
+    }
+  })
+
+  it('shows the price when available and marks sold-out items', () => {
+    render(<ProductGrid products={products} />)
+
+    expect(screen.getByText('15,00 €')).toBeInTheDocument()
+    expect(screen.getByText(/sold out/i)).toBeInTheDocument()
+    expect(screen.queryByText('20,00 €')).not.toBeInTheDocument()
+  })
+
+  it('lazy-loads thumbnails and omits the img entirely when there is none', () => {
+    const { container } = render(<ProductGrid products={products} />)
+
+    const imgs = [...container.querySelectorAll('img')]
+    expect(imgs).toHaveLength(1) // the t-shirt has image: null
+    expect(imgs[0]).toHaveAttribute('loading', 'lazy')
+    expect(imgs[0]).toHaveAttribute('alt', 'DIGIPACK - "ETERNAL SCARS"')
+  })
+
+  it('renders an empty list when given no products', () => {
+    const { container } = render(<ProductGrid products={[]} />)
+
+    expect(container.querySelectorAll('li')).toHaveLength(0)
+  })
+})

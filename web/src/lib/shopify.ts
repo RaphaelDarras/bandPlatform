@@ -8,8 +8,8 @@
 //
 // Like fetchUpcomingEvents, the network body is guarded by import.meta.env.SSR
 // so it is dead-code-eliminated from the client bundle and runs only in the
-// SSG render. Fails soft: any error yields [], and the caller falls back to a
-// plain storefront link.
+// SSG render. Fails soft: any error yields an empty catalogue, and the caller
+// falls back to a plain storefront link.
 
 export const STORE_URL = 'https://shop.hurakanband.fr/'
 
@@ -33,6 +33,38 @@ export function productsEndpoint(limit = 250): string {
   return `${STORE_URL}products.json?limit=${limit}&country=${MARKET_COUNTRY}`
 }
 
+/** One product, flattened to just what a card renders. */
+export interface ShopProduct {
+  handle: string
+  /** Cleaned-up store title (see displayTitle). */
+  label: string
+  /** Deep link to the product's own detail page on the storefront. */
+  url: string
+  price: string
+  image: string | null
+  available: boolean
+  isPreorder: boolean
+}
+
+/** Both catalogue slices the home page renders. */
+export interface Catalogue {
+  preorder: ShopProduct[]
+  all: ShopProduct[]
+}
+
+/** The subset of the products.json payload this module reads. */
+interface ShopifyProduct {
+  handle: string
+  title: string
+  images: { src: string }[]
+  variants: {
+    price: string
+    /** Currency the price is quoted in — varies with the requesting market. */
+    price_currency?: string
+    available: boolean
+  }[]
+}
+
 /**
  * Format a price in the currency Shopify actually priced it in, never an
  * assumed one. The payload's price_currency is the authority: hardcoding EUR
@@ -52,40 +84,32 @@ function formatPrice(amount: number, currency: string): string {
   }
 }
 
-/** One featured product, flattened to just what a card renders. */
-export interface PreorderProduct {
-  handle: string
-  /** Hand-authored label from data/preorder.ts, not the shouty Shopify title. */
-  label: string
-  url: string
-  price: string
-  image: string | null
-  available: boolean
+/**
+ * Store titles are written for the storefront, not for a teaser:
+ *   PREORDER - VINYL - "ETERNAL SCARS" SPLATTER GOLD/BLACK LIMITED
+ * Strip the redundant PREORDER prefix (the section heading already says it)
+ * and normalise the quote characters. Everything else is left alone: the
+ * titles are already uppercase, which suits the display face.
+ */
+export function displayTitle(title: string): string {
+  return title
+    .replace(/^\s*pre[\s-]?order\s*[-–—:]\s*/i, '')
+    .replace(/[“”‘’]/g, '"')
+    .trim()
 }
 
-/** The subset of the products.json payload this module reads. */
-interface ShopifyProduct {
-  handle: string
-  title: string
-  images: { src: string }[]
-  variants: {
-    price: string
-    /** Currency the price is quoted in — varies with the requesting market. */
-    price_currency?: string
-    available: boolean
-  }[]
-}
-
-export interface FeaturedHandle {
-  handle: string
-  label: string
+/** A product is a preorder if its handle or title says so. */
+export function isPreorderProduct(p: { handle: string; title: string }): boolean {
+  return /^pre[\s-]?order/i.test(p.handle) || /^\s*pre[\s-]?order/i.test(p.title)
 }
 
 /**
  * Shopify CDN images are served at their upload size unless asked otherwise.
- * The cards render at ~300px, so request 600 for 2x displays.
+ * Cards render at ~400px, so request 800 for 2x displays. The CDN
+ * content-negotiates WebP, so a real browser gets ~38KB where the source PNG
+ * is ~250KB.
  */
-export function sized(src: string, width = 600): string {
+export function sized(src: string, width = 800): string {
   try {
     const u = new URL(src)
     u.searchParams.set('width', String(width))
@@ -95,64 +119,59 @@ export function sized(src: string, width = 600): string {
   }
 }
 
-/**
- * Resolve hand-authored handles against a products.json payload, preserving
- * the order given in the config. Handles that no longer exist in the store are
- * skipped rather than rendered broken — so pulling a product from Shopify
- * removes it from the site on the next build with no code change.
- */
-export function selectFeatured(
-  products: ShopifyProduct[],
-  featured: FeaturedHandle[],
-): PreorderProduct[] {
-  const byHandle = new Map(products.map((p) => [p.handle, p]))
+/** Flatten one payload product into the shape a card needs. */
+export function toShopProduct(p: ShopifyProduct): ShopProduct {
+  const cheapest = p.variants
+    .filter((v) => Number.isFinite(Number(v.price)))
+    .sort((a, b) => Number(a.price) - Number(b.price))[0]
 
-  return featured.flatMap(({ handle, label }) => {
-    const p = byHandle.get(handle)
-    if (!p) return []
-
-    const cheapest = p.variants
-      .filter((v) => Number.isFinite(Number(v.price)))
-      .sort((a, b) => Number(a.price) - Number(b.price))[0]
-
-    return [
-      {
-        handle,
-        label,
-        url: `${STORE_URL}products/${handle}`,
-        price: cheapest
-          ? formatPrice(Number(cheapest.price), cheapest.price_currency ?? 'EUR')
-          : '',
-        image: p.images[0] ? sized(p.images[0].src) : null,
-        available: p.variants.some((v) => v.available),
-      },
-    ]
-  })
+  return {
+    handle: p.handle,
+    label: displayTitle(p.title),
+    url: `${STORE_URL}products/${p.handle}`,
+    price: cheapest
+      ? formatPrice(Number(cheapest.price), cheapest.price_currency ?? 'EUR')
+      : '',
+    image: p.images[0] ? sized(p.images[0].src) : null,
+    available: p.variants.some((v) => v.available),
+    isPreorder: isPreorderProduct(p),
+  }
 }
 
 /**
- * Fetch the featured preorder products at build time. Returns [] on any
+ * Split the catalogue into the two slices the home page shows. `all` is the
+ * complete catalogue in storefront order; `preorder` is the subset flagged as
+ * preorder. Preorder items therefore appear in both, which is deliberate —
+ * "All" means all, and featuring an item above the full grid is ordinary
+ * storefront practice.
+ */
+export function toCatalogue(products: ShopifyProduct[]): Catalogue {
+  const all = products.map(toShopProduct)
+  return { preorder: all.filter((p) => p.isPreorder), all }
+}
+
+/**
+ * Fetch the whole catalogue at build time. Returns empty slices on any
  * non-ok response or thrown error so the build never blocks; Home then falls
  * back to a plain link to the storefront.
  *
- * In dev (and in the client bundle) this returns [] immediately — same
+ * In dev (and in the client bundle) this returns empty immediately — same
  * fail-soft shape as the Bandsintown client, so `npm run dev` shows the
  * fallback rather than making a live call on every page load.
  */
-export async function fetchPreorderProducts(
-  featured: FeaturedHandle[],
-): Promise<PreorderProduct[]> {
-  if (!import.meta.env.SSR) return [] // never runs / ships in the client bundle
+export async function fetchCatalogue(): Promise<Catalogue> {
+  const empty: Catalogue = { preorder: [], all: [] }
+  if (!import.meta.env.SSR) return empty // never runs / ships in the client bundle
   try {
     const res = await fetch(productsEndpoint())
     if (!res.ok) {
-      console.warn(`[shopify] products.json failed with status ${res.status}, falling back to []`)
-      return []
+      console.warn(`[shopify] products.json failed with status ${res.status}, falling back`)
+      return empty
     }
     const body = (await res.json()) as { products?: ShopifyProduct[] }
-    return selectFeatured(body.products ?? [], featured)
+    return toCatalogue(body.products ?? [])
   } catch (err) {
-    console.warn('[shopify] products.json threw, falling back to []:', err)
-    return []
+    console.warn('[shopify] products.json threw, falling back:', err)
+    return empty
   }
 }

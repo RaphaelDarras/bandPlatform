@@ -63,7 +63,7 @@ export default function Header() {
             alt=""
             width={96}
             height={96}
-            className="h-8 w-8 rounded-full ring-1 ring-[var(--color-hairline)]"
+            className="h-8 w-8 ring-1 ring-[var(--color-hairline)]"
           />
           <span className="type-h2 text-[var(--color-ink)] transition-colors duration-200 group-hover:text-[var(--color-accent)]">
             Hurakan
@@ -105,7 +105,7 @@ export default function Header() {
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--color-ink)] transition-colors hover:bg-[rgba(245,234,205,0.06)] md:hidden"
+            className="flex h-11 w-11 items-center justify-center text-[var(--color-ink)] transition-colors hover:bg-[rgba(245,234,205,0.06)] md:hidden"
           >
             {open ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">

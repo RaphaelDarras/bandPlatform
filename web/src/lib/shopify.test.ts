@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { productsEndpoint, selectFeatured, sized, STORE_URL } from './shopify'
+import {
+  displayTitle,
+  isPreorderProduct,
+  productsEndpoint,
+  sized,
+  toCatalogue,
+  toShopProduct,
+  STORE_URL,
+} from './shopify'
 
 // Shape trimmed from the live shop.hurakanband.fr/products.json payload
 // (verified 2026-08-30): titles are store-facing and shouty, prices are
@@ -28,139 +36,149 @@ const products = [
   },
 ]
 
-describe('selectFeatured', () => {
-  it('returns only the configured handles, in config order', () => {
-    const out = selectFeatured(products, [
-      { handle: 'preorder-vinyl-eternal-scars', label: 'Vinyl' },
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
+describe('toCatalogue', () => {
+  it('returns the full catalogue in storefront order', () => {
+    const { all } = toCatalogue(products)
 
-    expect(out.map((p) => p.handle)).toEqual([
-      'preorder-vinyl-eternal-scars',
+    expect(all.map((p) => p.handle)).toEqual([
       'preorder-cd-eternal-scars',
+      'preorder-vinyl-eternal-scars',
+      'parasite-t-shirt',
     ])
-    expect(out.map((p) => p.label)).toEqual(['Vinyl', 'Digipack CD'])
   })
 
-  it('uses the hand-authored label, never the store title', () => {
-    const [p] = selectFeatured(products, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
+  it('filters the preorder slice out of the same list', () => {
+    const { preorder } = toCatalogue(products)
 
-    expect(p.label).toBe('Digipack CD')
-    expect(JSON.stringify(p)).not.toContain('PREORDER -')
+    expect(preorder.map((p) => p.handle)).toEqual([
+      'preorder-cd-eternal-scars',
+      'preorder-vinyl-eternal-scars',
+    ])
   })
 
-  it('deep-links each product rather than the store root', () => {
-    const [p] = selectFeatured(products, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
+  it('keeps preorder items in "all" too — All means all', () => {
+    const { all } = toCatalogue(products)
 
-    expect(p.url).toBe(`${STORE_URL}products/preorder-cd-eternal-scars`)
+    expect(all.some((p) => p.handle === 'preorder-cd-eternal-scars')).toBe(true)
+    expect(all).toHaveLength(3)
   })
 
-  it('prices from the cheapest variant, formatted as EUR', () => {
-    const [p] = selectFeatured(products, [
-      { handle: 'preorder-vinyl-eternal-scars', label: 'Vinyl' },
-    ])
-
-    // 35.00 (cheapest), not the 40.00 first variant. NBSP before the symbol is
-    // fr-FR's own separator, so match loosely.
-    expect(p.price.replace(/ |\s/g, ' ')).toBe('35,00 €')
-  })
-
-  it('reports availability if any variant is available', () => {
-    const [vinyl] = selectFeatured(products, [
-      { handle: 'preorder-vinyl-eternal-scars', label: 'Vinyl' },
-    ])
-    expect(vinyl.available).toBe(true)
-
-    const soldOut = selectFeatured(
-      [{ ...products[0], variants: [{ price: '15.00', available: false }] }],
-      [{ handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' }],
-    )
-    expect(soldOut[0].available).toBe(false)
-  })
-
-  it('skips handles the store no longer carries instead of rendering them broken', () => {
-    const out = selectFeatured(products, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-      { handle: 'deleted-from-shopify', label: 'Ghost' },
-    ])
-
-    expect(out).toHaveLength(1)
-    expect(out[0].handle).toBe('preorder-cd-eternal-scars')
-  })
-
-  it('tolerates a product with no image', () => {
-    const out = selectFeatured(
-      [{ ...products[0], images: [] }],
-      [{ handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' }],
-    )
-
-    expect(out[0].image).toBeNull()
+  it('survives an empty payload', () => {
+    expect(toCatalogue([])).toEqual({ preorder: [], all: [] })
   })
 })
 
-describe('selectFeatured — currency', () => {
+describe('toShopProduct', () => {
+  it('deep-links the product detail page, never the store root', () => {
+    const p = toShopProduct(products[0])
+
+    expect(p.url).toBe(`${STORE_URL}products/preorder-cd-eternal-scars`)
+    expect(p.url).not.toBe(STORE_URL)
+  })
+
+  it('prices from the cheapest variant', () => {
+    const p = toShopProduct(products[1])
+
+    // 35.00 (cheapest), not the 40.00 first variant.
+    expect(p.price.replace(/ |\s/g, ' ')).toBe('35,00 €')
+  })
+
+  it('reports availability if any variant is available', () => {
+    expect(toShopProduct(products[1]).available).toBe(true)
+    expect(
+      toShopProduct({ ...products[0], variants: [{ price: '15.00', available: false }] })
+        .available,
+    ).toBe(false)
+  })
+
+  it('tolerates a product with no image', () => {
+    expect(toShopProduct({ ...products[0], images: [] }).image).toBeNull()
+  })
+})
+
+describe('displayTitle', () => {
+  it('strips the redundant PREORDER prefix — the section heading says it', () => {
+    expect(displayTitle('PREORDER - DIGIPACK - "ETERNAL SCARS"')).toBe(
+      'DIGIPACK - "ETERNAL SCARS"',
+    )
+    expect(displayTitle('PREORDER - MOUTHGUARD')).toBe('MOUTHGUARD')
+  })
+
+  it('handles the unhyphenated and lowercase spellings', () => {
+    expect(displayTitle('Pre-order — Vinyl')).toBe('Vinyl')
+    expect(displayTitle('preorder: Poster')).toBe('Poster')
+  })
+
+  it('leaves a non-preorder title alone', () => {
+    expect(displayTitle('PARASITE - T-SHIRT')).toBe('PARASITE - T-SHIRT')
+  })
+
+  it('never strips a mid-title occurrence', () => {
+    expect(displayTitle('BUNDLE - PREORDER PACK')).toBe('BUNDLE - PREORDER PACK')
+  })
+
+  it('normalises curly quotes', () => {
+    expect(displayTitle('VINYL “ETERNAL SCARS”')).toBe('VINYL "ETERNAL SCARS"')
+  })
+})
+
+describe('isPreorderProduct', () => {
+  it('flags by handle prefix', () => {
+    expect(isPreorderProduct({ handle: 'preorder-mouthguard', title: 'Mouthguard' })).toBe(true)
+  })
+
+  it('flags by title prefix even when the handle does not say so', () => {
+    expect(isPreorderProduct({ handle: 'cd-eternal-scars', title: 'PREORDER - CD' })).toBe(true)
+  })
+
+  it('does not flag a regular product', () => {
+    expect(isPreorderProduct({ handle: 'parasite-t-shirt', title: 'PARASITE - T-SHIRT' })).toBe(
+      false,
+    )
+  })
+
+  it('does not flag a mid-string match', () => {
+    expect(isPreorderProduct({ handle: 'bundle-preorder', title: 'BUNDLE PREORDER' })).toBe(false)
+  })
+})
+
+describe('currency', () => {
   // The live bug: the Vercel build fetched from a US region, Shopify returned
   // 18.00 USD (~15 EUR converted), and the hardcoded EUR formatter rendered it
   // as "18,00 €". Currency must come from the payload, never be assumed.
   it('labels a USD payload in USD, never in euros', () => {
-    const usd = [
-      {
-        ...products[0],
-        variants: [{ price: '18.00', price_currency: 'USD', available: true }],
-      },
-    ]
-
-    const [p] = selectFeatured(usd, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
+    const p = toShopProduct({
+      ...products[0],
+      variants: [{ price: '18.00', price_currency: 'USD', available: true }],
+    })
 
     expect(p.price).not.toContain('€')
     expect(p.price).toMatch(/\$|USD/)
   })
 
   it('honours a zero-decimal currency', () => {
-    const jpy = [
-      {
-        ...products[0],
-        variants: [{ price: '2900', price_currency: 'JPY', available: true }],
-      },
-    ]
+    const p = toShopProduct({
+      ...products[0],
+      variants: [{ price: '2900', price_currency: 'JPY', available: true }],
+    })
 
-    const [p] = selectFeatured(jpy, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
-
-    expect(p.price).toContain('2')
     expect(p.price).not.toContain(',00')
   })
 
   it('assumes EUR only when the field is absent, matching the pinned market', () => {
-    const noCurrency = [
-      { ...products[0], variants: [{ price: '15.00', available: true }] },
-    ]
-
-    const [p] = selectFeatured(noCurrency, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
+    const p = toShopProduct({
+      ...products[0],
+      variants: [{ price: '15.00', available: true }],
+    })
 
     expect(p.price).toContain('€')
   })
 
   it('shows a bare number rather than a wrong symbol for a bad currency code', () => {
-    const bad = [
-      {
-        ...products[0],
-        variants: [{ price: '15.00', price_currency: 'NOTACURRENCY', available: true }],
-      },
-    ]
-
-    const [p] = selectFeatured(bad, [
-      { handle: 'preorder-cd-eternal-scars', label: 'Digipack CD' },
-    ])
+    const p = toShopProduct({
+      ...products[0],
+      variants: [{ price: '15.00', price_currency: 'NOTACURRENCY', available: true }],
+    })
 
     expect(p.price).toBe('15')
     expect(p.price).not.toContain('€')
@@ -186,7 +204,7 @@ describe('sized', () => {
   it('asks the Shopify CDN for a 2x width, preserving the cache key', () => {
     const out = sized('https://cdn.shopify.com/s/files/1/x/CD.png?v=123')
 
-    expect(out).toContain('width=600')
+    expect(out).toContain('width=800')
     expect(out).toContain('v=123')
   })
 

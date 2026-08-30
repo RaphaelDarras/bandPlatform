@@ -10,7 +10,7 @@ const textLinkClass =
 // Icons get a circular hit area that fills on hover — previously they were
 // bare glyphs with no affordance at all.
 const iconLinkClass =
-  'flex h-10 w-10 items-center justify-center rounded-full text-[var(--color-ink-dim)] ' +
+  'flex h-10 w-10 items-center justify-center text-[var(--color-ink-dim)] ' +
   'transition-colors duration-200 hover:bg-[rgba(94,127,133,0.18)] hover:text-[var(--color-ink)]'
 
 const SOCIALS = [

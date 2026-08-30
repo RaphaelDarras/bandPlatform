@@ -10,7 +10,7 @@ import YouTubeEmbed from './YouTubeEmbed'
 // the site's radius instead of floating as bare rectangles.
 export default function ReleaseItem({ release }: { release: Release }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--color-hairline)] bg-[#141414] [&_iframe]:block">
+    <div className="overflow-hidden border border-[var(--color-hairline)] bg-[#141414] [&_iframe]:block">
       {release.kind === 'spotify' ? (
         <SpotifyEmbed embedType={release.embedType} id={release.id} />
       ) : (

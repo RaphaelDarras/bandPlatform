@@ -24,7 +24,7 @@ export default function Layout() {
           it before. Visually hidden until focused. */}
       <a
         href="#main"
-        className="type-label sr-only focus:not-sr-only focus:absolute focus:left-5 focus:top-5 focus:z-[60] focus:rounded-full focus:bg-[var(--color-accent)] focus:px-5 focus:py-3 focus:text-[#141414]"
+        className="type-label sr-only focus:not-sr-only focus:absolute focus:left-5 focus:top-5 focus:z-[60] focus:bg-[var(--color-accent)] focus:px-5 focus:py-3 focus:text-[#141414]"
       >
         Skip to content
       </a>
