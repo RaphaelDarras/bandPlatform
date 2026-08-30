@@ -157,9 +157,12 @@ describe('Home page', () => {
     )
     // The generic store-root button gives way to the per-product cards.
     expect(screen.queryByRole('link', { name: /preorder now/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /all preorder items/i })).toHaveAttribute(
-      'href',
-      'https://shop.hurakanband.fr/',
+    // Same filled treatment as "Listen Now" — the section's own CTA, not an
+    // afterthought under the cards.
+    const allItems = screen.getByRole('link', { name: /all preorder items/i })
+    expect(allItems).toHaveAttribute('href', 'https://shop.hurakanband.fr/')
+    expect(allItems.className).toBe(
+      screen.getByRole('link', { name: /listen now/i }).className,
     )
   })
 

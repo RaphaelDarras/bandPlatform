@@ -81,9 +81,7 @@ export function Component() {
               <PreorderGrid products={preorderProducts} />
             </div>
             <div className="mt-6">
-              <Button variant="quiet" href={STORE_URL}>
-                All preorder items
-              </Button>
+              <Button href={STORE_URL}>All preorder items</Button>
             </div>
           </>
         ) : (
