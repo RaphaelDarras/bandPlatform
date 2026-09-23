@@ -1,6 +1,7 @@
 import { useLoaderData } from 'react-router-dom'
 import type { BitEvent } from '../lib/bandsintown'
 import { clean, nextEvent, venueDisplay } from '../lib/bandsintown'
+import { useUpcomingEvents } from '../hooks/useUpcomingEvents'
 import { releases } from '../data/releases'
 import type { Catalogue } from '../lib/shopify'
 import { STORE_URL } from '../lib/shopify'
@@ -25,7 +26,9 @@ import Reveal from '../components/Reveal'
 export function Component() {
   const { events, catalogue } =
     (useLoaderData() as { events?: BitEvent[]; catalogue?: Catalogue }) ?? {}
-  const next = nextEvent(events ?? [])
+  // Baked at build time, so a show can be over by the time someone reads this:
+  // re-filter against the visitor's clock before picking the teaser.
+  const next = nextEvent(useUpcomingEvents(events ?? []))
   const highlightedRelease = releases[0]
   const preorder = catalogue?.preorder ?? []
   const merch = catalogue?.merch ?? []

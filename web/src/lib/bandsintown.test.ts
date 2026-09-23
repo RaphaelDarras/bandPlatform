@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { clean, nextEvent, venueDisplay, fetchUpcomingEvents, sanitizeEvent } from './bandsintown'
+import {
+  clean,
+  nextEvent,
+  venueDisplay,
+  fetchUpcomingEvents,
+  sanitizeEvent,
+  dropPastEvents,
+} from './bandsintown'
 import type { BitEvent } from './bandsintown'
 import fixture from './__fixtures__/bandsintown-events.json'
 
@@ -90,6 +97,34 @@ describe('nextEvent', () => {
 
   it('returns null for an empty array', () => {
     expect(nextEvent([])).toBeNull()
+  })
+})
+
+describe('dropPastEvents (stale-build guard)', () => {
+  // Fixture events: [0] 2026-08-29 (festival), [1] 2026-09-15.
+  it('keeps every event when the clock is before all of them', () => {
+    expect(dropPastEvents(events, new Date('2026-08-01T12:00:00'))).toHaveLength(2)
+  })
+
+  it('drops only the events whose day has passed', () => {
+    const remaining = dropPastEvents(events, new Date('2026-09-01T12:00:00'))
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].id).toBe('108001122')
+  })
+
+  it('keeps a show happening later the same day', () => {
+    // 2026-09-15T20:00 gig, read at 09:00 that morning — still upcoming.
+    const remaining = dropPastEvents([events[1]], new Date('2026-09-15T09:00:00'))
+    expect(remaining).toHaveLength(1)
+  })
+
+  it('empties the list once every date has passed', () => {
+    expect(dropPastEvents(events, new Date('2026-12-01T12:00:00'))).toEqual([])
+  })
+
+  it('keeps an event with an unparseable datetime (fails open)', () => {
+    const broken = { ...events[0], datetime: 'not-a-date' } as BitEvent
+    expect(dropPastEvents([broken], new Date('2026-12-01T12:00:00'))).toHaveLength(1)
   })
 })
 

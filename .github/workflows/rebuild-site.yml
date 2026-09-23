@@ -1,0 +1,45 @@
+# Daily static-site rebuild — keeps the baked concert list honest.
+#
+# Purpose: hurakanband.fr is prerendered by vite-react-ssg, and
+# web/src/lib/bandsintown.ts fetches `date_range=upcoming` at BUILD time (D-09
+# keeps the artist key out of the browser, so the fetch cannot happen at
+# runtime). "Upcoming" is therefore frozen to whenever the site was last built:
+# without a rebuild, /concerts and Home's "Next Show" keep advertising gigs that
+# already happened, and new Bandsintown dates never appear at all.
+#
+# Hitting a Vercel Deploy Hook re-runs the build, which re-fetches Bandsintown
+# (and the Shopify catalogue baked into Home the same way).
+#
+# Required repo secret (Settings -> Secrets and variables -> Actions):
+#   - VERCEL_DEPLOY_HOOK_URL   Create it in Vercel: Project (hurakanband) ->
+#                              Settings -> Git -> Deploy Hooks -> add one named
+#                              e.g. "daily-rebuild" on branch `main`, then paste
+#                              the generated URL here. The URL is itself the
+#                              credential — treat it as a secret, never commit it.
+#
+# Pitfall (same as shopify-reconcile.yml): GitHub auto-disables scheduled
+# workflows after 60 days with no repo activity. If the repo goes quiet between
+# concert seasons this cron stops silently and the site freezes again. Symptom
+# to watch for: /concerts listing a date that has passed. Fallback: configure the
+# same POST on https://cron-job.org (free, no repo-activity dependency).
+
+name: rebuild-site
+
+on:
+  schedule:
+    # Daily at 05:00 UTC — a new Bandsintown date goes live within 24h.
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          # -f fails the step on any non-2xx so a revoked/expired hook surfaces
+          # as a red run instead of a silently frozen site. The URL is a secret,
+          # so it is passed via env and never echoed.
+          curl -fsS -X POST "${VERCEL_DEPLOY_HOOK_URL}" -o /dev/null

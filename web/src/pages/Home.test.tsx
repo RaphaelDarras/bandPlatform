@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { BitEvent } from '../lib/bandsintown'
@@ -6,6 +6,20 @@ import type { Catalogue } from '../lib/shopify'
 import fixture from '../lib/__fixtures__/bandsintown-events.json'
 
 const events = fixture as BitEvent[]
+
+// "Next Show" now filters out dates that passed since the build, and the
+// fixture is a real 2026 payload — so the clock has to be pinned. Only Date is
+// faked; React's scheduler keeps its real timers.
+const pinClock = (iso: string) => vi.setSystemTime(new Date(iso))
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  pinClock('2026-08-01T12:00:00') // before both fixture events
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 // The two slices partition the store — no handle appears in both.
 const catalogue: Catalogue = {
@@ -128,6 +142,23 @@ describe('Home page', () => {
     // for a festival venueDisplay() includes the location, so this string
     // legitimately appears in both.
     expect(screen.getAllByText(/Gravigny, France/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('advances the teaser past a show that happened since the build', () => {
+    pinClock('2026-09-01T12:00:00') // fixture[0] (2026-08-29) is over
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    renderHome()
+
+    expect(screen.queryByText(/Gravigny, France/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Le Bikini/)).toBeInTheDocument()
+  })
+
+  it('degrades to "No shows scheduled" once every baked date has passed', () => {
+    pinClock('2026-12-01T12:00:00')
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    renderHome()
+
+    expect(screen.getByText(/no shows scheduled/i)).toBeInTheDocument()
   })
 
   it('degrades to "No shows scheduled" linking to /concerts when events is empty', () => {

@@ -139,6 +139,27 @@ export function nextEvent(events: BitEvent[]): BitEvent | null {
 }
 
 /**
+ * Drop events that have already happened, relative to `now`.
+ *
+ * `date_range=upcoming` is applied by Bandsintown at FETCH time, which for this
+ * site is BUILD time — so a page that has not been rebuilt keeps listing shows
+ * after they happen. The daily rebuild cron (.github/workflows/rebuild-site.yml)
+ * is the actual fix; this filter is the fallback that makes a stale page degrade
+ * to "missing the newest dates" instead of "advertising gigs that are over".
+ *
+ * Granularity is the calendar day, matching Bandsintown itself: a gig later
+ * today is still upcoming. An unparseable datetime keeps the event — failing
+ * open never hides a real show.
+ */
+export function dropPastEvents(events: BitEvent[], now: Date = new Date()): BitEvent[] {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  return events.filter((e) => {
+    const t = new Date(e.datetime).getTime()
+    return Number.isNaN(t) || t >= startOfToday
+  })
+}
+
+/**
  * Display-friendly venue string. Mitigates the festival-quirk where
  * Bandsintown returns the festival `title` as `venue.name` instead of the
  * real venue name (RESEARCH Pitfall 2) — in that case prefer
