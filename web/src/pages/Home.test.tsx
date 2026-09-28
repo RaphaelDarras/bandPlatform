@@ -74,7 +74,7 @@ describe('Home page', () => {
 
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s).toHaveLength(1)
-    expect(h1s[0]).toHaveTextContent('Dogma')
+    expect(h1s[0]).toHaveTextContent('Disgrace')
   })
 
   it('splits the store into Preorder and Merch, in that order', () => {

@@ -38,7 +38,7 @@ export function Component() {
       {/* The release[0] entry is a YouTube video (D-17), so the hero is the
           release itself — player shown directly, no poster or play overlay. */}
       {highlightedRelease?.kind === 'youtube' && (
-        <FullscreenPlayer videoId={highlightedRelease.videoId} title="Dogma" />
+        <FullscreenPlayer videoId={highlightedRelease.videoId} title="Disgrace" />
       )}
 
       {preorder.length > 0 && (
