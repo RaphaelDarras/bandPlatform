@@ -14,6 +14,7 @@ jest.mock('mongoose', () => {
 const mockVoteModule = {
   find: jest.fn(),
   findOneAndUpdate: jest.fn(),
+  updateMany: jest.fn(),
 };
 jest.mock('../models/Vote', () => mockVoteModule);
 
@@ -100,6 +101,28 @@ describe('POST /api/votes', () => {
     mockVoteModule.findOneAndUpdate.mockRejectedValue(new Error('boom'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const res = await request(app).post('/api/votes').send({ choice: 'a' });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
+  });
+});
+
+describe('DELETE /api/votes', () => {
+  it('zeroes every count and returns the empty tally', async () => {
+    mockVoteModule.updateMany.mockResolvedValue({ modifiedCount: 4 });
+    mockDocs([
+      { choice: 'a', count: 0 },
+      { choice: 'b', count: 0 },
+    ]);
+    const res = await request(app).delete('/api/votes');
+    expect(res.status).toBe(200);
+    expect(mockVoteModule.updateMany).toHaveBeenCalledWith({}, { $set: { count: 0 } });
+    expect(res.body).toEqual({ counts: { a: 0, b: 0, c: 0, d: 0 }, total: 0 });
+  });
+
+  it('returns 500 when the model throws', async () => {
+    mockVoteModule.updateMany.mockRejectedValue(new Error('boom'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await request(app).delete('/api/votes');
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Internal server error' });
   });

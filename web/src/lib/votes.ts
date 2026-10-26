@@ -78,3 +78,7 @@ export async function castVote(choice: VoteChoiceId): Promise<VoteTally> {
     }),
   )
 }
+
+export async function resetVotes(): Promise<VoteTally> {
+  return parse(await fetch(`${API}/api/votes`, { method: 'DELETE' }))
+}

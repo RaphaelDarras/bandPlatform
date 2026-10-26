@@ -38,6 +38,7 @@ export const routes: RouteRecord[] = [
       // runtime data). No loader: nothing is baked into the static prerender.
       { path: 'beers', lazy: () => import('./pages/SecretResults') },
       { path: 'vote', lazy: () => import('./pages/SecretVote') },
+      { path: 'resetvotes', lazy: () => import('./pages/SecretReset') },
       { path: '*', lazy: () => import('./pages/NotFound') },
     ],
   },

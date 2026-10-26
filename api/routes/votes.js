@@ -49,4 +49,15 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Unauthenticated on purpose (owner's call): /resetvotes is a plain button.
+router.delete('/', async (req, res) => {
+  try {
+    await Vote.updateMany({}, { $set: { count: 0 } });
+    res.status(200).json(await readTally());
+  } catch (error) {
+    console.error('Error resetting votes:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
