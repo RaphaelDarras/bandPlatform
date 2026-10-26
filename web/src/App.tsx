@@ -34,6 +34,10 @@ export const routes: RouteRecord[] = [
       // success/cancel/paypal-return pages) are intentionally unmounted; their
       // page components remain in the tree but are now unreferenced dead code,
       // along with the /shop/(.*) vercel rewrite that used to front them.
+      // Intentionally unlinked secret pages (not in Header/Footer, noindex, live
+      // runtime data). No loader: nothing is baked into the static prerender.
+      { path: 'tireuse-h7q', lazy: () => import('./pages/SecretResults') },
+      { path: 'tireuse-h7q/vote', lazy: () => import('./pages/SecretVote') },
       { path: '*', lazy: () => import('./pages/NotFound') },
     ],
   },
