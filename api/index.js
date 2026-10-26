@@ -41,6 +41,7 @@ app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/concerts', require('./routes/concerts'));
 app.use('/api/sales', require('./routes/sales'));
 app.use('/api/shopify', require('./routes/shopify'));
+app.use('/api/votes', require('./routes/votes'));
 
 // Start server
 const PORT = process.env.PORT || 5000;
