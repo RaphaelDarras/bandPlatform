@@ -3,13 +3,12 @@ const API = import.meta.env.VITE_API_URL ?? 'https://hurakan-band-platform.onren
 // ============================================================================
 // EDIT THE 4 LABELS HERE — the only place labels live.
 // Do NOT change ids without changing api/utils/voteChoices.js.
-// (Labels below are PLACEHOLDERS.)
 // ============================================================================
 export const VOTE_CHOICES = [
-  { id: 'a', label: 'Choix 1' },
-  { id: 'b', label: 'Choix 2' },
-  { id: 'c', label: 'Choix 3' },
-  { id: 'd', label: 'Choix 4' },
+  { id: 'a', label: 'Imperial Stout' },
+  { id: 'b', label: 'Blanche blé noir' },
+  { id: 'c', label: 'Sour fruit noir' },
+  { id: 'd', label: 'Blonde aux piments' },
 ] as const
 
 export type VoteChoiceId = (typeof VOTE_CHOICES)[number]['id']
