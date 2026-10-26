@@ -36,8 +36,8 @@ export const routes: RouteRecord[] = [
       // along with the /shop/(.*) vercel rewrite that used to front them.
       // Intentionally unlinked secret pages (not in Header/Footer, noindex, live
       // runtime data). No loader: nothing is baked into the static prerender.
-      { path: 'tireuse-h7q', lazy: () => import('./pages/SecretResults') },
-      { path: 'tireuse-h7q/vote', lazy: () => import('./pages/SecretVote') },
+      { path: 'beers', lazy: () => import('./pages/SecretResults') },
+      { path: 'vote', lazy: () => import('./pages/SecretVote') },
       { path: '*', lazy: () => import('./pages/NotFound') },
     ],
   },
