@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Head } from 'vite-react-ssg'
-import { VOTE_CHOICES, VOTED_STORAGE_KEY, castVote, type VoteChoiceId } from '../lib/votes'
+import { VOTE_CHOICES, castVote, type VoteChoiceId } from '../lib/votes'
 
 export function Component() {
   const [selected, setSelected] = useState<VoteChoiceId | null>(null)
@@ -8,15 +8,11 @@ export function Component() {
   const [done, setDone] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // localStorage only inside an effect: the page is prerendered (SSG).
-  // The flag is a courtesy duplicate guard, not security.
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(VOTED_STORAGE_KEY)) setDone(true)
-    } catch {
-      // storage unavailable
-    }
-  }, [])
+  // Repeat voting is allowed on purpose: "Revoter" returns to the form.
+  function voteAgain() {
+    setSelected(null)
+    setDone(false)
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -25,11 +21,6 @@ export function Component() {
     setError(null)
     try {
       await castVote(selected)
-      try {
-        localStorage.setItem(VOTED_STORAGE_KEY, '1')
-      } catch {
-        // ignore
-      }
       setDone(true)
     } catch {
       setError("Le vote n'a pas pu être enregistré. Réessaie.")
@@ -45,9 +36,18 @@ export function Component() {
       </Head>
       <h1 className="type-h1">Vote</h1>
       {done ? (
-        <p className="type-body" role="status">
-          Merci pour ton vote !
-        </p>
+        <div className="flex flex-col items-center gap-6">
+          <p className="type-body" role="status">
+            Merci pour ton vote !
+          </p>
+          <button
+            type="button"
+            onClick={voteAgain}
+            className="type-label bg-[var(--color-accent)] px-6 py-4 text-[var(--color-on-accent)]"
+          >
+            Revoter
+          </button>
+        </div>
       ) : (
         <form onSubmit={onSubmit} className="flex w-full flex-col gap-6">
           <fieldset className="flex flex-col gap-3">

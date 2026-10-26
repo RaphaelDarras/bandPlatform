@@ -10,10 +10,9 @@ vi.mock('vite-react-ssg', () => ({
   Head: (props: { children?: React.ReactNode }) => <>{props.children}</>,
 }))
 
-import { castVote, VOTE_CHOICES, VOTED_STORAGE_KEY } from '../lib/votes'
+import { castVote, VOTE_CHOICES } from '../lib/votes'
 
 beforeEach(() => {
-  localStorage.clear()
   vi.mocked(castVote).mockReset()
 })
 
@@ -35,7 +34,6 @@ describe('SecretVote', () => {
     fireEvent.click(screen.getByRole('button', { name: /voter/i }))
     await waitFor(() => expect(screen.getByText(/merci/i)).toBeTruthy())
     expect(castVote).toHaveBeenCalledWith('b')
-    expect(localStorage.getItem(VOTED_STORAGE_KEY)).toBeTruthy()
   })
 
   it('shows an error and keeps the form on failure', async () => {
@@ -47,10 +45,17 @@ describe('SecretVote', () => {
     expect(screen.getByRole('button', { name: /voter/i })).toBeTruthy()
   })
 
-  it('shows the already-voted state from localStorage', async () => {
-    localStorage.setItem(VOTED_STORAGE_KEY, '1')
+  it('lets the user vote again after the thank-you', async () => {
+    vi.mocked(castVote).mockResolvedValue({ counts: { a: 1, b: 0, c: 0, d: 0 }, total: 1 })
     render(<SecretVote />)
-    await waitFor(() => expect(screen.getByText(/merci/i)).toBeTruthy())
-    expect(screen.queryByRole('button', { name: /voter/i })).toBeNull()
+    fireEvent.click(screen.getByLabelText(VOTE_CHOICES[0].label))
+    fireEvent.click(screen.getByRole('button', { name: /^voter$/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /revoter/i }))
+    const submit = screen.getByRole('button', { name: /^voter$/i }) as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    fireEvent.click(screen.getByLabelText(VOTE_CHOICES[2].label))
+    fireEvent.click(submit)
+    await waitFor(() => expect(castVote).toHaveBeenLastCalledWith('c'))
+    expect(castVote).toHaveBeenCalledTimes(2)
   })
 })

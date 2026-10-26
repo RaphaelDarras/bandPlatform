@@ -35,9 +35,6 @@ export interface VoteTally {
   total: number
 }
 
-// localStorage flag: courtesy duplicate guard, not security.
-export const VOTED_STORAGE_KEY = 'hurakan-vote-cast'
-
 // Max-relative scaling: with 4 choices a total-relative scale caps the leader
 // near 25-50%, so every bottle would look mostly empty. Max-relative makes the
 // leader a full bottle and the others read as "how close to the leader".
