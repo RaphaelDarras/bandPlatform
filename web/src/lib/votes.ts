@@ -1,14 +1,31 @@
 const API = import.meta.env.VITE_API_URL ?? 'https://hurakan-band-platform.onrender.com'
 
 // ============================================================================
-// EDIT THE 4 LABELS HERE — the only place labels live.
+// EDIT THE 4 LABELS AND DESCRIPTIONS HERE — the only place they live.
 // Do NOT change ids without changing api/utils/voteChoices.js.
 // ============================================================================
 export const VOTE_CHOICES = [
-  { id: 'a', label: 'Imperial Stout' },
-  { id: 'b', label: 'Blanche blé noir' },
-  { id: 'c', label: 'Sour fruit noir' },
-  { id: 'd', label: 'Blonde aux piments' },
+  {
+    id: 'a',
+    label: 'Imperial Stout',
+    description: "Sombre et forte, comme notre musique. Besoin de plus d'explications ?",
+  },
+  {
+    id: 'b',
+    label: 'Blanche au blé noir',
+    description: "On fait du slam mélodique, alors une blanche au blé noir, c'était logique.",
+  },
+  {
+    id: 'c',
+    label: 'Sour aux fruits noirs',
+    description:
+      "Parce qu'on n'est pas que des brutes. Acidulée, fruitée… mais noire quand même, faut pas déconner.",
+  },
+  {
+    id: 'd',
+    label: 'Blonde au piment',
+    description: 'Ça commence tout doux, ça finit en blast.',
+  },
 ] as const
 
 export type VoteChoiceId = (typeof VOTE_CHOICES)[number]['id']

@@ -49,6 +49,7 @@ export function Component() {
               <div key={c.id} className="flex flex-col items-center gap-3">
                 <BeerBottle fill={fills[c.id]} label={c.label} />
                 <h2 className="type-h3">{c.label}</h2>
+                <p className="type-body text-[var(--color-ink-dim)]">{c.description}</p>
                 <p className="font-display text-3xl">{tally.counts[c.id] ?? 0} votes</p>
               </div>
             ))}

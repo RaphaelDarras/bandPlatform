@@ -55,7 +55,7 @@ export function Component() {
             {VOTE_CHOICES.map((c) => (
               <label
                 key={c.id}
-                className={`type-h3 cursor-pointer border px-5 py-4 ${
+                className={`flex cursor-pointer flex-col gap-1 border px-5 py-4 ${
                   selected === c.id
                     ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]'
                     : 'border-[var(--color-hairline)]'
@@ -67,9 +67,16 @@ export function Component() {
                   value={c.id}
                   checked={selected === c.id}
                   onChange={() => setSelected(c.id)}
+                  aria-labelledby={`choice-${c.id}-name`}
+                  aria-describedby={`choice-${c.id}-desc`}
                   className="sr-only"
                 />
-                {c.label}
+                <span id={`choice-${c.id}-name`} className="type-h3">
+                  {c.label}
+                </span>
+                <span id={`choice-${c.id}-desc`} className="type-body">
+                  {c.description}
+                </span>
               </label>
             ))}
           </fieldset>

@@ -10,7 +10,7 @@ vi.mock('vite-react-ssg', () => ({
   Head: (props: { children?: React.ReactNode }) => <>{props.children}</>,
 }))
 
-import { fetchVotes } from '../lib/votes'
+import { VOTE_CHOICES, fetchVotes } from '../lib/votes'
 
 const tally = { counts: { a: 10, b: 5, c: 0, d: 2 }, total: 17 }
 
@@ -32,6 +32,7 @@ describe('SecretResults', () => {
     )
     expect(fills).toEqual(['1', '0.5', '0', '0.2'])
     expect(screen.getByText('10 votes')).toBeTruthy()
+    for (const c of VOTE_CHOICES) expect(screen.getByText(c.description)).toBeTruthy()
     expect(document.querySelector('meta[name="robots"][content="noindex"]')).not.toBeNull()
   })
 

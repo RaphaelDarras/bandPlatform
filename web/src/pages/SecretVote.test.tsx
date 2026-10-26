@@ -20,7 +20,10 @@ beforeEach(() => {
 describe('SecretVote', () => {
   it('renders choices, disabled submit, and noindex', () => {
     render(<SecretVote />)
-    for (const c of VOTE_CHOICES) expect(screen.getByLabelText(c.label)).toBeTruthy()
+    for (const c of VOTE_CHOICES) {
+      expect(screen.getByLabelText(c.label)).toBeTruthy()
+      expect(screen.getByText(c.description)).toBeTruthy()
+    }
     expect((screen.getByRole('button', { name: /voter/i }) as HTMLButtonElement).disabled).toBe(true)
     expect(document.querySelector('meta[name="robots"][content="noindex"]')).not.toBeNull()
   })
