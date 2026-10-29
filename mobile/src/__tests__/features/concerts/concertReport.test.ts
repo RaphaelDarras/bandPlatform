@@ -68,7 +68,7 @@ function buildSale(overrides: Record<string, unknown> = {}) {
     id: 'sale-1',
     concertId: 'concert-1',
     items_json: JSON.stringify([
-      { productId: 'prod-1', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
+      { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
     ]),
     totalAmount: 20,
     total_amount: 20,
@@ -85,30 +85,8 @@ function buildSale(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// Helper to build a CachedProduct
-function buildProduct(id: string, name: string, variants: Array<{ sku: string; label: string }>) {
-  return {
-    id,
-    name,
-    price: 10,
-    imageUrl: null,
-    active: 1,
-    updatedAt: Date.now(),
-    variants: variants.map((v) => ({ sku: v.sku, label: v.label, priceAdjustment: 0, stock: 10 })),
-  };
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetCachedProducts.mockResolvedValue([
-    buildProduct('prod-1', 'T-Shirt', [
-      { sku: 'SM', label: 'Small' },
-      { sku: 'LG', label: 'Large' },
-    ]),
-    buildProduct('prod-2', 'Hat', [
-      { sku: 'ONE', label: 'One Size' },
-    ]),
-  ]);
 });
 
 describe('getConcertReport', () => {
@@ -118,8 +96,8 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-1',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
-            { productId: 'prod-2', variantSku: 'ONE', quantity: 1, priceAtSale: 15 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/2', variantGid: 'gid://shopify/ProductVariant/ONE', productName: 'Hat', variantLabel: 'One Size', variantSku: 'ONE', quantity: 1, priceAtSale: 15 },
           ]),
           totalAmount: 35,
           total_amount: 35,
@@ -130,8 +108,8 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-2',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'SM', quantity: 1, priceAtSale: 10 },
-            { productId: 'prod-1', variantSku: 'LG', quantity: 3, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 1, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/LG', productName: 'T-Shirt', variantLabel: 'Large', variantSku: 'LG', quantity: 3, priceAtSale: 10 },
           ]),
           totalAmount: 40,
           total_amount: 40,
@@ -145,7 +123,7 @@ describe('getConcertReport', () => {
 
       // T-Shirt SM: 3 units sold, 30 EUR
       const smBreakdown = report.variantBreakdowns.find(
-        (v) => v.productId === 'prod-1' && v.variantSku === 'SM'
+        (v) => v.productId === 'gid://shopify/Product/1' && v.variantSku === 'SM'
       );
       expect(smBreakdown).toBeDefined();
       expect(smBreakdown?.quantitySold).toBe(3);
@@ -155,14 +133,14 @@ describe('getConcertReport', () => {
 
       // T-Shirt LG: 3 units sold, 30 EUR
       const lgBreakdown = report.variantBreakdowns.find(
-        (v) => v.productId === 'prod-1' && v.variantSku === 'LG'
+        (v) => v.productId === 'gid://shopify/Product/1' && v.variantSku === 'LG'
       );
       expect(lgBreakdown).toBeDefined();
       expect(lgBreakdown?.quantitySold).toBe(3);
 
       // Hat ONE: 1 unit, 15 EUR
       const hatBreakdown = report.variantBreakdowns.find(
-        (v) => v.productId === 'prod-2' && v.variantSku === 'ONE'
+        (v) => v.productId === 'gid://shopify/Product/2' && v.variantSku === 'ONE'
       );
       expect(hatBreakdown).toBeDefined();
       expect(hatBreakdown?.quantitySold).toBe(1);
@@ -174,8 +152,8 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-1',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'SM', quantity: 5, priceAtSale: 10 },
-            { productId: 'prod-2', variantSku: 'ONE', quantity: 1, priceAtSale: 15 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 5, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/2', variantGid: 'gid://shopify/ProductVariant/ONE', productName: 'Hat', variantLabel: 'One Size', variantSku: 'ONE', quantity: 1, priceAtSale: 15 },
           ]),
           totalAmount: 65,
           total_amount: 65,
@@ -196,7 +174,7 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-1',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
           ]),
           totalAmount: 20,
           total_amount: 20,
@@ -206,7 +184,7 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-2',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'LG', quantity: 1, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/LG', productName: 'T-Shirt', variantLabel: 'Large', variantSku: 'LG', quantity: 1, priceAtSale: 10 },
           ]),
           totalAmount: 10,
           total_amount: 10,
@@ -228,7 +206,7 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-active',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 2, priceAtSale: 10 },
           ]),
           totalAmount: 20,
           total_amount: 20,
@@ -239,7 +217,7 @@ describe('getConcertReport', () => {
         buildSale({
           id: 'sale-voided',
           items_json: JSON.stringify([
-            { productId: 'prod-1', variantSku: 'SM', quantity: 10, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/SM', productName: 'T-Shirt', variantLabel: 'Small', variantSku: 'SM', quantity: 10, priceAtSale: 10 },
           ]),
           totalAmount: 100,
           total_amount: 100,
@@ -252,7 +230,7 @@ describe('getConcertReport', () => {
       const report = await getConcertReport('concert-1');
 
       const smBreakdown = report.variantBreakdowns.find(
-        (v) => v.productId === 'prod-1' && v.variantSku === 'SM'
+        (v) => v.productId === 'gid://shopify/Product/1' && v.variantSku === 'SM'
       );
       expect(smBreakdown?.quantitySold).toBe(2); // not 12
       expect(report.transactionCount).toBe(1);
@@ -408,6 +386,31 @@ describe('getConcertReport', () => {
       for (let i = 0; i < revenues.length - 1; i++) {
         expect(revenues[i]).toBeGreaterThanOrEqual(revenues[i + 1]);
       }
+    });
+  });
+
+  describe('Snapshot-based names (D-02/D-21)', () => {
+    it('never reads the products cache', async () => {
+      mockGetLocalSales.mockResolvedValue([buildSale()] as never);
+      await getConcertReport('concert-1');
+      expect(mockGetCachedProducts).not.toHaveBeenCalled();
+    });
+
+    it('renders API-resolved names on a legacy line and falls back to SKU / Unknown item', async () => {
+      mockGetLocalSales.mockResolvedValue([
+        buildSale({
+          items_json: JSON.stringify([
+            { productId: 'legacy-1', productName: 'Old Shirt', variantLabel: 'XL', variantSku: 'OLD-XL', quantity: 1, priceAtSale: 10 },
+            { productId: 'legacy-2', variantSku: '', quantity: 1, priceAtSale: 10 },
+          ]),
+        }),
+      ] as never);
+      const report = await getConcertReport('concert-1');
+      const named = report.variantBreakdowns.find((v) => v.variantSku === 'OLD-XL');
+      expect(named?.productName).toBe('Old Shirt');
+      expect(named?.variantLabel).toBe('XL');
+      const unnamed = report.variantBreakdowns.find((v) => v.productId === 'legacy-2');
+      expect(unnamed?.productName).toBe('Unknown item');
     });
   });
 });

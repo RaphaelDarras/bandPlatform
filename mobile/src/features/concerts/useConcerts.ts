@@ -18,7 +18,6 @@ import {
   apiPatchConcert,
 } from '@/api/concerts';
 import { getLocalSales } from '@/db/sales';
-import { getCachedProducts } from '@/db/products';
 import type { LocalSaleItem } from '@/db/outbox';
 
 export interface ConcertTotals {
@@ -76,19 +75,6 @@ function toDisplayLabel(raw: string): string {
 export async function getConcertReport(concertId: string): Promise<ConcertReport> {
   const db = await getDb();
   const allSales = await getLocalSales(db, concertId);
-  const products = await getCachedProducts(db);
-
-  // Build product+variant lookup map
-  const productMap = new Map<string, { productName: string; variantLabel: string }>();
-  for (const product of products) {
-    for (const variant of product.variants) {
-      productMap.set(`${product.id}:${variant.sku}`, {
-        productName: product.name,
-        variantLabel: variant.label,
-      });
-    }
-  }
-
   // Split into voided and non-voided
   const nonVoided = allSales.filter((s) => !s.voided);
   const voided = allSales.filter((s) => s.voided);
@@ -122,8 +108,8 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
     const discountRatio = subtotal > 0 ? discountAmount / subtotal : 0;
 
     for (const item of items) {
-      const key = `${item.productId}:${item.variantSku}:${currency}`;
-      const lookup = productMap.get(`${item.productId}:${item.variantSku}`);
+      const lineKey = item.variantGid ?? item.productId ?? '';
+      const key = `${lineKey}:${item.variantSku}:${currency}`;
       const grossRevenue = item.priceAtSale * item.quantity;
       const netRevenue = grossRevenue * (1 - discountRatio);
       const existing = variantMap.get(key);
@@ -132,10 +118,10 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
         existing.revenue += netRevenue;
       } else {
         variantMap.set(key, {
-          productId: item.productId,
-          productName: lookup?.productName ?? item.productId,
+          productId: item.productGid ?? item.productId ?? '',
+          productName: item.productName || item.variantSku || 'Unknown item',
           variantSku: item.variantSku,
-          variantLabel: lookup?.variantLabel ?? item.variantSku,
+          variantLabel: item.variantLabel ?? item.variantSku ?? '',
           quantitySold: item.quantity,
           revenue: netRevenue,
           currency,

@@ -1,4 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
+import type { LocalSaleItem } from '@/db/outbox';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,12 +33,7 @@ function formatConcertDate(ts: number): string {
   });
 }
 
-type SaleItem = {
-  productId: string;
-  variantSku: string;
-  quantity: number;
-  priceAtSale: number;
-};
+type SaleItem = LocalSaleItem;
 
 interface SaleRowItem {
   id: string;
