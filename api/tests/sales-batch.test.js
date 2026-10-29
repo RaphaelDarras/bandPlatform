@@ -30,6 +30,7 @@ jest.mock('../models/Sale', () => mockSaleModule);
 const mockProductModule = {
   findOne: jest.fn(),
   findOneAndUpdate: jest.fn(),
+  find: jest.fn(),
 };
 jest.mock('../models/Product', () => mockProductModule);
 
@@ -177,10 +178,6 @@ describe('POST /api/sales/batch', () => {
 
     // No duplicates found
     mockSaleModule.findOne.mockResolvedValue(null);
-    // Product found with stock
-    mockProductModule.findOne.mockResolvedValue(mockProduct(10));
-    // Stock deducted
-    mockProductModule.findOneAndUpdate.mockResolvedValue(mockProduct(8));
     // Sale created
     mockSaleModule.create.mockResolvedValue(mockSaleDoc());
 
@@ -209,8 +206,6 @@ describe('POST /api/sales/batch', () => {
       .mockResolvedValueOnce(mockSaleDoc({ idempotencyKey: 'dup-2' }))
       .mockResolvedValueOnce(null);
 
-    mockProductModule.findOne.mockResolvedValue(mockProduct(10));
-    mockProductModule.findOneAndUpdate.mockResolvedValue(mockProduct(8));
     mockSaleModule.create.mockResolvedValue(mockSaleDoc({ idempotencyKey: 'key-new' }));
 
     const res = await request(app)
@@ -223,33 +218,22 @@ describe('POST /api/sales/batch', () => {
     expect(res.body.skipped).toBe(2);
   });
 
-  it('deducts stock atomically per item', async () => {
-    const sales = [makeSaleEntry({ idempotencyKey: 'key-atomic' })];
-
+  it('whitelists snapshot fields and never touches Product stock', async () => {
+    const sales = [makeSaleEntry({
+      idempotencyKey: 'key-new-shape',
+      items: [{
+        variantGid: 'gid://shopify/ProductVariant/1',
+        productGid: 'gid://shopify/Product/9',
+        productName: 'Tee',
+        variantLabel: 'M / Black',
+        variantSku: 'TEE-M',
+        quantity: 2,
+        priceAtSale: 20,
+        stockBefore: 99,
+        evil: { $gt: '' },
+      }],
+    })];
     mockSaleModule.findOne.mockResolvedValue(null);
-    mockProductModule.findOne.mockResolvedValue(mockProduct(10));
-    mockProductModule.findOneAndUpdate.mockResolvedValue(mockProduct(8));
-    mockSaleModule.create.mockResolvedValue(mockSaleDoc());
-
-    await request(app)
-      .post('/api/sales/batch')
-      .set('Authorization', AUTH_HEADER)
-      .send(sales);
-
-    expect(mockProductModule.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ 'variants.sku': 'S-BLK' }),
-      expect.objectContaining({ $inc: { 'variants.$.stock': -2 } }),
-      expect.objectContaining({ new: true })
-    );
-  });
-
-  it('allows stock to go negative (concert sales never rejected)', async () => {
-    const sales = [makeSaleEntry({ idempotencyKey: 'key-negative' })];
-
-    mockSaleModule.findOne.mockResolvedValue(null);
-    // Stock is 0 but still allows the sale
-    mockProductModule.findOne.mockResolvedValue(mockProduct(0));
-    mockProductModule.findOneAndUpdate.mockResolvedValue(mockProduct(-2));
     mockSaleModule.create.mockResolvedValue(mockSaleDoc());
 
     const res = await request(app)
@@ -258,7 +242,69 @@ describe('POST /api/sales/batch', () => {
       .send(sales);
 
     expect(res.status).toBe(201);
-    expect(res.body.created).toBe(1);
+    expect(mockSaleModule.create.mock.calls[0][0].items[0]).toEqual({
+      variantGid: 'gid://shopify/ProductVariant/1',
+      productGid: 'gid://shopify/Product/9',
+      productName: 'Tee',
+      variantLabel: 'M / Black',
+      variantSku: 'TEE-M',
+      quantity: 2,
+      priceAtSale: 20,
+    });
+    expect(mockProductModule.findOne).not.toHaveBeenCalled();
+    expect(mockProductModule.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('drops a malformed variantGid but still creates the sale', async () => {
+    const sales = [makeSaleEntry({
+      idempotencyKey: 'key-bad-gid',
+      items: [{ variantGid: 'not-a-gid', variantSku: 'X', quantity: 1, priceAtSale: 5 }],
+    })];
+    mockSaleModule.findOne.mockResolvedValue(null);
+    mockSaleModule.create.mockResolvedValue(mockSaleDoc());
+
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', AUTH_HEADER)
+      .send(sales);
+
+    expect(res.status).toBe(201);
+    expect(mockSaleModule.create.mock.calls[0][0].items[0]).not.toHaveProperty('variantGid');
+  });
+
+  it('returns 400 for quantity 0', async () => {
+    mockSaleModule.findOne.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', AUTH_HEADER)
+      .send([makeSaleEntry({ items: [{ variantSku: 'X', quantity: 0, priceAtSale: 5 }] })]);
+
+    expect(res.status).toBe(400);
+    expect(mockSaleModule.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for non-numeric priceAtSale', async () => {
+    mockSaleModule.findOne.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', AUTH_HEADER)
+      .send([makeSaleEntry({ items: [{ variantSku: 'X', quantity: 1, priceAtSale: 'abc' }] })]);
+
+    expect(res.status).toBe(400);
+    expect(res.body.index).toBe(0);
+  });
+
+  it('keeps a valid legacy productId on old-shape items', async () => {
+    mockSaleModule.findOne.mockResolvedValue(null);
+    mockSaleModule.create.mockResolvedValue(mockSaleDoc());
+
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', AUTH_HEADER)
+      .send([makeSaleEntry({ idempotencyKey: 'key-legacy' })]);
+
+    expect(res.status).toBe(201);
+    expect(mockSaleModule.create.mock.calls[0][0].items[0].productId).toBe('507f1f77bcf86cd799439012');
   });
 });
 
@@ -365,10 +411,9 @@ describe('POST /api/sales/:id/void', () => {
     expect(res.body.error).toMatch(/already voided/i);
   });
 
-  it('voids sale, reverses stock, and returns updated sale', async () => {
+  it('voids sale without touching Product stock', async () => {
     const sale = mockSaleDoc();
     mockSaleModule.findById.mockResolvedValue(sale);
-    mockProductModule.findOneAndUpdate.mockResolvedValue(mockProduct(12));
 
     const res = await request(app)
       .post('/api/sales/507f1f77bcf86cd799439099/void')
@@ -377,11 +422,7 @@ describe('POST /api/sales/:id/void', () => {
     expect(res.status).toBe(200);
     expect(sale.voidedAt).toBeTruthy();
     expect(sale.save).toHaveBeenCalled();
-    // Stock reversed: +2 (quantity)
-    expect(mockProductModule.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ 'variants.sku': 'S-BLK' }),
-      expect.objectContaining({ $inc: { 'variants.$.stock': 2 } })
-    );
+    expect(mockProductModule.findOneAndUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -425,10 +466,9 @@ describe('POST /api/sales/:id/unvoid', () => {
     expect(res.body.error).toMatch(/not voided/i);
   });
 
-  it('unvoids sale, re-deducts stock, and returns updated sale', async () => {
+  it('unvoids sale without touching Product stock', async () => {
     const voidedSale = mockSaleDoc({ voidedAt: new Date(), voidedBy: 'admin1' });
     mockSaleModule.findById.mockResolvedValue(voidedSale);
-    mockProductModule.findOneAndUpdate.mockResolvedValue(mockProduct(8));
 
     const res = await request(app)
       .post('/api/sales/507f1f77bcf86cd799439099/unvoid')
@@ -437,10 +477,6 @@ describe('POST /api/sales/:id/unvoid', () => {
     expect(res.status).toBe(200);
     expect(voidedSale.voidedAt).toBeUndefined();
     expect(voidedSale.save).toHaveBeenCalled();
-    // Stock re-deducted: -2 (quantity)
-    expect(mockProductModule.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ 'variants.sku': 'S-BLK' }),
-      expect.objectContaining({ $inc: { 'variants.$.stock': -2 } })
-    );
+    expect(mockProductModule.findOneAndUpdate).not.toHaveBeenCalled();
   });
 });

@@ -1,23 +1,66 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Product = require('../models/Product');
 const Sale = require('../models/Sale');
 const { authenticateToken } = require('../middleware/auth');
-// Outbound Shopify mirror (07-07): this POS path is the DOMINANT stock-changing
-// event (D-01 criterion 3), not inventory.js. Pushes are best-effort,
-// config-guarded, fire-and-forget — they must NEVER change the batch/void/unvoid
-// response, idempotency-skip behaviour, or the "stock can go negative — concert
-// sales never rejected" contract. No-ops when Shopify is unconfigured.
-const shopifyOutbound = require('../services/shopifyOutbound');
 
 // All routes require authentication
 router.use(authenticateToken);
+
+const VARIANT_GID_RE = /^gid:\/\/shopify\/ProductVariant\/\d+$/;
+const PRODUCT_GID_RE = /^gid:\/\/shopify\/Product\/\d+$/;
+
+/**
+ * Whitelist + validate one sale line (T-07.1-01). Typed copies only; unknown
+ * keys are dropped (mass-assignment guard).
+ * @returns {{ ok: true, value: object } | { ok: false, error: string }}
+ */
+function sanitizeSaleItem(item) {
+  if (!item || typeof item !== 'object') return { ok: false, error: 'Invalid item' };
+
+  const { quantity, priceAtSale } = item;
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    return { ok: false, error: 'Invalid quantity' };
+  }
+  if (typeof priceAtSale !== 'number' || !Number.isFinite(priceAtSale) || priceAtSale < 0) {
+    return { ok: false, error: 'Invalid priceAtSale' };
+  }
+
+  const value = {
+    variantSku: String(item.variantSku ?? '').slice(0, 200),
+    quantity,
+    priceAtSale,
+  };
+
+  if (typeof item.productName === 'string') value.productName = item.productName.trim().slice(0, 200);
+  if (typeof item.variantLabel === 'string') value.variantLabel = item.variantLabel.trim().slice(0, 200);
+  if (typeof item.variantGid === 'string' && VARIANT_GID_RE.test(item.variantGid)) {
+    value.variantGid = item.variantGid;
+  }
+  if (typeof item.productGid === 'string' && PRODUCT_GID_RE.test(item.productGid)) {
+    value.productGid = item.productGid;
+  }
+  if (
+    Number.isInteger(item.appliedDelta) &&
+    item.appliedDelta <= 0 &&
+    item.appliedDelta >= -quantity
+  ) {
+    value.appliedDelta = item.appliedDelta;
+  }
+  // Legacy lines from old APKs only
+  if (item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
+    value.productId = item.productId;
+  }
+
+  return { ok: true, value };
+}
 
 /**
  * POST /api/sales/batch
  * Submit a batch of offline sales with idempotency key deduplication.
  * Duplicates (matching idempotencyKey) are silently skipped.
- * Stock can go negative — concert sales are never rejected.
+ * Stock lives in Shopify (07.1); this route records sales only and never adjusts stock.
  */
 router.post('/batch', async (req, res) => {
   try {
@@ -44,42 +87,15 @@ router.post('/batch', async (req, res) => {
         }
       }
 
-      // For each item, read stockBefore and atomically deduct stock
+      // Validate + whitelist every line before creating anything
       const resolvedItems = [];
-      for (const item of items) {
-        const { productId, variantSku, quantity, priceAtSale } = item;
-
-        // Read current stock (stockBefore)
-        const product = await Product.findOne({ 'variants.sku': variantSku });
-        const variant = product
-          ? product.variants.find(v => v.sku === variantSku)
-          : null;
-        const stockBefore = variant ? variant.stock : 0;
-
-        // Atomically deduct stock — concert sales never rejected (stock can go negative)
-        const updatedProduct = await Product.findOneAndUpdate(
-          { _id: productId, 'variants.sku': variantSku },
-          { $inc: { 'variants.$.stock': -quantity } },
-          { new: true }
-        );
-
-        const updatedVariant = updatedProduct
-          ? updatedProduct.variants.find(v => v.sku === variantSku)
-          : null;
-        const stockAfter = updatedVariant ? updatedVariant.stock : stockBefore - quantity;
-
-        resolvedItems.push({
-          productId,
-          variantSku,
-          quantity,
-          priceAtSale,
-          stockBefore,
-          stockAfter,
-        });
-
-        // Mirror the new absolute count for this changed variant to Shopify
-        // (fire-and-forget, D-06) — fired once per deducted line item.
-        shopifyOutbound.syncInventoryOut(productId, variantSku).catch(() => {});
+      const rawItems = Array.isArray(items) ? items : [];
+      for (let index = 0; index < rawItems.length; index++) {
+        const result = sanitizeSaleItem(rawItems[index]);
+        if (!result.ok) {
+          return res.status(400).json({ error: 'Invalid sale item', index });
+        }
+        resolvedItems.push(result.value);
       }
 
       // Normalise paymentMethod to backend enum
@@ -161,7 +177,8 @@ router.get('/', async (req, res) => {
 
 /**
  * POST /api/sales/:id/void
- * Void a sale: sets voidedAt and voidedBy, reverses stock.
+ * Void a sale: sets voidedAt and voidedBy (flag only — stock is mirrored to
+ * Shopify by the mobile outbox, D-13).
  */
 router.post('/:id/void', async (req, res) => {
   try {
@@ -178,17 +195,6 @@ router.post('/:id/void', async (req, res) => {
       return res.status(400).json({ error: 'Sale already voided' });
     }
 
-    // Reverse stock for each item
-    for (const item of sale.items) {
-      await Product.findOneAndUpdate(
-        { _id: item.productId, 'variants.sku': item.variantSku },
-        { $inc: { 'variants.$.stock': item.quantity } }
-      );
-
-      // Mirror the restored absolute count to Shopify (fire-and-forget, D-06).
-      shopifyOutbound.syncInventoryOut(item.productId, item.variantSku).catch(() => {});
-    }
-
     sale.voidedAt = new Date();
     sale.voidedBy = req.user.userId;
     await sale.save();
@@ -202,7 +208,8 @@ router.post('/:id/void', async (req, res) => {
 
 /**
  * POST /api/sales/:id/unvoid
- * Unvoid a sale: clears voidedAt and voidedBy, re-deducts stock.
+ * Unvoid a sale: clears voidedAt and voidedBy (flag only — stock is mirrored to
+ * Shopify by the mobile outbox, D-13).
  */
 router.post('/:id/unvoid', async (req, res) => {
   try {
@@ -219,17 +226,6 @@ router.post('/:id/unvoid', async (req, res) => {
       return res.status(400).json({ error: 'Sale is not voided' });
     }
 
-    // Re-deduct stock for each item
-    for (const item of sale.items) {
-      await Product.findOneAndUpdate(
-        { _id: item.productId, 'variants.sku': item.variantSku },
-        { $inc: { 'variants.$.stock': -item.quantity } }
-      );
-
-      // Mirror the re-deducted absolute count to Shopify (fire-and-forget, D-06).
-      shopifyOutbound.syncInventoryOut(item.productId, item.variantSku).catch(() => {});
-    }
-
     sale.voidedAt = undefined;
     sale.voidedBy = undefined;
     await sale.save();
@@ -242,3 +238,4 @@ router.post('/:id/unvoid', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.sanitizeSaleItem = sanitizeSaleItem;
