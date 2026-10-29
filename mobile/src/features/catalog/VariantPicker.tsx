@@ -28,7 +28,8 @@ export function VariantPicker({ product, onClose }: Props) {
   const handleVariantPress = (variant: ProductVariant) => {
     const origPrice = (product as CachedProduct & { originalPrice?: number }).originalPrice ?? product.price;
     addItem({
-      productId: product.id,
+      productGid: product.id,
+      variantGid: variant.variantGid,
       variantSku: variant.sku,
       productName: product.name,
       variantLabel: variant.label,

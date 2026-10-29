@@ -98,28 +98,28 @@ beforeEach(() => {
 });
 
 const makeProduct = (overrides: Partial<CachedProduct> = {}): CachedProduct => ({
-  id: 'prod-1',
+  id: 'gid://shopify/Product/1',
   name: 'Band T-Shirt',
   price: 25.0,
   imageUrl: null,
   active: 1,
   updatedAt: Date.now(),
   variants: [
-    { sku: 'TSHIRT-S', label: 'S', priceAdjustment: 0, stock: 3 },
-    { sku: 'TSHIRT-M', label: 'M', priceAdjustment: 0, stock: 12 },
-    { sku: 'TSHIRT-XL', label: 'XL', priceAdjustment: 0, stock: 0 },
+    { variantGid: 'gid://shopify/ProductVariant/TSHIRT-S', sku: 'TSHIRT-S', label: 'S', priceAdjustment: 0, stock: 3 },
+    { variantGid: 'gid://shopify/ProductVariant/TSHIRT-M', sku: 'TSHIRT-M', label: 'M', priceAdjustment: 0, stock: 12 },
+    { variantGid: 'gid://shopify/ProductVariant/TSHIRT-XL', sku: 'TSHIRT-XL', label: 'XL', priceAdjustment: 0, stock: 0 },
   ],
   ...overrides,
 });
 
 const makeSingleVariantProduct = (): CachedProduct => ({
-  id: 'prod-2',
+  id: 'gid://shopify/Product/2',
   name: 'Sticker Pack',
   price: 5.0,
   imageUrl: null,
   active: 1,
   updatedAt: Date.now(),
-  variants: [{ sku: 'STICKER-1', label: 'Default', priceAdjustment: 0, stock: 20 }],
+  variants: [{ variantGid: 'gid://shopify/ProductVariant/STICKER-1', sku: 'STICKER-1', label: 'Default', priceAdjustment: 0, stock: 20 }],
 });
 
 describe('ProductGrid', () => {
@@ -168,6 +168,9 @@ describe('ProductTile', () => {
     const items = useCartStore.getState().items;
     expect(items).toHaveLength(1);
     expect(items[0].variantSku).toBe('STICKER-1');
+    expect(items[0].variantGid).toBe('gid://shopify/ProductVariant/STICKER-1');
+    expect(items[0].productGid).toBe('gid://shopify/Product/2');
+    expect(items[0].variantLabel).toBe('Default');
     expect(items[0].productName).toBe('Sticker Pack');
   });
 
@@ -203,6 +206,7 @@ describe('ProductTile', () => {
     const items = useCartStore.getState().items;
     expect(items).toHaveLength(1);
     expect(items[0].variantSku).toBe('TSHIRT-S');
+    expect(items[0].variantGid).toBe('gid://shopify/ProductVariant/TSHIRT-S');
     expect(items[0].priceAtSale).toBe(25.0);
   });
 

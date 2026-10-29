@@ -10,7 +10,8 @@ const mmkvStorage = {
 };
 
 export interface CartItem {
-  productId: string;
+  productGid: string;
+  variantGid: string;
   variantSku: string;
   productName: string;
   variantLabel: string;
@@ -26,8 +27,8 @@ interface CartStore {
   discount: number;
   discountType: 'flat' | 'percent';
   addItem: (item: CartItem) => void;
-  removeItem: (productId: string, sku: string) => void;
-  updateQuantity: (productId: string, sku: string, quantity: number) => void;
+  removeItem: (variantGid: string) => void;
+  updateQuantity: (variantGid: string, quantity: number) => void;
   clearCart: () => void;
   setConcertId: (id: string | null) => void;
   setCurrency: (currency: string) => void;
@@ -46,12 +47,11 @@ export const useCartStore = create<CartStore>()(
 
       addItem: (item) =>
         set((s) => {
-          const key = `${item.productId}:${item.variantSku}`;
-          const existing = s.items.find((i) => `${i.productId}:${i.variantSku}` === key);
+          const existing = s.items.find((i) => i.variantGid === item.variantGid);
           if (existing) {
             return {
               items: s.items.map((i) =>
-                `${i.productId}:${i.variantSku}` === key
+                i.variantGid === item.variantGid
                   ? { ...i, quantity: i.quantity + item.quantity }
                   : i
               ),
@@ -60,14 +60,12 @@ export const useCartStore = create<CartStore>()(
           return { items: [...s.items, item] };
         }),
 
-      removeItem: (productId, sku) =>
-        set((s) => ({ items: s.items.filter((i) => !(i.productId === productId && i.variantSku === sku)) })),
+      removeItem: (variantGid) =>
+        set((s) => ({ items: s.items.filter((i) => i.variantGid !== variantGid) })),
 
-      updateQuantity: (productId, sku, quantity) =>
+      updateQuantity: (variantGid, quantity) =>
         set((s) => ({
-          items: s.items.map((i) =>
-            i.productId === productId && i.variantSku === sku ? { ...i, quantity } : i
-          ),
+          items: s.items.map((i) => (i.variantGid === variantGid ? { ...i, quantity } : i)),
         })),
 
       clearCart: () => set({ items: [], discount: 0, discountType: 'flat' }),
@@ -94,15 +92,17 @@ export const useCartStore = create<CartStore>()(
       storage: createJSONStorage(() => mmkvStorage),
       merge: (persisted, current) => {
         const state = persisted as Partial<CartStore>;
-        const rawItems: CartItem[] = state.items ?? [];
+        // pre-07.1 carts hold Mongo ids (no variantGid); discard
+        const rawItems: CartItem[] = (state.items ?? []).filter(
+          (item) => typeof (item as Partial<CartItem>).variantGid === 'string'
+        );
         const deduped = rawItems.reduce<CartItem[]>((acc, item) => {
-          const key = `${item.productId}:${item.variantSku}`;
-          const existing = acc.find((i) => `${i.productId}:${i.variantSku}` === key);
+          const existing = acc.find((i) => i.variantGid === item.variantGid);
           if (existing) {
             existing.quantity += item.quantity;
             return acc;
           }
-          return [...acc, item];
+          return [...acc, { ...item }];
         }, []);
         return { ...current, ...state, items: deduped };
       },

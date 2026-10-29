@@ -1,7 +1,7 @@
 import { useCartStore } from '@/stores/cartStore';
 
-const item1 = { productId: 'p1', variantSku: 'p1-m', productName: 'T-Shirt', variantLabel: 'M', quantity: 1, priceAtSale: 20, originalPrice: 20 };
-const item2 = { productId: 'p2', variantSku: 'p2-l', productName: 'Cap', variantLabel: 'L', quantity: 2, priceAtSale: 10, originalPrice: 10 };
+const item1 = { productGid: 'gid://shopify/Product/1', variantGid: 'V1', variantSku: 'p1-m', productName: 'T-Shirt', variantLabel: 'M', quantity: 1, priceAtSale: 20, originalPrice: 20 };
+const item2 = { productGid: 'gid://shopify/Product/2', variantGid: 'V2', variantSku: 'p2-l', productName: 'Cap', variantLabel: 'L', quantity: 2, priceAtSale: 10, originalPrice: 10 };
 
 beforeEach(() => {
   useCartStore.getState().clearCart();
@@ -22,11 +22,35 @@ describe('cartStore - addItem', () => {
   });
 });
 
+describe('cartStore - variantGid keying', () => {
+  it('merges quantities for the same variantGid', () => {
+    useCartStore.getState().addItem(item1);
+    useCartStore.getState().addItem({ ...item1, quantity: 2 });
+    expect(useCartStore.getState().items).toHaveLength(1);
+    expect(useCartStore.getState().items[0].quantity).toBe(3);
+  });
+
+  it('keeps different variantGids with the same empty SKU separate', () => {
+    useCartStore.getState().addItem({ ...item1, variantSku: '', variantGid: 'V1' });
+    useCartStore.getState().addItem({ ...item2, variantSku: '', variantGid: 'V2' });
+    expect(useCartStore.getState().items).toHaveLength(2);
+  });
+
+  it('persist merge drops legacy items lacking variantGid and dedupes GID items', () => {
+    const merge = (useCartStore as any).persist.getOptions().merge;
+    const legacy = { productId: 'mongo', variantSku: 'x', productName: 'Old', variantLabel: 'M', quantity: 1, priceAtSale: 1, originalPrice: 1 };
+    const merged = merge({ items: [legacy, item1, { ...item1, quantity: 2 }] }, useCartStore.getState());
+    expect(merged.items).toHaveLength(1);
+    expect(merged.items[0].variantGid).toBe('V1');
+    expect(merged.items[0].quantity).toBe(3);
+  });
+});
+
 describe('cartStore - removeItem', () => {
-  it('removes item by variantSku', () => {
+  it('removes item by variantGid', () => {
     useCartStore.getState().addItem(item1);
     useCartStore.getState().addItem(item2);
-    useCartStore.getState().removeItem('p1', 'p1-m');
+    useCartStore.getState().removeItem('V1');
     expect(useCartStore.getState().items).toHaveLength(1);
     expect(useCartStore.getState().items[0].variantSku).toBe('p2-l');
   });
@@ -35,7 +59,7 @@ describe('cartStore - removeItem', () => {
 describe('cartStore - updateQuantity', () => {
   it('updates quantity for specific item', () => {
     useCartStore.getState().addItem(item1);
-    useCartStore.getState().updateQuantity('p1', 'p1-m', 3);
+    useCartStore.getState().updateQuantity('V1', 3);
     expect(useCartStore.getState().items[0].quantity).toBe(3);
   });
 });

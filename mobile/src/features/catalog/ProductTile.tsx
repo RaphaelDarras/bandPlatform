@@ -33,7 +33,8 @@ export function ProductTile({ product }: Props) {
       const variant = product.variants[0];
       const origPrice = (product as CachedProduct & { originalPrice?: number }).originalPrice ?? product.price;
       addItem({
-        productId: product.id,
+        productGid: product.id,
+        variantGid: variant.variantGid,
         variantSku: variant.sku,
         productName: product.name,
         variantLabel: variant.label,

@@ -171,7 +171,7 @@ export default function ReviewScreen() {
           <View style={[styles.section, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
             <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>Items</Text>
             {items.map((item) => (
-              <View key={`${item.productId}:${item.variantSku}`} style={styles.itemRow}>
+              <View key={item.variantGid} style={styles.itemRow}>
                 <View style={styles.itemInfo}>
                   <Text style={[styles.itemName, { color: c.text }]}>{item.productName}</Text>
                   <Text style={[styles.itemVariant, { color: c.textSecondary }]}>

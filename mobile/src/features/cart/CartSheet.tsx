@@ -55,7 +55,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
 
         <ScrollView style={styles.itemList} showsVerticalScrollIndicator={false}>
           {items.map((item) => (
-            <View key={`${item.productId}:${item.variantSku}`} style={[styles.itemRow, { borderBottomColor: c.border }]} testID="cart-item">
+            <View key={item.variantGid} style={[styles.itemRow, { borderBottomColor: c.border }]} testID="cart-item">
               <View style={styles.itemInfo}>
                 <Text style={[styles.itemName, { color: c.text }]} numberOfLines={1}>
                   {item.productName}
@@ -68,8 +68,8 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
                   style={[styles.qtyBtn, { backgroundColor: c.backgroundElement }]}
                   onPress={() =>
                     item.quantity > 1
-                      ? updateQuantity(item.productId, item.variantSku, item.quantity - 1)
-                      : removeItem(item.productId, item.variantSku)
+                      ? updateQuantity(item.variantGid, item.quantity - 1)
+                      : removeItem(item.variantGid)
                   }
                   accessibilityLabel={`Decrease ${item.productName}`}
                 >
@@ -80,7 +80,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
 
                 <Pressable
                   style={[styles.qtyBtn, { backgroundColor: c.backgroundElement }]}
-                  onPress={() => updateQuantity(item.productId, item.variantSku, item.quantity + 1)}
+                  onPress={() => updateQuantity(item.variantGid, item.quantity + 1)}
                   accessibilityLabel={`Increase ${item.productName}`}
                 >
                   <Text style={[styles.qtyBtnText, { color: c.text }]}>{'+'}</Text>
@@ -93,7 +93,7 @@ export const CartSheet = forwardRef<CartSheetHandle>((_, ref) => {
 
               <Pressable
                 style={styles.removeBtn}
-                onPress={() => removeItem(item.productId, item.variantSku)}
+                onPress={() => removeItem(item.variantGid)}
                 accessibilityLabel={`Remove ${item.productName}`}
               >
                 <Text style={styles.removeBtnText}>{'✕'}</Text>
