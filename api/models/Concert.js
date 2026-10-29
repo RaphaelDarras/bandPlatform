@@ -26,7 +26,9 @@ const ConcertSchema = new mongoose.Schema({
     trim: true
   },
   priceOverrides: [{
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    // Shopify product GID (07.1). Pre-07.1 docs held Mongo Product ObjectIds;
+    // re-keyed by scripts/migratePriceOverridesToShopify.js
+    productId: { type: String, trim: true, required: true },
     price: { type: Number, required: true },
   }],
   active: {
