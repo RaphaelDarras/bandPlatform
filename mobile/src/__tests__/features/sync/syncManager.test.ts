@@ -357,7 +357,7 @@ describe('requestSync — shopify_stock and sale_applied', () => {
     });
     mockGetPendingOutboxRows.mockResolvedValue([stockRow('s1', 1), stockRow('s2', 2)]);
     const p = requestSync(mockDb as never, mockApiClient as never);
-    await new Promise((r) => setImmediate(r));
+    await new Promise<void>((r) => setImmediate(() => r()));
     expect(order).toEqual(['start:s1']);
     release();
     await p;
