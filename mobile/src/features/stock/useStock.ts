@@ -1,111 +1,34 @@
 /**
  * useStock — manages stock overview, cache refresh, and restock operations.
  *
- * Online: fetches from API and upserts to local SQLite cache.
- * Offline: reads from local SQLite cache only.
+ * Refresh: reads ACTIVE products from Shopify via refreshCatalogue (D-20) and
+ * falls back to the local SQLite cache when offline.
+ * Restock = Shopify +/- delta via the shopify_stock outbox, D-19 (works offline,
+ * applied on next sync).
  */
 import { useState, useCallback } from 'react';
 
 import { getDb } from '@/db';
-import {
-  getCachedProducts,
-  upsertProducts,
-  reconcileActiveProducts,
-  type CachedProduct,
-} from '@/db/products';
-import { getPendingOutboxRows } from '@/db/outbox';
-import { apiGetStock, apiRestock } from '@/api/inventory';
-import { apiGetProducts } from '@/api/products';
-import { useAuthStore } from '@/stores/authStore';
+import { getCachedProducts, updateLocalStock, type CachedProduct } from '@/db/products';
+import { insertOutboxEntries } from '@/db/outbox';
+import { buildRestockEntry } from '@/db/stockOps';
+import { refreshCatalogue } from '@/features/stock/catalogue';
+import { requestSync } from '@/features/sync/SyncManager';
+import { apiClient } from '@/api/client';
 
 export function useStock() {
   const [products, setProducts] = useState<CachedProduct[]>([]);
   const [loading, setLoading] = useState(false);
 
   /**
-   * Refreshes the stock list.
-   * Always attempts an API fetch first; falls back to SQLite cache on network failure.
+   * Refreshes the stock list from Shopify; SQLite cache is the final source
+   * for the UI (offline fallback).
    */
   const refreshStock = useCallback(async () => {
     setLoading(true);
     const db = await getDb();
-    try {
-      if (!useAuthStore.getState().token) throw new Error('not authenticated');
-      const [stockProducts, priceProducts] = await Promise.all([
-        apiGetStock(),
-        apiGetProducts(),
-      ]);
+    await refreshCatalogue(db);
 
-      // Build a per-variant delta from pending (unsynced) outbox rows.
-      // sale_create: deducted locally but backend doesn't know yet → subtract
-      // sale_void: reversed locally but backend doesn't know yet → add back
-      // sale_unvoid: re-deducted locally but backend doesn't know yet → subtract
-      const pendingRows = await getPendingOutboxRows(db);
-      const pendingDelta = new Map<string, number>();
-      for (const row of pendingRows) {
-        if (row.type === 'sale_create') {
-          const payload = JSON.parse(row.payload) as {
-            items: Array<{ productId: string; variantSku: string; quantity: number }>;
-          };
-          for (const item of payload.items) {
-            const key = `${item.productId}:${item.variantSku}`;
-            pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
-          }
-        } else if (row.type === 'sale_void') {
-          const payload = JSON.parse(row.payload) as {
-            items?: Array<{ productId: string; variantSku: string; quantity: number }>;
-          };
-          if (payload.items) {
-            for (const item of payload.items) {
-              const key = `${item.productId}:${item.variantSku}`;
-              pendingDelta.set(key, (pendingDelta.get(key) ?? 0) - item.quantity);
-            }
-          }
-        } else if (row.type === 'sale_unvoid') {
-          const payload = JSON.parse(row.payload) as {
-            items?: Array<{ productId: string; variantSku: string; quantity: number }>;
-          };
-          if (payload.items) {
-            for (const item of payload.items) {
-              const key = `${item.productId}:${item.variantSku}`;
-              pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
-            }
-          }
-        }
-      }
-
-      // Baseline = API stock (reflects all synced sales + restocks).
-      // Subtract only what the backend doesn't know about yet.
-      const priceProductMap = new Map(priceProducts.map((p) => [p.id, p]));
-      const merged = stockProducts.map((p) => {
-        const apiProd = priceProductMap.get(p.id);
-        const adjMap = new Map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (apiProd?.variants ?? []).map((v: any) => [v.sku, v.priceAdjustment ?? 0])
-        );
-        return {
-          ...p,
-          price: apiProd?.price ?? 0,
-          variants: p.variants.map((v) => ({
-            ...v,
-            priceAdjustment: adjMap.get(v.sku) ?? 0,
-            stock: v.stock - (pendingDelta.get(`${p.id}:${v.sku}`) ?? 0),
-          })),
-        };
-      });
-      if (merged.length > 0) {
-        await upsertProducts(db, merged);
-      }
-      // Reconcile against the authoritative active set: products deactivated or
-      // deleted on the server drop out of `stockProducts` (an active-only feed),
-      // so mark any such cached row inactive to remove it from the POS. Reached
-      // only on a successful fetch — the catch below owns the offline path.
-      await reconcileActiveProducts(db, stockProducts.map((p) => p.id));
-    } catch (err: unknown) {
-      console.error('[useStock] API fetch failed:', err instanceof Error ? err.message : String(err));
-    }
-
-    // Always read from SQLite as the final source of truth for the UI
     try {
       const cached = await getCachedProducts(db);
       setProducts(cached);
@@ -117,28 +40,26 @@ export function useStock() {
   }, []);
 
   /**
-   * Restocks a product variant via the API, then refreshes local cache.
-   * Requires internet connection.
+   * Queues a Shopify stock adjustment (positive restock or negative correction),
+   * updates the local cache optimistically and kicks the sync.
    */
   const restock = useCallback(
-    async (
-      productId: string,
-      variantSku: string,
-      quantity: number,
-      reason: string
-    ): Promise<void> => {
-      await apiRestock(productId, variantSku, quantity, reason);
+    async (variantGid: string, delta: number, note: string): Promise<void> => {
+      if (delta === 0) return;
+      const db = await getDb();
+      const entry = buildRestockEntry(variantGid, delta, note, Date.now());
+      await insertOutboxEntries(db, [entry]);
+
+      const cached = await getCachedProducts(db);
+      const product = cached.find((p) => p.variants.some((v) => v.variantGid === variantGid));
+      if (product) {
+        await updateLocalStock(db, product.id, variantGid, delta);
+      }
+
+      void requestSync(db, apiClient);
       await refreshStock();
     },
     [refreshStock]
-  );
-
-  /**
-   * Products with at least one variant having stock < 0.
-   * These need to be reproduced/reordered.
-   */
-  const needsReproduction = products.filter((product) =>
-    product.variants.some((v) => v.stock <= 0)
   );
 
   return {
@@ -146,6 +67,5 @@ export function useStock() {
     loading,
     refreshStock,
     restock,
-    needsReproduction,
   };
 }
