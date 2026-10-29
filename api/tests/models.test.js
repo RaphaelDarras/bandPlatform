@@ -114,6 +114,65 @@ describe('Sale model - extended fields', () => {
   });
 });
 
+describe('Sale model - 07.1 snapshot lines', () => {
+  let Sale;
+
+  beforeAll(() => {
+    Sale = require('../models/Sale');
+  });
+
+  const newItem = (extra = {}) => ({
+    variantGid: 'gid://shopify/ProductVariant/1',
+    productGid: 'gid://shopify/Product/9',
+    productName: 'Tee',
+    variantLabel: 'M / Black',
+    variantSku: 'TEE-M',
+    quantity: 2,
+    priceAtSale: 20,
+    ...extra,
+  });
+
+  it('saves a new-shape line without productId/stockBefore/stockAfter', async () => {
+    const sale = await Sale.create({ items: [newItem()], totalAmount: 40 });
+    expect(sale.items[0].variantGid).toBe('gid://shopify/ProductVariant/1');
+    expect(sale.items[0].productId).toBeUndefined();
+    expect(sale.items[0].stockBefore).toBeUndefined();
+  });
+
+  it('stores appliedDelta -1', async () => {
+    const sale = await Sale.create({ items: [newItem({ appliedDelta: -1 })], totalAmount: 40 });
+    const found = await Sale.findById(sale._id).lean();
+    expect(found.items[0].appliedDelta).toBe(-1);
+  });
+
+  it('rejects appliedDelta 1', async () => {
+    await expect(
+      Sale.create({ items: [newItem({ appliedDelta: 1 })], totalAmount: 40 })
+    ).rejects.toThrow();
+  });
+
+  it('still saves an old-shape line', async () => {
+    const sale = await Sale.create({
+      items: [{
+        productId: new mongoose.Types.ObjectId(),
+        variantSku: 'S-BLK',
+        quantity: 1,
+        priceAtSale: 25,
+        stockBefore: 5,
+        stockAfter: 4,
+      }],
+      totalAmount: 25,
+    });
+    expect(sale.items[0].stockAfter).toBe(4);
+  });
+
+  it('rejects quantity 0', async () => {
+    await expect(
+      Sale.create({ items: [newItem({ quantity: 0 })], totalAmount: 0 })
+    ).rejects.toThrow();
+  });
+});
+
 // ---- Product model ----
 
 describe('Product model - JSON serialization', () => {

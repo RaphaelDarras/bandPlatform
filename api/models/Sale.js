@@ -1,14 +1,25 @@
 const mongoose = require('mongoose');
 
+// New lines (07.1) carry Shopify GIDs + a snapshot (name, label, SKU, price).
+// productId/stockBefore/stockAfter exist only on archived pre-07.1 lines.
+// appliedDelta is the net stock delta Shopify actually applied for the line (<= 0).
 const SaleItemSchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: true
+    required: false
   },
+  productGid: { type: String, trim: true },
+  variantGid: { type: String, trim: true },
+  productName: { type: String, trim: true },
+  variantLabel: { type: String, trim: true },
   variantSku: {
     type: String,
-    required: true
+    default: ''
+  },
+  appliedDelta: {
+    type: Number,
+    max: 0
   },
   quantity: {
     type: Number,
@@ -20,12 +31,10 @@ const SaleItemSchema = new mongoose.Schema({
     required: true
   },
   stockBefore: {
-    type: Number,
-    required: true
+    type: Number
   },
   stockAfter: {
-    type: Number,
-    required: true
+    type: Number
   }
 }, { _id: false });
 
