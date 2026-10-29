@@ -110,7 +110,7 @@ describe('gql', () => {
       .mockResolvedValueOnce(res(401))
       .mockResolvedValueOnce(tokenRes())
       .mockResolvedValueOnce(res(401));
-    const err = await gql('q', {}).catch((e: any) => e);
+    const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.kind).toBe('http');
     expect(err.status).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(4);
@@ -118,13 +118,13 @@ describe('gql', () => {
 
   it.each([429, 503])('marks %i retryable', async (status) => {
     fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(res(status));
-    const err = await gql('q', {}).catch((e: any) => e);
+    const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.retryable).toBe(true);
   });
 
   it('marks 400 non-retryable', async () => {
     fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(res(400));
-    const err = await gql('q', {}).catch((e: any) => e);
+    const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.retryable).toBe(false);
   });
 
@@ -132,7 +132,7 @@ describe('gql', () => {
     fetchMock
       .mockResolvedValueOnce(tokenRes())
       .mockResolvedValueOnce(res(200, { errors: [{ extensions: { code: 'THROTTLED' } }] }));
-    const err = await gql('q', {}).catch((e: any) => e);
+    const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.kind).toBe('graphql');
     expect(err.retryable).toBe(true);
   });
@@ -141,14 +141,14 @@ describe('gql', () => {
     fetchMock
       .mockResolvedValueOnce(tokenRes())
       .mockResolvedValueOnce(res(200, { errors: [{ message: 'bad' }] }));
-    const err = await gql('q', {}).catch((e: any) => e);
+    const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.kind).toBe('graphql');
     expect(err.retryable).toBe(false);
   });
 
   it('network failure is retryable', async () => {
     fetchMock.mockResolvedValueOnce(tokenRes()).mockRejectedValueOnce(new Error('offline'));
-    const err = await gql('q', {}).catch((e: any) => e);
+    const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.kind).toBe('network');
     expect(err.retryable).toBe(true);
   });
