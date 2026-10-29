@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import type { LocalSale, PaymentSplitEntry } from './outbox';
+import type { LocalSale, LocalSaleItem, PaymentSplitEntry } from './outbox';
+import { getAllPendingOutboxRows, SHOPIFY_STOCK, SALE_APPLIED } from './outbox';
 import type { ApiSale } from '@/api/sales';
 
 export interface LocalSaleRow extends Omit<LocalSale, 'items' | 'paymentSplit'> {
@@ -126,6 +127,23 @@ export async function reconcileSalesFromServer(
   // Build set of local IDs that the server knows about
   const serverLocalIds = new Set<string>();
 
+  // Sales with in-flight stock ops: local appliedDelta is fresher than the server's
+  const pendingRowsAll = await getAllPendingOutboxRows(db);
+  const pendingSaleIds = new Set<string>();
+  for (const r of pendingRowsAll) {
+    if (r.type === SHOPIFY_STOCK || r.type === SALE_APPLIED) {
+      try {
+        const sid = (JSON.parse(r.payload) as { saleId?: string }).saleId;
+        if (sid) pendingSaleIds.add(sid);
+      } catch {
+        // ignore malformed payload
+      }
+    } else if (r.type === 'sale_create') {
+      const id = localIdFromKey(r.idempotency_key);
+      if (id) pendingSaleIds.add(id);
+    }
+  }
+
   await db.execAsync('BEGIN');
   try {
     for (const sale of serverSales) {
@@ -135,13 +153,39 @@ export async function reconcileSalesFromServer(
       const voided = sale.voidedAt ? 1 : 0;
       const voidedAt = sale.voidedAt ? new Date(sale.voidedAt).getTime() : null;
       const createdAt = new Date(sale.createdAt).getTime();
+      const existing = await db.getFirstAsync<{ items_json: string }>(
+        `SELECT items_json FROM sales WHERE id = ?`,
+        [localId]
+      );
+      let localItems: LocalSaleItem[] = [];
+      if (existing?.items_json) {
+        try {
+          localItems = JSON.parse(existing.items_json) as LocalSaleItem[];
+        } catch {
+          localItems = [];
+        }
+      }
       const itemsJson = JSON.stringify(
-        sale.items.map((i) => ({
-          productId: i.productId,
-          variantSku: i.variantSku,
-          quantity: i.quantity,
-          priceAtSale: i.priceAtSale,
-        }))
+        sale.items.map((i, idx) => {
+          const localDelta = localItems[idx]?.appliedDelta;
+          const appliedDelta =
+            localDelta !== undefined &&
+            (i.appliedDelta === undefined || pendingSaleIds.has(localId))
+              ? localDelta
+              : i.appliedDelta;
+          const item: LocalSaleItem = {
+            productGid: i.productGid,
+            variantGid: i.variantGid,
+            productName: i.productName,
+            variantLabel: i.variantLabel,
+            variantSku: i.variantSku ?? '',
+            quantity: i.quantity,
+            priceAtSale: i.priceAtSale,
+            appliedDelta,
+          };
+          if (i.productId !== undefined) item.productId = i.productId;
+          return item;
+        })
       );
 
       const paymentSplitJson = sale.paymentSplit && Array.isArray(sale.paymentSplit) && sale.paymentSplit.length > 0
@@ -192,4 +236,37 @@ export async function reconcileSalesFromServer(
     await db.execAsync('ROLLBACK');
     throw e;
   }
+}
+
+/** Returns the parsed items of a local sale, or null if the sale does not exist. */
+export async function getLocalSaleItems(
+  db: SQLite.SQLiteDatabase,
+  saleId: string
+): Promise<LocalSaleItem[] | null> {
+  const row = await db.getFirstAsync<{ items_json: string }>(
+    `SELECT items_json FROM sales WHERE id = ?`,
+    [saleId]
+  );
+  if (!row) return null;
+  try {
+    return JSON.parse(row.items_json) as LocalSaleItem[];
+  } catch {
+    return null;
+  }
+}
+
+/** Records the applied stock delta on one line of a local sale. No-op if missing. */
+export async function setSaleLineApplied(
+  db: SQLite.SQLiteDatabase,
+  saleId: string,
+  lineIndex: number,
+  appliedDelta: number
+): Promise<void> {
+  const items = await getLocalSaleItems(db, saleId);
+  if (!items || !items[lineIndex]) return;
+  items[lineIndex] = { ...items[lineIndex], appliedDelta };
+  await db.runAsync(`UPDATE sales SET items_json = ? WHERE id = ?`, [
+    JSON.stringify(items),
+    saleId,
+  ]);
 }
