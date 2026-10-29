@@ -19,9 +19,17 @@ import { useSyncStore } from '@/stores/syncStore';
 
 // Mock outbox module
 jest.mock('@/db/outbox', () => ({
+  SHOPIFY_STOCK: 'shopify_stock',
+  SALE_APPLIED: 'sale_applied',
   getPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   markOutboxDone: jest.fn(() => Promise.resolve()),
   incrementAttempt: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('@/features/sync/shopifyStockOps', () => ({ executeStockOp: jest.fn() }));
+jest.mock('@/api/sales', () => ({
+  apiUpdateSale: jest.fn(() => Promise.resolve()),
+  apiPatchSaleApplied: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock apiClient
@@ -50,6 +58,10 @@ jest.mock('@/stores/syncStore', () => ({
   },
 }));
 
+import { executeStockOp } from '@/features/sync/shopifyStockOps';
+import { apiPatchSaleApplied } from '@/api/sales';
+const mockExecuteStockOp = executeStockOp as jest.Mock;
+const mockPatchApplied = apiPatchSaleApplied as jest.Mock;
 const mockGetPendingOutboxRows = outboxModule.getPendingOutboxRows as jest.Mock;
 const mockMarkOutboxDone = outboxModule.markOutboxDone as jest.Mock;
 const mockIncrementAttempt = outboxModule.incrementAttempt as jest.Mock;
@@ -220,8 +232,8 @@ describe('requestSync — concurrent sync prevention', () => {
 
     await Promise.all([firstSync, secondSync]);
 
-    // getPendingOutboxRows should be called once (not twice) due to concurrent guard
-    expect(mockGetPendingOutboxRows).toHaveBeenCalledTimes(1);
+    // One run = initial query + pending-count re-query; the guarded second call adds none
+    expect(mockGetPendingOutboxRows).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -285,6 +297,91 @@ describe('requestSync — sale_void and sale_unvoid', () => {
       expect.anything()
     );
     expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'row-1');
+  });
+});
+
+describe('requestSync — shopify_stock and sale_applied', () => {
+  const stockRow = (id: string, created: number) =>
+    makeOutboxRow({ id, type: 'shopify_stock', payload: '{}', created_at: created });
+
+  beforeEach(() => {
+    mockExecuteStockOp.mockReset();
+    mockExecuteStockOp.mockResolvedValue('done');
+    mockPatchApplied.mockReset();
+    mockPatchApplied.mockResolvedValue(undefined);
+  });
+
+  it('posts sale_create and executes the stock row', async () => {
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'a', type: 'sale_create' }),
+      stockRow('s1', 2),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockApiClient.post).toHaveBeenCalledWith(expect.stringContaining('sales/batch'), expect.any(Object));
+    expect(mockExecuteStockOp).toHaveBeenCalledTimes(1);
+    expect(mockExecuteStockOp.mock.calls[0][1].id).toBe('s1');
+  });
+
+  it('stock op failure does not block sale_create nor touch the API indicator', async () => {
+    mockExecuteStockOp.mockRejectedValue(new Error('shopify down'));
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'a', type: 'sale_create' }),
+      stockRow('s1', 2),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'a');
+    expect(mockSyncStore.incrementFailures).not.toHaveBeenCalled();
+    expect(mockSyncStore.setIsOnline).not.toHaveBeenCalledWith(false);
+  });
+
+  it('only-stock outbox with Shopify failing leaves API indicator unchanged', async () => {
+    mockExecuteStockOp.mockRejectedValue(new Error('x'));
+    mockGetPendingOutboxRows.mockResolvedValue([stockRow('s1', 1)]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockSyncStore.incrementFailures).not.toHaveBeenCalled();
+    expect(mockSyncStore.setIsOnline).not.toHaveBeenCalled();
+  });
+
+  it('executes stock rows sequentially in order', async () => {
+    const order: string[] = [];
+    let release: () => void = () => {};
+    mockExecuteStockOp.mockImplementation((_db: unknown, r: { id: string }) => {
+      order.push('start:' + r.id);
+      if (r.id === 's1') {
+        return new Promise<string>((res) => {
+          release = () => { order.push('end:s1'); res('done'); };
+        });
+      }
+      order.push('end:' + r.id);
+      return Promise.resolve('done');
+    });
+    mockGetPendingOutboxRows.mockResolvedValue([stockRow('s1', 1), stockRow('s2', 2)]);
+    const p = requestSync(mockDb as never, mockApiClient as never);
+    await new Promise((r) => setImmediate(r));
+    expect(order).toEqual(['start:s1']);
+    release();
+    await p;
+    expect(order).toEqual(['start:s1', 'end:s1', 'start:s2', 'end:s2']);
+  });
+
+  it('sale_applied calls apiPatchSaleApplied then marks done', async () => {
+    const lines = [{ lineIndex: 0, appliedDelta: -1 }];
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'sa', type: 'sale_applied', payload: JSON.stringify({ saleId: 'sale-1', lines }) }),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockPatchApplied).toHaveBeenCalledWith('sale-1', lines);
+    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'sa');
+  });
+
+  it('sale_applied 404 backs off and stays pending', async () => {
+    mockPatchApplied.mockRejectedValue({ response: { status: 404 } });
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'sa', type: 'sale_applied', payload: JSON.stringify({ saleId: 'sale-1', lines: [] }) }),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockIncrementAttempt).toHaveBeenCalledWith(mockDb, 'sa', expect.any(Number));
+    expect(mockMarkOutboxDone).not.toHaveBeenCalledWith(mockDb, 'sa');
   });
 });
 

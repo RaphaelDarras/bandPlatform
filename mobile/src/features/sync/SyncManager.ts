@@ -2,7 +2,9 @@
  * SyncManager — background outbox processor.
  *
  * Processes pending outbox rows in batches of 10.
- * Supports sale_create (batched), sale_void, and sale_unvoid types.
+ * Supports sale_create (batched), sale_void, sale_unvoid, sale_update_concert and
+ * sale_applied (API ops) plus shopify_stock (direct-to-Shopify stock ops, 07.1 D-14).
+ * Shopify failures never flip API connectivity (syncStore) and never block API ops.
  * Exponential backoff on failure (capped at 30s).
  * After 3 consecutive failures, sets syncStore alert flag.
  *
@@ -18,12 +20,15 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { AxiosInstance } from 'axios';
 
 import {
+  SHOPIFY_STOCK,
+  SALE_APPLIED,
   getPendingOutboxRows,
   markOutboxDone,
   incrementAttempt,
   type OutboxRow,
 } from '@/db/outbox';
-import { apiUpdateSale } from '@/api/sales';
+import { apiUpdateSale, apiPatchSaleApplied } from '@/api/sales';
+import { executeStockOp } from '@/features/sync/shopifyStockOps';
 import { useSyncStore } from '@/stores/syncStore';
 
 const BATCH_SIZE = 10;
@@ -77,7 +82,10 @@ export async function requestSync(
 
     // Separate sale_create rows for batching from other types
     const saleCreateRows = pendingRows.filter((r) => r.type === 'sale_create');
-    const otherRows = pendingRows.filter((r) => r.type !== 'sale_create');
+    const stockRows = pendingRows.filter((r) => r.type === SHOPIFY_STOCK);
+    const otherRows = pendingRows.filter(
+      (r) => r.type !== 'sale_create' && r.type !== SHOPIFY_STOCK
+    );
 
     // Process sale_create in a single batch (up to BATCH_SIZE)
     if (saleCreateRows.length > 0) {
@@ -87,6 +95,15 @@ export async function requestSync(
     // Process void/unvoid rows individually
     for (const row of otherRows) {
       await processOtherRow(db, apiClient, row);
+    }
+
+    // Shopify stock ops: sequential, isolated, no syncStore signals (D-14)
+    for (const row of stockRows) {
+      try {
+        await executeStockOp(db, row);
+      } catch {
+        console.warn('[SyncManager] stock op error', row.id);
+      }
     }
 
     // Re-query actual pending count — don't estimate, since batch/individual
@@ -188,6 +205,8 @@ async function processOtherRow(
       await apiClient.post(`sales/${payload.saleId}/unvoid`, {});
     } else if (row.type === 'sale_update_concert') {
       await apiUpdateSale(payload.saleId, { concertId: payload.concertId });
+    } else if (row.type === SALE_APPLIED) {
+      await apiPatchSaleApplied(payload.saleId, payload.lines);
     } else {
       // Unknown type — skip and mark done to avoid blocking queue
       await markOutboxDone(db, row.id);
