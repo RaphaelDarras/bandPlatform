@@ -56,6 +56,50 @@ function sanitizeSaleItem(item) {
   return { ok: true, value };
 }
 
+/** Normalise a Shopify id to a GID; undefined when unusable. */
+function toGid(kind, id) {
+  if (id === undefined || id === null) return undefined;
+  const str = String(id);
+  if (str.startsWith('gid://shopify/')) return str;
+  if (/^\d+$/.test(str)) return `gid://shopify/${kind}/${str}`;
+  return undefined;
+}
+
+/**
+ * Attach readable names to pre-07.1 lines (no snapshot) from the archived,
+ * read-only Product collection (D-21, D-08). Mutates the lean objects in
+ * memory only — nothing is persisted. One batched lookup (T-07.1-05).
+ */
+async function enrichLegacyLines(sales) {
+  const ids = new Set();
+  for (const sale of sales) {
+    for (const item of sale.items || []) {
+      if (!item.productName && item.productId) ids.add(String(item.productId));
+    }
+  }
+  if (ids.size === 0) return;
+
+  const products = await Product.find({ _id: { $in: [...ids] } }).lean();
+  const byId = new Map(products.map((p) => [String(p._id), p]));
+
+  for (const sale of sales) {
+    for (const item of sale.items || []) {
+      if (item.productName || !item.productId) continue;
+      const product = byId.get(String(item.productId));
+      if (!product) continue;
+      const variant = (product.variants || []).find((v) => v.sku === item.variantSku);
+      item.productName = product.name;
+      item.variantLabel = variant
+        ? ([variant.size, variant.color].filter(Boolean).join(' / ') || item.variantSku)
+        : item.variantSku;
+      const productGid = toGid('Product', product.shopifyProductId);
+      if (productGid) item.productGid = productGid;
+      const variantGid = variant ? toGid('ProductVariant', variant.shopifyVariantId) : undefined;
+      if (variantGid) item.variantGid = variantGid;
+    }
+  }
+}
+
 /**
  * POST /api/sales/batch
  * Submit a batch of offline sales with idempotency key deduplication.
@@ -132,6 +176,43 @@ router.post('/batch', async (req, res) => {
 });
 
 /**
+ * PATCH /api/sales/:id/applied
+ * Record the per-line stock delta Shopify actually applied (D-12/D-13).
+ * Body: { lines: [{ lineIndex, appliedDelta }] }. 404 until the sale is synced
+ * (the mobile outbox retries).
+ */
+router.patch('/:id/applied', async (req, res) => {
+  try {
+    const lines = req.body && req.body.lines;
+    const valid =
+      Array.isArray(lines) &&
+      lines.length > 0 &&
+      lines.length <= 100 &&
+      lines.every(
+        (l) =>
+          l &&
+          Number.isInteger(l.lineIndex) && l.lineIndex >= 0 && l.lineIndex <= 99 &&
+          Number.isInteger(l.appliedDelta) && l.appliedDelta <= 0
+      );
+    if (!valid) return res.status(400).json({ error: 'Invalid applied lines' });
+
+    const $set = {};
+    for (const l of lines) $set[`items.${l.lineIndex}.appliedDelta`] = l.appliedDelta;
+
+    const sale = await Sale.findOneAndUpdate(
+      { idempotencyKey: `sale_create:${req.params.id}` },
+      { $set },
+      { new: true }
+    );
+    if (!sale) return res.status(404).json({ error: 'Sale not found' });
+    return res.status(200).json(sale);
+  } catch (error) {
+    console.error('Update applied delta error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * PATCH /api/sales/:id
  * Update mutable fields on a sale. Currently supports: concertId.
  */
@@ -159,6 +240,7 @@ router.patch('/:id', async (req, res) => {
  * GET /api/sales
  * List all sales sorted by createdAt desc.
  * Optional query param: concertId — filters by concert.
+ * Returns POS sales only — online orders live in Shopify (D-16).
  */
 router.get('/', async (req, res) => {
   try {
@@ -167,7 +249,12 @@ router.get('/', async (req, res) => {
       filter.concertId = req.query.concertId;
     }
 
-    const sales = await Sale.find(filter).sort({ createdAt: -1 });
+    const sales = await Sale.find(filter).sort({ createdAt: -1 }).lean();
+    try {
+      await enrichLegacyLines(sales);
+    } catch (err) {
+      console.warn('[sales] legacy name resolution failed', err.message);
+    }
     return res.status(200).json(sales);
   } catch (error) {
     console.error('List sales error:', error);

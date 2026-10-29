@@ -328,7 +328,7 @@ describe('GET /api/sales', () => {
 
   it('returns all sales sorted by createdAt desc', async () => {
     const mockSales = [mockSaleDoc(), mockSaleDoc()];
-    const sortMock = jest.fn().mockResolvedValue(mockSales);
+    const sortMock = jest.fn(() => ({ lean: jest.fn().mockResolvedValue(mockSales) }));
     mockSaleModule.find.mockReturnValue({ sort: sortMock });
 
     const res = await request(app)
@@ -345,7 +345,7 @@ describe('GET /api/sales', () => {
   it('filters by concertId when provided', async () => {
     const concertId = '507f1f77bcf86cd799439011';
     const mockSales = [mockSaleDoc()];
-    const sortMock = jest.fn().mockResolvedValue(mockSales);
+    const sortMock = jest.fn(() => ({ lean: jest.fn().mockResolvedValue(mockSales) }));
     mockSaleModule.find.mockReturnValue({ sort: sortMock });
 
     const res = await request(app)
@@ -359,7 +359,7 @@ describe('GET /api/sales', () => {
 
   it('includes voided status in response', async () => {
     const voidedSale = mockSaleDoc({ voidedAt: new Date(), voidedBy: 'admin1' });
-    const sortMock = jest.fn().mockResolvedValue([voidedSale]);
+    const sortMock = jest.fn(() => ({ lean: jest.fn().mockResolvedValue([voidedSale]) }));
     mockSaleModule.find.mockReturnValue({ sort: sortMock });
 
     const res = await request(app)
