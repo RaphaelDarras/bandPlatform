@@ -42,7 +42,6 @@ describe('production build output (dist)', () => {
     'concerts/index.html',
     'about/index.html',
     'contact/index.html',
-    'stock/index.html',
     // The internal storefront (/shop, /shop/:id, /cart, /checkout*) moved to
     // Shopify and is fully unmounted, so none of those routes prerender any
     // more — see the "no shell under /shop" assertion below.
@@ -50,6 +49,10 @@ describe('production build output (dist)', () => {
 
   it.each(routes)('emits %s', (route) => {
     expect(existsSync(path.join(DIST, ...route.split('/')))).toBe(true)
+  })
+
+  it('no longer emits the retired /stock page (07.1 D-22)', () => {
+    expect(existsSync(path.join(DIST, 'stock', 'index.html'))).toBe(false)
   })
 
   it('never emits any static shell under /shop, /cart, or /checkout (storefront moved to Shopify)', () => {
