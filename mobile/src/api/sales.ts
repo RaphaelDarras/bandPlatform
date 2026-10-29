@@ -1,5 +1,17 @@
 import { apiClient } from './client';
 
+export interface ApiSaleItem {
+  productId?: string;
+  productGid?: string;
+  variantGid?: string;
+  productName?: string;
+  variantLabel?: string;
+  variantSku?: string;
+  quantity: number;
+  priceAtSale: number;
+  appliedDelta?: number;
+}
+
 export interface ApiSale {
   id: string;
   concertId: string;
@@ -14,12 +26,17 @@ export interface ApiSale {
   voidedAt?: string | null;
   createdAt: string;
   idempotencyKey?: string | null;
-  items: Array<{
-    productId: string;
-    variantSku: string;
-    quantity: number;
-    priceAtSale: number;
-  }>;
+  items: ApiSaleItem[];
+}
+
+/**
+ * PATCH /sales/:id/applied — record the stock delta actually applied per line.
+ */
+export async function apiPatchSaleApplied(
+  id: string,
+  lines: Array<{ lineIndex: number; appliedDelta: number }>
+): Promise<void> {
+  await apiClient.patch(`/sales/${id}/applied`, { lines });
 }
 
 /**
