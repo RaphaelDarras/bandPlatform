@@ -70,12 +70,8 @@
     "transactionHistorySubtitle": "View past sales",
     "stockOverview": "Stock Overview",
     "stockOverviewSubtitle": "Check inventory levels",
-    "needsRestock": "Needs Restock",
-    "needsRestockSubtitle": "Items with negative stock",
     "restock": "Restock",
-    "restockSubtitle": "Add inventory",
-    "manageProducts": "Manage Products",
-    "manageProductsSubtitle": "Edit catalog"
+    "restockSubtitle": "Add inventory"
   },
   "settings": {
     "language": "Language / Langue",

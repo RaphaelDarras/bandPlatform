@@ -3,7 +3,6 @@
  * Expandable product rows: collapsed shows product name + total stock.
  * Expanded shows per-variant breakdown (SKU, label, individual stock count).
  * Pull-to-refresh + auto-refresh on screen focus.
- * "Needs Reproduction" section for items with negative stock.
  */
 import React, { useState, useCallback } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -47,7 +46,7 @@ function ProductRow({ product }: { product: CachedProduct }) {
       {expanded && (
         <View style={[styles.variantList, { borderTopColor: c.border }]}>
           {product.variants.map((variant) => (
-            <View key={variant.sku} style={styles.variantRow}>
+            <View key={variant.variantGid ?? variant.sku} style={styles.variantRow}>
               <Text style={[styles.variantLabel, { color: c.text }]}>{variant.label}</Text>
               <Text style={[styles.variantStock, { color: stockColor(variant.stock) }]}>{variant.stock}</Text>
             </View>
@@ -60,7 +59,7 @@ function ProductRow({ product }: { product: CachedProduct }) {
 
 export default function StockScreen() {
   const { t } = useTranslation();
-  const { products, loading, refreshStock, needsReproduction } = useStock();
+  const { products, loading, refreshStock } = useStock();
   const c = useTheme();
 
   // Auto-refresh when screen gains focus
@@ -90,31 +89,6 @@ export default function StockScreen() {
         renderItem={({ item }) => <ProductRow product={item} />}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={refreshStock} />
-        }
-        ListHeaderComponent={
-          needsReproduction.length > 0 ? (
-            <View style={[styles.deficitSection, { backgroundColor: 'rgba(255, 245, 245, 0.15)', borderColor: c.danger }]}>
-              <View style={styles.deficitHeader}>
-                <Text style={[styles.deficitTitle, { color: c.danger }]}>Needs Reproduction</Text>
-                <View style={[styles.deficitBadge, { backgroundColor: c.danger }]}>
-                  <Text style={styles.deficitBadgeText}>{needsReproduction.length}</Text>
-                </View>
-              </View>
-              {needsReproduction.map((product) => {
-                const deficitVariants = product.variants.filter((v) => v.stock <= 0);
-                return (
-                  <View key={product.id} style={styles.deficitItem}>
-                    <Text style={[styles.deficitProductName, { color: c.text }]}>{product.name}</Text>
-                    {deficitVariants.map((v) => (
-                      <Text key={v.sku} style={[styles.deficitVariantText, { color: c.danger }]}>
-                        {v.label}: {v.stock}
-                      </Text>
-                    ))}
-                  </View>
-                );
-              })}
-            </View>
-          ) : null
         }
         ListEmptyComponent={
           !loading ? (
@@ -186,28 +160,6 @@ const styles = StyleSheet.create({
   variantSku: { fontSize: 12, color: '#666', width: 80, fontFamily: 'monospace' },
   variantLabel: { fontSize: 13, color: '#444', flex: 1 },
   variantStock: { fontSize: 14, fontWeight: '600', color: '#1a1a1a', width: 40, textAlign: 'right' },
-  deficitSection: {
-    backgroundColor: '#fff5f5',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  deficitHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  deficitTitle: { fontSize: 15, fontWeight: '700', color: '#dc2626' },
-  deficitBadge: {
-    backgroundColor: '#dc2626',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deficitBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  deficitItem: { marginBottom: 8 },
-  deficitProductName: { fontSize: 14, fontWeight: '600', color: '#1a1a1a' },
-  deficitVariantText: { fontSize: 12, color: '#dc2626', marginLeft: 8 },
   emptyState: { alignItems: 'center', paddingVertical: 48 },
   emptyText: { fontSize: 16, color: '#666', fontWeight: '500' },
   emptySubtext: { fontSize: 13, color: '#aaa', marginTop: 4 },

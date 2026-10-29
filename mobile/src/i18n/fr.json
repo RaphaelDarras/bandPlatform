@@ -70,12 +70,8 @@
     "transactionHistorySubtitle": "Voir les ventes passées",
     "stockOverview": "Aperçu du stock",
     "stockOverviewSubtitle": "Vérifier les niveaux d'inventaire",
-    "needsRestock": "Réapprovisionnement",
-    "needsRestockSubtitle": "Articles en stock négatif",
     "restock": "Réapprovisionner",
-    "restockSubtitle": "Ajouter de l'inventaire",
-    "manageProducts": "Gérer les produits",
-    "manageProductsSubtitle": "Modifier le catalogue"
+    "restockSubtitle": "Ajouter de l'inventaire"
   },
   "settings": {
     "language": "Langue / Language",

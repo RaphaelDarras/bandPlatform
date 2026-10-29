@@ -114,7 +114,7 @@ function ActionCardItem({ card }: { card: ActionCard }) {
 export default function DashboardScreen() {
   const c = useTheme();
   const { t } = useTranslation();
-  const { products, needsReproduction, refreshStock } = useStock();
+  const { products, refreshStock } = useStock();
   const { loadConcerts } = useConcerts();
   const { pullFromServer } = useHistory();
 
@@ -156,28 +156,11 @@ export default function DashboardScreen() {
       onPress: () => router.push('/concerts' as never),
     },
     {
-      id: 'deficit',
-      title: t('dashboard.needsRestock'),
-      subtitle: t('dashboard.needsRestockSubtitle'),
-      icon: '⚠️',
-      onPress: () => router.push('/deficit' as never),
-      badge: needsReproduction.length,
-      badgeColor: '#ef4444',
-      alert: needsReproduction.length > 0,
-    },
-    {
       id: 'restock',
       title: t('dashboard.restock'),
       subtitle: t('dashboard.restockSubtitle'),
       icon: '📥',
       onPress: () => router.push('/restock' as never),
-    },
-    {
-      id: 'products',
-      title: t('dashboard.manageProducts'),
-      subtitle: t('dashboard.manageProductsSubtitle'),
-      icon: '🏷️',
-      onPress: () => router.push('/products' as never),
     },
   ];
 

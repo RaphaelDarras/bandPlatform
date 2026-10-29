@@ -43,7 +43,6 @@ jest.mock('@/features/stock/useStock', () => ({
   useStock: jest.fn(() => ({
     products: [],
     loading: false,
-    needsReproduction: [],
     refreshStock: jest.fn(),
   })),
 }));
