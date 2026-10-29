@@ -1,3 +1,5 @@
+// READ-ONLY ARCHIVE (07.1, D-08): Shopify is the catalogue source of truth; nothing writes this collection any more.
+// Read by routes/sales.js (legacy line names, D-21) and scripts/migratePriceOverridesToShopify.js.
 const mongoose = require('mongoose');
 
 // Variant sub-schema with per-variant version field for optimistic locking
@@ -35,23 +37,11 @@ const VariantSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // Shopify inventory-item id (D-08) — the handle used to push/pull stock
-  // levels through Shopify's inventory API.
-  shopifyInventoryItemId: {
-    type: String,
-    trim: true
-  },
   // Variant-level soft-delete (D-15) — a variant retired on either side is
   // flagged inactive rather than removed, preserving order/audit history.
   active: {
     type: Boolean,
     default: true
-  },
-  // Confirm-and-retry marker (D-05) — set when a stock write to Shopify is
-  // pending confirmation so a follow-up pass can retry it.
-  syncPending: {
-    type: Boolean,
-    default: false
   }
 }, { _id: false });
 
@@ -107,9 +97,5 @@ ProductSchema.index({ 'variants.sku': 1 });
 
 // Index on variants.version to support optimistic locking queries
 ProductSchema.index({ 'variants.version': 1 });
-
-// Indexes on Shopify identity fields for fast post-seed sync matching (D-08/Pitfall 5)
-ProductSchema.index({ shopifyProductId: 1 });
-ProductSchema.index({ 'variants.shopifyVariantId': 1 });
 
 module.exports = mongoose.model('Product', ProductSchema);

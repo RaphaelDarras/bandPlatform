@@ -7,9 +7,7 @@
     "test": "jest --testPathPatterns=tests/",
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "seed:admin": "node utils/seedAdmin.js",
-    "seed:shopify": "node scripts/seedShopify.js",
-    "shopify:setup": "node scripts/shopifySetup.js"
+    "seed:admin": "node utils/seedAdmin.js"
   },
   "jest": {
     "testEnvironment": "node"
@@ -19,7 +17,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@shopify/admin-api-client": "^1.1.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",

@@ -29,92 +29,6 @@ const swaggerOptions = {
         }
       },
       schemas: {
-        Product: {
-          type: 'object',
-          required: ['name', 'basePrice'],
-          properties: {
-            _id: {
-              type: 'string',
-              description: 'Product ID',
-              example: '507f1f77bcf86cd799439011'
-            },
-            name: {
-              type: 'string',
-              description: 'Product name',
-              example: 'Band Logo T-Shirt'
-            },
-            description: {
-              type: 'string',
-              description: 'Product description',
-              example: 'Official band t-shirt with logo'
-            },
-            category: {
-              type: 'string',
-              description: 'Product category',
-              example: 'clothing'
-            },
-            basePrice: {
-              type: 'number',
-              description: 'Base price in euros',
-              example: 25.00
-            },
-            images: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Array of image URLs',
-              example: ['https://example.com/image1.jpg']
-            },
-            active: {
-              type: 'boolean',
-              description: 'Product visibility status',
-              example: true
-            },
-            variants: {
-              type: 'array',
-              items: {
-                $ref: '#/components/schemas/Variant'
-              }
-            }
-          }
-        },
-        Variant: {
-          type: 'object',
-          required: ['sku', 'stock'],
-          properties: {
-            sku: {
-              type: 'string',
-              description: 'Stock keeping unit',
-              example: 'TSHIRT-BLACK-L'
-            },
-            size: {
-              type: 'string',
-              description: 'Size',
-              example: 'L'
-            },
-            color: {
-              type: 'string',
-              description: 'Color',
-              example: 'Black'
-            },
-            stock: {
-              type: 'number',
-              description: 'Available stock quantity',
-              example: 50
-            },
-            version: {
-              type: 'number',
-              description: 'Version number for optimistic locking',
-              example: 0
-            },
-            priceAdjustment: {
-              type: 'number',
-              description: 'Price adjustment from base price',
-              example: 0
-            }
-          }
-        },
         LoginRequest: {
           type: 'object',
           required: ['username', 'password'],
@@ -155,43 +69,6 @@ const swaggerOptions = {
                   example: 'admin'
                 }
               }
-            }
-          }
-        },
-        InventoryDeductRequest: {
-          type: 'object',
-          required: ['productId', 'variantSku', 'quantity', 'source'],
-          properties: {
-            productId: {
-              type: 'string',
-              description: 'Product ID',
-              example: '507f1f77bcf86cd799439011'
-            },
-            variantSku: {
-              type: 'string',
-              description: 'Variant SKU',
-              example: 'TSHIRT-BLACK-L'
-            },
-            quantity: {
-              type: 'number',
-              description: 'Quantity to deduct',
-              example: 2
-            },
-            source: {
-              type: 'string',
-              enum: ['online', 'pos'],
-              description: 'Sale source',
-              example: 'pos'
-            },
-            customerEmail: {
-              type: 'string',
-              description: 'Customer email (required for online)',
-              example: 'customer@example.com'
-            },
-            concertId: {
-              type: 'string',
-              description: 'Concert ID (required for pos)',
-              example: '507f1f77bcf86cd799439012'
             }
           }
         },
