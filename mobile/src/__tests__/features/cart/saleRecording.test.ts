@@ -9,9 +9,9 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
 }));
 
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn()
+// Mock expo-crypto (useSaleRecording generates ids with Crypto.randomUUID)
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn()
     .mockReturnValueOnce('sale-uuid-1')
     .mockReturnValueOnce('outbox-uuid-1'),
 }));
@@ -47,9 +47,9 @@ const mockGetDb = dbModule.getDb as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Reset uuid mock
-  const { v4 } = require('uuid');
-  (v4 as jest.Mock)
+  // Reset randomUUID mock
+  const { randomUUID } = require('expo-crypto');
+  (randomUUID as jest.Mock)
     .mockReturnValueOnce('sale-uuid-1')
     .mockReturnValueOnce('outbox-uuid-1');
 

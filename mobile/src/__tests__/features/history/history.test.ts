@@ -12,9 +12,9 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(() => ({ saleId: 'sale-1' })),
 }));
 
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn().mockReturnValue('outbox-uuid'),
+// Mock expo-crypto (useHistory generates outbox ids with Crypto.randomUUID)
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn().mockReturnValue('outbox-uuid'),
 }));
 
 import { useHistory } from '@/features/history/useHistory';
@@ -127,8 +127,8 @@ function makeSaleRow(overrides: Partial<{
 
 beforeEach(() => {
   jest.clearAllMocks();
-  const { v4 } = require('uuid');
-  (v4 as jest.Mock).mockReturnValue('outbox-uuid');
+  const { randomUUID } = require('expo-crypto');
+  (randomUUID as jest.Mock).mockReturnValue('outbox-uuid');
   mockGetLocalSales.mockResolvedValue([]);
   mockGetLocalSaleItems.mockResolvedValue(null);
   // Reset mockDb methods after clearAllMocks

@@ -146,7 +146,7 @@ describe('ProductTile', () => {
       <ProductTile product={makeProduct()} />
     );
     expect(getByText('Band T-Shirt')).toBeTruthy();
-    expect(getByText('€25.00')).toBeTruthy();
+    expect(getByText('€ 25.00')).toBeTruthy();
   });
 
   it('displays per-variant stock counts', () => {
