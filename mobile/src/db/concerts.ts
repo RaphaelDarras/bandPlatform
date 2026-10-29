@@ -147,3 +147,28 @@ export async function deletePriceOverride(
     [concertId, productId]
   );
 }
+
+/**
+ * Replaces all local price overrides for a concert with the server's list.
+ * product_id is the Shopify product GID (07.1).
+ */
+export async function replacePriceOverrides(
+  db: SQLite.SQLiteDatabase,
+  concertId: string,
+  overrides: Array<{ productId: string; price: number }>
+): Promise<void> {
+  await db.execAsync('BEGIN');
+  try {
+    await db.runAsync('DELETE FROM concert_price_overrides WHERE concert_id = ?', [concertId]);
+    for (const ov of overrides) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO concert_price_overrides (concert_id, product_id, price) VALUES (?, ?, ?)',
+        [concertId, ov.productId, ov.price]
+      );
+    }
+    await db.execAsync('COMMIT');
+  } catch (e) {
+    await db.execAsync('ROLLBACK');
+    throw e;
+  }
+}

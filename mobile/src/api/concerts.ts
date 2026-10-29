@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 export interface ConcertPriceOverrideApi {
+  /** Shopify product GID (gid://shopify/Product/<n>) */
   productId: string;
   price: number;
 }

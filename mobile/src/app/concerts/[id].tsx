@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getDb } from '@/db';
 import type { CachedConcert } from '@/db/concerts';
-import { getConcertById, getConcertPriceOverrides, upsertPriceOverride, deletePriceOverride } from '@/db/concerts';
+import { getConcertById, getConcertPriceOverrides, replacePriceOverrides, upsertPriceOverride, deletePriceOverride } from '@/db/concerts';
 import type { ConcertPriceOverride } from '@/db/concerts';
 import { getCachedProducts } from '@/db/products';
 import type { CachedProduct } from '@/db/products';
@@ -151,12 +151,7 @@ export default function ConcertDetailScreen() {
         try {
           const { apiGetConcert } = await import('@/api/concerts');
           const apiConcert = await apiGetConcert(id);
-          if (apiConcert.priceOverrides && apiConcert.priceOverrides.length > 0) {
-            // Sync API overrides to local SQLite
-            for (const ov of apiConcert.priceOverrides) {
-              await upsertPriceOverride(db, id, ov.productId, ov.price);
-            }
-          }
+          await replacePriceOverrides(db, id, apiConcert.priceOverrides ?? []);
         } catch {
           // Offline — use local overrides
         }
