@@ -5,6 +5,8 @@ module.exports = {
   ],
   setupFilesAfterEnv: ['./jest.setup.js'],
   moduleNameMapper: {
+    // Stylesheets (nativewind global.css) are Metro-only; stub them in Jest
+    '\\.css$': '<rootDir>/src/__mocks__/style-stub.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     // Prevent Expo SDK 55 WinterCG runtime from triggering Jest scope errors
     'expo/src/winter/runtime\\.native': '<rootDir>/src/__mocks__/expo-winter-runtime.js',
