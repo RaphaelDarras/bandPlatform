@@ -1,4 +1,4 @@
-import { reconcileActiveProducts } from '@/db/products';
+import { reconcileActiveProducts, getCachedProducts, updateLocalStock } from '@/db/products';
 
 const mockDb = {
   execAsync: jest.fn(() => Promise.resolve()),
@@ -66,5 +66,41 @@ describe('reconcileActiveProducts', () => {
     await reconcileActiveProducts(mockDb as any, ['123']);
 
     expect(updateCalls()).toHaveLength(0);
+  });
+});
+
+describe('getCachedProducts dedupe', () => {
+  it('keeps variants sharing an empty SKU when variantGid differs', async () => {
+    mockDb.getAllAsync.mockResolvedValue([
+      {
+        id: 'P1', name: 'Tee', price: 20, image_url: null, active: 1, updated_at: 1,
+        variants_json: JSON.stringify([
+          { variantGid: 'V1', sku: '', label: 'S', priceAdjustment: 0, stock: 1 },
+          { variantGid: 'V2', sku: '', label: 'M', priceAdjustment: 0, stock: 2 },
+          { variantGid: 'V2', sku: '', label: 'M', priceAdjustment: 0, stock: 2 },
+        ]),
+      },
+    ]);
+    const res = await getCachedProducts(mockDb as any);
+    expect(res[0].variants.map((v) => v.variantGid)).toEqual(['V1', 'V2']);
+  });
+});
+
+describe('updateLocalStock', () => {
+  it('clamps at 0 and leaves other variants unchanged', async () => {
+    mockDb.getFirstAsync.mockResolvedValueOnce({
+      id: 'P1', name: 'Tee', price: 20, image_url: null, active: 1, updated_at: 1,
+      variants_json: JSON.stringify([
+        { variantGid: 'V1', sku: 'S', label: 'S', priceAdjustment: 0, stock: 4 },
+        { variantGid: 'V2', sku: 'XL', label: 'XL', priceAdjustment: 0, stock: 1 },
+      ]),
+    } as any);
+    await updateLocalStock(mockDb as any, 'P1', 'V2', -5);
+    const call = (mockDb.runAsync.mock.calls as any[][]).find((c) =>
+      String(c[0]).includes('UPDATE products SET variants_json')
+    )!;
+    const saved = JSON.parse(call[1][0]);
+    expect(saved[0].stock).toBe(4);
+    expect(saved[1].stock).toBe(0);
   });
 });

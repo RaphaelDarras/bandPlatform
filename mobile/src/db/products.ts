@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 export interface ProductVariant {
+  variantGid: string;
   sku: string;
   label: string;
   priceAdjustment: number;
@@ -40,8 +41,9 @@ export async function getCachedProducts(
     const variants = JSON.parse(row.variants_json ?? '[]') as ProductVariant[];
     const seen = new Set<string>();
     const uniqueVariants = variants.filter((v) => {
-      if (seen.has(v.sku)) return false;
-      seen.add(v.sku);
+      const key = v.variantGid ?? v.sku;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
     return {
@@ -82,8 +84,9 @@ export async function upsertProducts(
 }
 
 /**
- * Reconciles the local cache against the authoritative set of active product
- * ids returned by a successful catalog fetch. Any cached product whose id is
+ * Reconciles the local cache against the authoritative set of active Shopify
+ * product GIDs returned by a successful catalogue fetch (a product whose
+ * status is not ACTIVE is simply absent, D-07). Any cached product whose id is
  * NOT in `activeIds` was deactivated or deleted on the server — the active-only
  * API responses simply stop returning it, so an upsert-only sync never learns
  * it is gone. This marks such rows inactive so they leave the POS
@@ -146,14 +149,14 @@ export async function getProductById(
 export async function updateLocalStock(
   db: SQLite.SQLiteDatabase,
   productId: string,
-  variantSku: string,
+  variantGid: string,
   delta: number
 ): Promise<void> {
   const product = await getProductById(db, productId);
   if (!product) return;
 
   const updatedVariants = product.variants.map((v) =>
-    v.sku === variantSku ? { ...v, stock: v.stock + delta } : v
+    v.variantGid === variantGid ? { ...v, stock: Math.max(0, v.stock + delta) } : v
   );
 
   await db.runAsync(
