@@ -6,24 +6,12 @@ const { swaggerUi, swaggerSpec } = require('./config/swagger');
 
 const app = express();
 
-// 1. Webhook routes FIRST -- raw body required for Shopify HMAC signature
-// verification (Pitfall 4). Must be mounted BEFORE express.json() below:
-// otherwise Express parses+re-serializes the body, destroying the exact
-// bytes the provider's HMAC was computed over (shopifyWebhooks.js scopes
-// express.raw() per-route internally).
-app.use('/api/shopify/webhooks', require('./routes/shopifyWebhooks'));
-
-// 2. THEN the global JSON parser for every other route.
+// Global JSON parser.
 app.use(express.json());
-// WR-09 — was origin: '*'. Now that /api/orders collects guest-checkout PII
-// (email, name, full shipping address) and drives real PayPal capture calls,
-// an unrestricted origin lets any third-party site's client-side JS invoke
-// these unauthenticated endpoints directly. Restrict to the single known web
-// origin (WEB_BASE_URL, already used app-wide for Stripe/PayPal redirect
-// URLs); the `cors` package treats a falsy origin the same as '*', so local
-// dev without WEB_BASE_URL set is unaffected. This is a browser-only
-// restriction — it does not affect the mobile app's native fetch calls,
-// which never enforce/require CORS headers.
+// WR-09 -- restrict CORS to the single known web origin (WEB_BASE_URL); the
+// `cors` package treats a falsy origin the same as '*', so local dev without
+// WEB_BASE_URL set is unaffected. Browser-only restriction; the mobile app's
+// native fetch calls never enforce CORS.
 app.use(cors({ origin: process.env.WEB_BASE_URL }));
 
 // Swagger API Documentation
@@ -34,13 +22,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-// 3. Normal routes (unaffected -- receive parsed JSON bodies)
+// Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/concerts', require('./routes/concerts'));
 app.use('/api/sales', require('./routes/sales'));
-app.use('/api/shopify', require('./routes/shopify'));
 app.use('/api/votes', require('./routes/votes'));
 
 // Start server
