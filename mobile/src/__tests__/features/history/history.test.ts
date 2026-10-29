@@ -20,6 +20,7 @@ jest.mock('uuid', () => ({
 import { useHistory } from '@/features/history/useHistory';
 import * as salesModule from '@/db/sales';
 import * as productsModule from '@/db/products';
+import * as stockOpsModule from '@/db/stockOps';
 import * as outboxModule from '@/db/outbox';
 import * as dbModule from '@/db';
 
@@ -41,6 +42,12 @@ jest.mock('@/db/sales', () => ({
   getLocalSales: jest.fn(() => Promise.resolve([])),
   voidLocalSale: jest.fn(() => Promise.resolve()),
   unvoidLocalSale: jest.fn(() => Promise.resolve()),
+  getLocalSaleItems: jest.fn(() => Promise.resolve(null)),
+}));
+
+jest.mock('@/db/stockOps', () => ({
+  enqueueVoidRestores: jest.fn(() => Promise.resolve({ cancelled: 0, enqueued: 0 })),
+  enqueueUnvoidDeducts: jest.fn(() => Promise.resolve({ cancelled: 0, enqueued: 0 })),
 }));
 
 jest.mock('@/db/products', () => ({
@@ -80,6 +87,9 @@ const mockGetLocalSales = salesModule.getLocalSales as jest.Mock;
 const mockVoidLocalSale = salesModule.voidLocalSale as jest.Mock;
 const mockUnvoidLocalSale = salesModule.unvoidLocalSale as jest.Mock;
 const mockUpdateLocalStock = productsModule.updateLocalStock as jest.Mock;
+const mockGetLocalSaleItems = salesModule.getLocalSaleItems as jest.Mock;
+const mockEnqueueVoidRestores = stockOpsModule.enqueueVoidRestores as jest.Mock;
+const mockEnqueueUnvoidDeducts = stockOpsModule.enqueueUnvoidDeducts as jest.Mock;
 
 // Build a mock LocalSaleRow
 function makeSaleRow(overrides: Partial<{
@@ -120,6 +130,7 @@ beforeEach(() => {
   const { v4 } = require('uuid');
   (v4 as jest.Mock).mockReturnValue('outbox-uuid');
   mockGetLocalSales.mockResolvedValue([]);
+  mockGetLocalSaleItems.mockResolvedValue(null);
   // Reset mockDb methods after clearAllMocks
   mockDb.runAsync.mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
   mockDb.getAllAsync.mockResolvedValue([]);
@@ -206,35 +217,35 @@ describe('useHistory — voidSale', () => {
     expect(mockVoidLocalSale).toHaveBeenCalledWith(expect.anything(), 'sale-1');
   });
 
-  it('calls updateLocalStock to reverse stock (positive delta) for each item', async () => {
-    mockGetLocalSales.mockResolvedValue([
-      makeSaleRow({
-        id: 'sale-1',
-        concertId: 'concert-1',
-        voided: 0,
-        items_json: JSON.stringify([
-          { productId: 'prod-1', variantSku: 'SKU-S', quantity: 2, priceAtSale: 25 },
-          { productId: 'prod-2', variantSku: 'SKU-L', quantity: 1, priceAtSale: 30 },
-        ]),
-      }),
-    ]);
-
+  it('reads items from SQLite and enqueues Shopify restores, optimistic stock uses appliedDelta', async () => {
+    const items = [
+      { productGid: 'gid://p/1', variantGid: 'gid://v/1', variantSku: 'SKU-S', quantity: 2, priceAtSale: 25, appliedDelta: -1 },
+      { productGid: 'gid://p/2', variantGid: 'gid://v/2', variantSku: 'SKU-L', quantity: 1, priceAtSale: 30 },
+      { productId: 'legacy', variantSku: 'OLD', quantity: 4, priceAtSale: 5 },
+    ];
+    mockGetLocalSaleItems.mockResolvedValue(items);
     const { result } = renderHook(() => useHistory());
-
     await act(async () => {
-      await result.current.loadHistory();
+      await result.current.voidSale('s1');
     });
+    expect(mockGetLocalSaleItems).toHaveBeenCalledWith(expect.anything(), 's1');
+    expect(mockVoidLocalSale).toHaveBeenCalledWith(expect.anything(), 's1');
+    expect(mockEnqueueVoidRestores).toHaveBeenCalledWith(expect.anything(), 's1', items, expect.any(Number));
+    expect(mockUpdateLocalStock).toHaveBeenCalledWith(expect.anything(), 'gid://p/1', 'gid://v/1', 1);
+    expect(mockUpdateLocalStock).toHaveBeenCalledWith(expect.anything(), 'gid://p/2', 'gid://v/2', 1);
+    expect(mockUpdateLocalStock).toHaveBeenCalledTimes(2);
+  });
 
+  it('voids a legacy-only sale without touching stock or throwing', async () => {
+    mockGetLocalSaleItems.mockResolvedValue([
+      { productId: 'legacy', variantSku: 'OLD', quantity: 4, priceAtSale: 5 },
+    ]);
+    const { result } = renderHook(() => useHistory());
     await act(async () => {
-      await result.current.voidSale('sale-1');
+      await result.current.voidSale('s1');
     });
-
-    expect(mockUpdateLocalStock).toHaveBeenCalledWith(
-      expect.anything(), 'prod-1', 'SKU-S', 2 // positive = add back
-    );
-    expect(mockUpdateLocalStock).toHaveBeenCalledWith(
-      expect.anything(), 'prod-2', 'SKU-L', 1
-    );
+    expect(mockUpdateLocalStock).not.toHaveBeenCalled();
+    expect(mockVoidLocalSale).toHaveBeenCalled();
   });
 
   it('inserts an outbox entry with type sale_void when voiding', async () => {
@@ -286,30 +297,16 @@ describe('useHistory — unvoidSale', () => {
     expect(mockUnvoidLocalSale).toHaveBeenCalledWith(expect.anything(), 'sale-1');
   });
 
-  it('calls updateLocalStock to re-deduct stock (negative delta) for each item when unvoiding', async () => {
-    mockGetLocalSales.mockResolvedValue([
-      makeSaleRow({
-        id: 'sale-1',
-        concertId: 'concert-1',
-        voided: 1,
-        items_json: JSON.stringify([
-          { productId: 'prod-1', variantSku: 'SKU-S', quantity: 3, priceAtSale: 25 },
-        ]),
-      }),
-    ]);
-
+  it('enqueues Shopify re-deducts and subtracts quantity locally for GID lines', async () => {
+    const items = [
+      { productGid: 'gid://p/1', variantGid: 'gid://v/1', variantSku: 'SKU-S', quantity: 3, priceAtSale: 25 },
+    ];
+    mockGetLocalSaleItems.mockResolvedValue(items);
     const { result } = renderHook(() => useHistory());
-
     await act(async () => {
-      await result.current.loadHistory();
+      await result.current.unvoidSale('s1');
     });
-
-    await act(async () => {
-      await result.current.unvoidSale('sale-1');
-    });
-
-    expect(mockUpdateLocalStock).toHaveBeenCalledWith(
-      expect.anything(), 'prod-1', 'SKU-S', -3 // negative = deduct again
-    );
+    expect(mockEnqueueUnvoidDeducts).toHaveBeenCalledWith(expect.anything(), 's1', items, expect.any(Number));
+    expect(mockUpdateLocalStock).toHaveBeenCalledWith(expect.anything(), 'gid://p/1', 'gid://v/1', -3);
   });
 });

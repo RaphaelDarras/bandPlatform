@@ -3,7 +3,15 @@ import * as Crypto from 'expo-crypto';
 
 import { getDb } from '@/db';
 import type { LocalSaleRow } from '@/db/sales';
-import { getLocalSales, voidLocalSale, unvoidLocalSale, reconcileSalesFromServer } from '@/db/sales';
+import {
+  getLocalSales,
+  getLocalSaleItems,
+  voidLocalSale,
+  unvoidLocalSale,
+  reconcileSalesFromServer,
+} from '@/db/sales';
+import type { LocalSaleItem } from '@/db/outbox';
+import { enqueueVoidRestores, enqueueUnvoidDeducts } from '@/db/stockOps';
 import { updateLocalStock } from '@/db/products';
 import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
 import { apiGetSales, apiVoidSale, apiUnvoidSale } from '@/api/sales';
@@ -20,19 +28,15 @@ function concertLabel(c: CachedConcert): string {
  * A parsed sale with items as an array (not raw JSON).
  */
 export interface SaleWithItems extends LocalSaleRow {
-  parsedItems: Array<{
-    productId: string;
-    variantSku: string;
-    quantity: number;
-    priceAtSale: number;
-  }>;
+  parsedItems: LocalSaleItem[];
 }
 
 /**
  * Hook for loading transaction history from local SQLite.
  *
  * Groups sales by concertId, sorted newest first within each group.
- * Provides voidSale and unvoidSale actions with local stock adjustment and outbox entries.
+ * Stock is mirrored to Shopify by shopify_stock outbox ops; void restores exactly
+ * the applied delta (D-13).
  */
 export function useHistory() {
   const [salesByGroup, setSalesByGroup] = useState<Record<string, SaleWithItems[]>>({});
@@ -108,62 +112,62 @@ export function useHistory() {
     }
   }, []);
 
-  /**
-   * Voids a sale locally and adds an outbox entry for API sync.
-   * Also reverses local stock (adds items back).
-   * If online, immediately calls the API void endpoint.
-   *
-   * @param items - Optional items array. When provided, stock reversal uses this
-   *   directly instead of searching salesByGroup (which may be empty if the caller
-   *   never loaded history).
-   */
-  const voidSale = useCallback(async (
-    saleId: string,
-    items?: Array<{ productId: string; variantSku: string; quantity: number }>
-  ) => {
-    const db = await getDb();
 
-    // Use caller-supplied items when available; fall back to salesByGroup lookup
-    let resolvedItems = items;
-    if (!resolvedItems) {
-      let sale: SaleWithItems | undefined;
-      for (const group of Object.values(salesByGroup)) {
-        sale = group.find((s) => s.id === saleId);
-        if (sale) break;
-      }
-      resolvedItems = sale?.parsedItems;
+  /** Resolve lines: SQLite row is authoritative (holds appliedDelta), then caller items, then loaded history. */
+  const resolveItems = useCallback(async (
+    db: Awaited<ReturnType<typeof getDb>>,
+    saleId: string,
+    items?: LocalSaleItem[]
+  ): Promise<LocalSaleItem[]> => {
+    const stored = await getLocalSaleItems(db, saleId);
+    if (stored) return stored;
+    if (items) return items;
+    for (const group of Object.values(salesByGroup)) {
+      const sale = group.find((s) => s.id === saleId);
+      if (sale) return sale.parsedItems;
     }
+    return [];
+  }, [salesByGroup]);
+
+  /**
+   * Voids a sale locally and adds an outbox entry for the API voidedAt flag.
+   * Queues Shopify restore ops for the exact applied delta (D-13) and
+   * optimistically reverses local stock. If online, immediately calls the API.
+   *
+   * @param items - Optional fallback items when the SQLite row is unavailable.
+   */
+  const voidSale = useCallback(async (saleId: string, items?: LocalSaleItem[]) => {
+    const db = await getDb();
+    const resolvedItems = await resolveItems(db, saleId, items);
 
     // 1. Void in SQLite
     await voidLocalSale(db, saleId);
 
-    // 2. Reverse local stock (add items back)
-    if (resolvedItems) {
-      for (const item of resolvedItems) {
-        await updateLocalStock(db, item.productId, item.variantSku, item.quantity);
-      }
+    // 2. Queue Shopify restores (exact applied delta) + optimistic local stock
+    await enqueueVoidRestores(db, saleId, resolvedItems, Date.now());
+    for (const item of resolvedItems) {
+      if (!item.variantGid) continue;
+      await updateLocalStock(
+        db,
+        item.productGid ?? '',
+        item.variantGid,
+        item.appliedDelta !== undefined ? -item.appliedDelta : item.quantity
+      );
     }
 
-    // 3. Add outbox entry for background API sync (include items for stock delta computation)
+    // 3. Add outbox entry for the API voidedAt flag
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
     await db.runAsync(
       `INSERT OR IGNORE INTO outbox
        (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
        VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
-      [
-        outboxId,
-        'sale_void',
-        JSON.stringify({ saleId, items: resolvedItems }),
-        `sale_void:${saleId}`,
-        now,
-      ]
+      [outboxId, 'sale_void', JSON.stringify({ saleId }), `sale_void:${saleId}`, now]
     );
 
     // 4. Try immediate API call (best effort — outbox handles retry if offline)
     try {
       await apiVoidSale(saleId);
-      // Success — mark outbox done so refreshStock won't double-count the delta
       await db.runAsync(`UPDATE outbox SET status = 'done' WHERE id = ?`, [outboxId]);
     } catch {
       // Offline or API error — outbox will sync later
@@ -171,63 +175,41 @@ export function useHistory() {
 
     // 5. Reload history
     await loadHistory();
-  }, [salesByGroup, loadHistory]);
+  }, [resolveItems, loadHistory]);
 
   /**
-   * Unvoids a sale locally and adds an outbox entry for API sync.
-   * Also re-deducts local stock.
-   * If online, immediately calls the API unvoid endpoint.
+   * Unvoids a sale locally and adds an outbox entry for the API flag.
+   * Queues clamped Shopify re-deducts and optimistically re-deducts local stock.
    *
-   * @param items - Optional items array. When provided, stock deduction uses this
-   *   directly instead of searching salesByGroup.
+   * @param items - Optional fallback items when the SQLite row is unavailable.
    */
-  const unvoidSale = useCallback(async (
-    saleId: string,
-    items?: Array<{ productId: string; variantSku: string; quantity: number }>
-  ) => {
+  const unvoidSale = useCallback(async (saleId: string, items?: LocalSaleItem[]) => {
     const db = await getDb();
-
-    // Use caller-supplied items when available; fall back to salesByGroup lookup
-    let resolvedItems = items;
-    if (!resolvedItems) {
-      let sale: SaleWithItems | undefined;
-      for (const group of Object.values(salesByGroup)) {
-        sale = group.find((s) => s.id === saleId);
-        if (sale) break;
-      }
-      resolvedItems = sale?.parsedItems;
-    }
+    const resolvedItems = await resolveItems(db, saleId, items);
 
     // 1. Unvoid in SQLite
     await unvoidLocalSale(db, saleId);
 
-    // 2. Re-deduct local stock (apply sale again)
-    if (resolvedItems) {
-      for (const item of resolvedItems) {
-        await updateLocalStock(db, item.productId, item.variantSku, -item.quantity);
-      }
+    // 2. Queue clamped Shopify re-deducts + optimistic local stock
+    await enqueueUnvoidDeducts(db, saleId, resolvedItems, Date.now());
+    for (const item of resolvedItems) {
+      if (!item.variantGid) continue;
+      await updateLocalStock(db, item.productGid ?? '', item.variantGid, -item.quantity);
     }
 
-    // 3. Add outbox entry for background API sync (include items for stock delta computation)
+    // 3. Add outbox entry for the API flag
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
     await db.runAsync(
       `INSERT OR IGNORE INTO outbox
        (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
        VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
-      [
-        outboxId,
-        'sale_unvoid',
-        JSON.stringify({ saleId, items: resolvedItems }),
-        `sale_unvoid:${saleId}`,
-        now,
-      ]
+      [outboxId, 'sale_unvoid', JSON.stringify({ saleId }), `sale_unvoid:${saleId}`, now]
     );
 
     // 4. Try immediate API call (best effort)
     try {
       await apiUnvoidSale(saleId);
-      // Success — mark outbox done so refreshStock won't double-count the delta
       await db.runAsync(`UPDATE outbox SET status = 'done' WHERE id = ?`, [outboxId]);
     } catch {
       // Offline or API error — outbox will sync later
@@ -235,7 +217,7 @@ export function useHistory() {
 
     // 5. Reload history
     await loadHistory();
-  }, [salesByGroup, loadHistory]);
+  }, [resolveItems, loadHistory]);
 
   return {
     salesByGroup,
