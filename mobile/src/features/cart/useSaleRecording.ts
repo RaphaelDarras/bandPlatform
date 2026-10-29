@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 
 import { getDb } from '@/db';
+import { buildDeductEntries } from '@/db/stockOps';
 import { recordSaleLocally } from '@/db/outbox';
 import type { LocalSale } from '@/db/outbox';
 import { updateLocalStock } from '@/db/products';
@@ -74,7 +75,10 @@ export function useSaleRecording() {
       id: saleId,
       concertId: currentConcertId ?? '',
       items: cartItems.map((item) => ({
-        productId: item.productId,
+        productGid: item.productGid,
+        variantGid: item.variantGid,
+        productName: item.productName,
+        variantLabel: item.variantLabel,
         variantSku: item.variantSku,
         quantity: item.quantity,
         priceAtSale: item.priceAtSale,
@@ -107,24 +111,26 @@ export function useSaleRecording() {
     }
 
     // 1. Atomic write: sale + outbox
-    await recordSaleLocally(db, sale, {
+    const saleCreateEntry = {
       id: outboxId,
       type: 'sale_create',
       payload: JSON.stringify(outboxPayload),
       idempotency_key: `sale_create:${saleId}`,
       created_at: now,
-    });
+    };
+    const stockEntries = buildDeductEntries(saleId, sale.items, now);
+    await recordSaleLocally(db, sale, [saleCreateEntry, ...stockEntries]);
 
     // 2. Update local product stock for each item
     for (const item of cartItems) {
-      await updateLocalStock(db, item.productId, item.variantSku, -item.quantity);
+      await updateLocalStock(db, item.productGid, item.variantGid, -item.quantity);
     }
 
     // 3. Clear cart
     clearCart();
 
     // 4. Increment sync pending count
-    setPendingCount(pendingCount + 1);
+    setPendingCount(pendingCount + 1 + stockEntries.length);
 
     // 5. Kick off sync immediately (fire-and-forget)
     requestSync(db, apiClient);

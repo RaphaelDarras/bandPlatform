@@ -30,6 +30,11 @@ jest.mock('@/db', () => ({
 
 jest.mock('@/db/outbox', () => ({
   recordSaleLocally: jest.fn(() => Promise.resolve()),
+  SHOPIFY_STOCK: 'shopify_stock',
+}));
+
+jest.mock('@/features/sync/SyncManager', () => ({
+  requestSync: jest.fn(),
 }));
 
 jest.mock('@/db/products', () => ({
@@ -52,7 +57,8 @@ beforeEach(() => {
   useCartStore.setState({
     items: [
       {
-        productId: 'prod-1',
+        productGid: 'gid://shopify/Product/1',
+        variantGid: 'gid://shopify/ProductVariant/S',
         variantSku: 'TSHIRT-S',
         productName: 'Band T-Shirt',
         variantLabel: 'S',
@@ -61,7 +67,8 @@ beforeEach(() => {
         originalPrice: 25.0,
       },
       {
-        productId: 'prod-2',
+        productGid: 'gid://shopify/Product/2',
+        variantGid: 'gid://shopify/ProductVariant/ST',
         variantSku: 'STICKER-1',
         productName: 'Sticker Pack',
         variantLabel: 'Default',
@@ -89,20 +96,31 @@ describe('useSaleRecording', () => {
     });
 
     expect(mockRecordSaleLocally).toHaveBeenCalledTimes(1);
-    const [_db, sale, outboxEntry] = mockRecordSaleLocally.mock.calls[0];
+    const [_db, sale, entries] = mockRecordSaleLocally.mock.calls[0];
+    const outboxEntry = entries[0];
 
     // Sale data
     expect(sale.id).toBe('sale-uuid-1');
     expect(sale.concertId).toBe('concert-abc');
     expect(sale.currency).toBe('EUR');
-    expect(sale.paymentMethod).toBe('Cash');
+    expect(sale.paymentMethod).toBe('cash');
     expect(sale.items).toHaveLength(2);
     expect(sale.items[0]).toMatchObject({
-      productId: 'prod-1',
+      productGid: 'gid://shopify/Product/1',
+      variantGid: 'gid://shopify/ProductVariant/S',
+      productName: 'Band T-Shirt',
+      variantLabel: 'S',
       variantSku: 'TSHIRT-S',
       quantity: 2,
       priceAtSale: 25.0,
     });
+    expect(sale.items[0]).not.toHaveProperty('productId');
+
+    // One atomic call: sale_create + one deduct per line
+    expect(entries).toHaveLength(3);
+    expect(entries[1].type).toBe('shopify_stock');
+    expect(entries[1].idempotency_key).toBe('shopify_stock:sale-uuid-1:0:deduct');
+    expect(entries[2].idempotency_key).toBe('shopify_stock:sale-uuid-1:1:deduct');
 
     // Outbox entry
     expect(outboxEntry.type).toBe('sale_create');
@@ -111,6 +129,12 @@ describe('useSaleRecording', () => {
     // payload is JSON-stringified
     const payload = JSON.parse(outboxEntry.payload);
     expect(payload.saleId).toBe('sale-uuid-1');
+    expect(payload.items[0]).toMatchObject({
+      productGid: 'gid://shopify/Product/1',
+      variantGid: 'gid://shopify/ProductVariant/S',
+      productName: 'Band T-Shirt',
+      variantLabel: 'S',
+    });
   });
 
   it('calls updateLocalStock for each cart item', async () => {
@@ -125,14 +149,14 @@ describe('useSaleRecording', () => {
 
     expect(mockUpdateLocalStock).toHaveBeenCalledWith(
       expect.anything(), // db
-      'prod-1',
-      'TSHIRT-S',
+      'gid://shopify/Product/1',
+      'gid://shopify/ProductVariant/S',
       -2 // -quantity
     );
     expect(mockUpdateLocalStock).toHaveBeenCalledWith(
       expect.anything(), // db
-      'prod-2',
-      'STICKER-1',
+      'gid://shopify/Product/2',
+      'gid://shopify/ProductVariant/ST',
       -1
     );
   });
@@ -147,14 +171,14 @@ describe('useSaleRecording', () => {
     expect(useCartStore.getState().items).toHaveLength(0);
   });
 
-  it('increments syncStore.pendingCount by 1', async () => {
+  it('increments syncStore.pendingCount by 1 + one per deduct line', async () => {
     const { result } = renderHook(() => useSaleRecording());
 
     await act(async () => {
       await result.current.recordSale('Cash');
     });
 
-    expect(useSyncStore.getState().pendingCount).toBe(1);
+    expect(useSyncStore.getState().pendingCount).toBe(3);
   });
 
   it('returns the sale ID', async () => {
