@@ -1,5 +1,13 @@
 import * as SQLite from 'expo-sqlite';
 
+/**
+ * The outbox holds two independent op families (D-14):
+ *  - API (Mongo): sale_create / sale_void / sale_unvoid / sale_update_concert / sale_applied
+ *  - Shopify:     shopify_stock (one row per sale line / restock)
+ */
+export const SHOPIFY_STOCK = 'shopify_stock';
+export const SALE_APPLIED = 'sale_applied';
+
 export interface OutboxRow {
   id: string;
   type: string;
@@ -12,10 +20,15 @@ export interface OutboxRow {
 }
 
 export interface LocalSaleItem {
-  productId: string;
-  variantSku: string;
+  productGid?: string; // gid://shopify/Product/<n> (always set on 07.1+ lines)
+  variantGid?: string; // gid://shopify/ProductVariant/<n> (always set on 07.1+ lines)
+  productName?: string; // snapshot at sale time
+  variantLabel?: string; // snapshot at sale time ('' for single-variant products)
+  variantSku: string; // snapshot SKU ('' when Shopify has none)
   quantity: number;
-  priceAtSale: number;
+  priceAtSale: number; // unit price at sale time
+  appliedDelta?: number; // net Shopify delta currently applied for this line (<= 0)
+  productId?: string; // legacy Mongo id on pre-07.1 lines re-pulled from the API (D-21)
 }
 
 export interface PaymentSplitEntry {
@@ -39,16 +52,41 @@ export interface LocalSale {
   discountType: 'flat' | 'percent';
 }
 
-type OutboxEntryInput = Omit<OutboxRow, 'status' | 'attempt_count' | 'next_attempt_at'>;
+export type OutboxEntryInput = Omit<OutboxRow, 'status' | 'attempt_count' | 'next_attempt_at'>;
+
+export type StockOpKind = 'deduct' | 'restore' | 'unvoid' | 'restock';
+export interface StockOpPlan {
+  inventoryItemId: string;
+  changeFrom: number | null; // available read before a negative delta; null for positive
+  delta: number; // the frozen delta to send (non-zero)
+  key: string; // Shopify @idempotent key (outbox row id, or a rotated UUID)
+}
+export interface ShopifyStockPayload {
+  kind: StockOpKind;
+  variantGid: string;
+  saleId?: string; // set for deduct/restore/unvoid
+  lineIndex?: number; // set for deduct/restore/unvoid
+  requested: number; // deduct/unvoid: positive qty; restock: signed delta; restore: display estimate only
+  note?: string; // restock reason text (local audit only)
+  plan?: StockOpPlan; // written BEFORE the first mutation attempt
+}
+
+const INSERT_OUTBOX_SQL = `INSERT OR IGNORE INTO outbox
+       (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
+       VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`;
+
+function outboxParams(e: OutboxEntryInput): (string | number)[] {
+  return [e.id, e.type, e.payload, e.idempotency_key, e.created_at];
+}
 
 /**
- * Atomic write: sale + outbox in one transaction.
- * This is called the instant the user taps "Confirm" — write is the first operation.
+ * Atomic write: sale + all outbox entries (sale_create + shopify_stock rows) in one transaction.
+ * Called the instant the user taps "Confirm" - write is the first operation.
  */
 export async function recordSaleLocally(
   db: SQLite.SQLiteDatabase,
   sale: LocalSale,
-  outboxEntry: OutboxEntryInput
+  outboxEntries: OutboxEntryInput[]
 ): Promise<void> {
   await db.execAsync('BEGIN');
   try {
@@ -70,23 +108,45 @@ export async function recordSaleLocally(
       ]
     );
     // INSERT OR IGNORE prevents duplicate on retry
-    await db.runAsync(
-      `INSERT OR IGNORE INTO outbox
-       (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
-       VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
-      [
-        outboxEntry.id,
-        outboxEntry.type,
-        outboxEntry.payload,
-        outboxEntry.idempotency_key,
-        outboxEntry.created_at,
-      ]
-    );
+    for (const entry of outboxEntries) {
+      await db.runAsync(INSERT_OUTBOX_SQL, outboxParams(entry));
+    }
     await db.execAsync('COMMIT');
   } catch (e) {
     await db.execAsync('ROLLBACK');
     throw e;
   }
+}
+
+/**
+ * Inserts outbox entries (INSERT OR IGNORE). No transaction of its own;
+ * callers needing atomicity wrap it in BEGIN/COMMIT.
+ */
+export async function insertOutboxEntries(
+  db: SQLite.SQLiteDatabase,
+  entries: OutboxEntryInput[]
+): Promise<void> {
+  for (const entry of entries) {
+    await db.runAsync(INSERT_OUTBOX_SQL, outboxParams(entry));
+  }
+}
+
+/** Replaces an outbox row's payload (e.g. to persist a stock op plan). */
+export async function updateOutboxPayload(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  payload: string
+): Promise<void> {
+  await db.runAsync(`UPDATE outbox SET payload = ? WHERE id = ?`, [payload, id]);
+}
+
+/** All pending rows regardless of next_attempt_at, ordered by creation time. */
+export async function getAllPendingOutboxRows(
+  db: SQLite.SQLiteDatabase
+): Promise<OutboxRow[]> {
+  return db.getAllAsync<OutboxRow>(
+    `SELECT * FROM outbox WHERE status = 'pending' ORDER BY created_at ASC`
+  );
 }
 
 /**

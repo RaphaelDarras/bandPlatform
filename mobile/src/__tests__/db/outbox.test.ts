@@ -1,4 +1,12 @@
-import { recordSaleLocally, getPendingOutboxRows, markOutboxDone, incrementAttempt } from '@/db/outbox';
+import {
+  recordSaleLocally,
+  getPendingOutboxRows,
+  markOutboxDone,
+  incrementAttempt,
+  insertOutboxEntries,
+  updateOutboxPayload,
+  getAllPendingOutboxRows,
+} from '@/db/outbox';
 import type { LocalSale } from '@/db/outbox';
 
 const mockDb = {
@@ -11,7 +19,17 @@ const mockDb = {
 const mockSale: LocalSale = {
   id: 'sale-uuid-1',
   concertId: 'concert-1',
-  items: [{ productId: 'p1', variantSku: 'p1-m', quantity: 2, priceAtSale: 15 }],
+  items: [
+    {
+      productGid: 'gid://shopify/Product/1',
+      variantGid: 'gid://shopify/ProductVariant/2',
+      productName: 'Tee',
+      variantLabel: 'M',
+      variantSku: 'p1-m',
+      quantity: 2,
+      priceAtSale: 15,
+    },
+  ],
   totalAmount: 30,
   paymentMethod: 'cash',
   currency: 'EUR',
@@ -33,13 +51,13 @@ beforeEach(() => {
 
 describe('recordSaleLocally', () => {
   it('wraps writes in BEGIN/COMMIT', async () => {
-    await recordSaleLocally(mockDb as any, mockSale, mockOutboxEntry);
+    await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry]);
     expect(mockDb.execAsync).toHaveBeenCalledWith('BEGIN');
     expect(mockDb.execAsync).toHaveBeenCalledWith('COMMIT');
   });
 
   it('inserts into sales table with correct fields', async () => {
-    await recordSaleLocally(mockDb as any, mockSale, mockOutboxEntry);
+    await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry]);
     const insertSaleCall = (mockDb.runAsync.mock.calls as any[][]).find((call) =>
       call[0].includes('INSERT INTO sales')
     );
@@ -59,7 +77,7 @@ describe('recordSaleLocally', () => {
   });
 
   it('inserts into outbox table with idempotency key', async () => {
-    await recordSaleLocally(mockDb as any, mockSale, mockOutboxEntry);
+    await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry]);
     const insertOutboxCall = (mockDb.runAsync.mock.calls as any[][]).find((call) =>
       call[0].includes('INSERT OR IGNORE INTO outbox')
     );
@@ -72,6 +90,87 @@ describe('recordSaleLocally', () => {
         mockOutboxEntry.idempotency_key,
       ])
     );
+  });
+});
+
+describe('recordSaleLocally multi-entry', () => {
+  const e2 = { ...mockOutboxEntry, id: 'o2', idempotency_key: 'k2' };
+  const e3 = { ...mockOutboxEntry, id: 'o3', idempotency_key: 'k3' };
+
+  it('writes one sale row and three outbox rows in one transaction', async () => {
+    await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry, e2, e3]);
+    const calls = (mockDb.runAsync.mock.calls as any[][]).map((c) => c[0] as string);
+    expect(calls.filter((c) => c.includes('INSERT INTO sales'))).toHaveLength(1);
+    expect(calls.filter((c) => c.includes('INSERT OR IGNORE INTO outbox'))).toHaveLength(3);
+    expect(mockDb.execAsync).toHaveBeenCalledWith('COMMIT');
+  });
+
+  it('persists snapshot fields in items_json', async () => {
+    await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry]);
+    const call = (mockDb.runAsync.mock.calls as any[][]).find((c) =>
+      c[0].includes('INSERT INTO sales')
+    );
+    const items = JSON.parse(call![1][2]);
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        productGid: 'gid://shopify/Product/1',
+        variantGid: 'gid://shopify/ProductVariant/2',
+        productName: 'Tee',
+        variantLabel: 'M',
+        variantSku: 'p1-m',
+        quantity: 2,
+        priceAtSale: 15,
+      })
+    );
+  });
+
+  it('rolls back and rethrows when a later outbox insert fails', async () => {
+    let n = 0;
+    (mockDb.runAsync as jest.Mock).mockImplementation(() => {
+      n += 1;
+      if (n === 3) return Promise.reject(new Error('boom'));
+      return Promise.resolve({ lastInsertRowId: 1, changes: 1 });
+    });
+    await expect(
+      recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry, e2, e3])
+    ).rejects.toThrow('boom');
+    expect(mockDb.execAsync).toHaveBeenCalledWith('ROLLBACK');
+    expect(mockDb.execAsync).not.toHaveBeenCalledWith('COMMIT');
+    (mockDb.runAsync as jest.Mock).mockImplementation(() =>
+      Promise.resolve({ lastInsertRowId: 1, changes: 1 })
+    );
+  });
+});
+
+describe('insertOutboxEntries', () => {
+  it('inserts each entry as pending with zero attempts', async () => {
+    await insertOutboxEntries(mockDb as any, [
+      mockOutboxEntry,
+      { ...mockOutboxEntry, id: 'x', idempotency_key: 'y' },
+    ]);
+    const calls = mockDb.runAsync.mock.calls as any[][];
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0]).toContain("'pending', 0, 0");
+  });
+});
+
+describe('updateOutboxPayload', () => {
+  it('updates payload by id', async () => {
+    await updateOutboxPayload(mockDb as any, 'id1', '{"a":1}');
+    expect(mockDb.runAsync).toHaveBeenCalledWith(
+      'UPDATE outbox SET payload = ? WHERE id = ?',
+      ['{"a":1}', 'id1']
+    );
+  });
+});
+
+describe('getAllPendingOutboxRows', () => {
+  it('selects pending rows without next_attempt_at filter, ordered by created_at', async () => {
+    await getAllPendingOutboxRows(mockDb as any);
+    const sql = (mockDb.getAllAsync.mock.calls as any[][])[0][0] as string;
+    expect(sql).toContain("status = 'pending'");
+    expect(sql).not.toContain('next_attempt_at');
+    expect(sql).toContain('ORDER BY created_at ASC');
   });
 });
 
