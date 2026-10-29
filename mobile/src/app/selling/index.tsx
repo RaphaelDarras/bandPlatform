@@ -9,19 +9,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/use-theme';
 import { getDb } from '@/db';
-import { getCachedProducts, upsertProducts, reconcileActiveProducts } from '@/db/products';
+import { getCachedProducts } from '@/db/products';
 import { getConcertPriceOverrides } from '@/db/concerts';
-import { getPendingOutboxRows } from '@/db/outbox';
 import type { CachedProduct } from '@/db/products';
-import { apiGetProducts } from '@/api/products';
+import { refreshCatalogue } from '@/features/stock/catalogue';
 import { useCartStore } from '@/stores/cartStore';
 import { ProductGrid } from '@/features/catalog/ProductGrid';
 
 /**
  * Selling index screen — shows the product grid.
- * - Loads products from local SQLite cache
+ * - Catalogue comes from Shopify (ACTIVE products) via refreshCatalogue, cached in SQLite
  * - If no cached products and offline: shows a message
- * - Pull-to-refresh reloads from cache (API sync driven by separate background job)
+ * - Pull-to-refresh and focus re-fetch from Shopify, falling back to the cache offline
  */
 export default function SellingScreen() {
   const c = useTheme();
@@ -33,50 +32,7 @@ export default function SellingScreen() {
   const loadProducts = useCallback(async () => {
     try {
       const db = await getDb();
-      let fetchedFromApi = false;
-
-      try {
-        const apiProducts = await apiGetProducts();
-        if (apiProducts.length > 0) {
-          fetchedFromApi = true;
-          // Build pending delta from unsynced sale_create outbox rows.
-          const pendingRows = await getPendingOutboxRows(db);
-          const pendingDelta = new Map<string, number>();
-          for (const row of pendingRows) {
-            if (row.type !== 'sale_create') continue;
-            const payload = JSON.parse(row.payload) as {
-              items: Array<{ productId: string; variantSku: string; quantity: number }>;
-            };
-            for (const item of payload.items) {
-              const key = `${item.productId}:${item.variantSku}`;
-              pendingDelta.set(key, (pendingDelta.get(key) ?? 0) + item.quantity);
-            }
-          }
-
-          await upsertProducts(db, apiProducts.map((p) => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            imageUrl: p.imageUrl ?? null,
-            active: 1 as const,
-            updatedAt: Date.now(),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            variants: (p.variants as any[]).map((v) => ({
-              sku: v.sku,
-              label: v.label || [v.size, v.color].filter(Boolean).join(' / ') || v.sku,
-              priceAdjustment: v.priceAdjustment ?? 0,
-              stock: (v.stock ?? 0) - (pendingDelta.get(`${p.id}:${v.sku}`) ?? 0),
-            })),
-          })));
-        }
-        // Reconcile against the fetched active set so products deactivated or
-        // deleted on the server leave the POS. Runs whenever the fetch succeeded
-        // — including an empty result (all deactivated) — but not on the network
-        // failure handled below, which must keep the cache intact for offline use.
-        await reconcileActiveProducts(db, apiProducts.map((p) => p.id));
-      } catch {
-        // Network unavailable — fall through to cache
-      }
+      const fetchedFromApi = await refreshCatalogue(db);
 
       let cached = await getCachedProducts(db);
 

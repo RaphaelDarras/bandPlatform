@@ -1,7 +1,7 @@
 /**
  * Stock Adjustment screen — add or remove units per variant.
  * Select product → adjust each variant inline with +/- → optional reason → confirm.
- * Requires internet connection.
+ * Adjustments are queued and applied to Shopify (works offline).
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
@@ -18,17 +18,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useStock } from '@/features/stock/useStock';
 import { useTheme } from '@/hooks/use-theme';
-import { useSyncStore } from '@/stores/syncStore';
 import type { CachedProduct } from '@/db/products';
 import { stockColor } from '@/utils/stockColor';
 
 export default function RestockScreen() {
   const { products, loading, refreshStock, restock } = useStock();
-  const { isOnline } = useSyncStore();
   const c = useTheme();
 
   const [selectedProduct, setSelectedProduct] = useState<CachedProduct | null>(null);
-  // quantities[sku] = current displayed quantity (starts at variant.stock)
+  // quantities[variantGid] = current displayed quantity (starts at variant.stock)
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -41,18 +39,18 @@ export default function RestockScreen() {
     setSelectedProduct(product);
     const initial: Record<string, number> = {};
     for (const v of product.variants) {
-      initial[v.sku] = v.stock;
+      initial[v.variantGid] = v.stock;
     }
     setQuantities(initial);
     setReason('');
   }, []);
 
-  const adjust = useCallback((sku: string, by: number) => {
-    setQuantities((prev) => ({ ...prev, [sku]: (prev[sku] ?? 0) + by }));
+  const adjust = useCallback((variantGid: string, by: number) => {
+    setQuantities((prev) => ({ ...prev, [variantGid]: (prev[variantGid] ?? 0) + by }));
   }, []);
 
   const hasChanges = selectedProduct?.variants.some(
-    (v) => (quantities[v.sku] ?? v.stock) !== v.stock
+    (v) => (quantities[v.variantGid] ?? v.stock) !== v.stock
   ) ?? false;
 
   const handleConfirm = useCallback(async () => {
@@ -60,9 +58,9 @@ export default function RestockScreen() {
     setSubmitting(true);
     try {
       for (const variant of selectedProduct.variants) {
-        const delta = (quantities[variant.sku] ?? variant.stock) - variant.stock;
+        const delta = (quantities[variant.variantGid] ?? variant.stock) - variant.stock;
         if (delta !== 0) {
-          await restock(selectedProduct.id, variant.sku, delta, reason);
+          await restock(variant.variantGid, delta, reason);
         }
       }
       Alert.alert('Stock Updated', `${selectedProduct.name} stock has been adjusted.`, [
@@ -74,27 +72,6 @@ export default function RestockScreen() {
       setSubmitting(false);
     }
   }, [selectedProduct, quantities, hasChanges, reason, restock]);
-
-  if (!isOnline) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
-        <View style={[styles.header, { backgroundColor: c.headerBg, borderBottomColor: c.border }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: c.text }]}>Stock Adjustment</Text>
-          <View style={{ width: 60 }} />
-        </View>
-        <View style={styles.offlineState}>
-          <Text style={styles.offlineIcon}>📵</Text>
-          <Text style={[styles.offlineTitle, { color: c.text }]}>Internet Required</Text>
-          <Text style={[styles.offlineSubtext, { color: c.textSecondary }]}>
-            Stock adjustments require an internet connection. Please connect and try again.
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
@@ -143,12 +120,12 @@ export default function RestockScreen() {
             <Text style={[styles.sectionTitle, { color: c.text }]}>2. Adjust Quantities</Text>
             <View style={[styles.variantsCard, { backgroundColor: c.card, borderWidth: 1, borderColor: c.cardBorder }]}>
               {selectedProduct.variants.map((variant, index) => {
-                const qty = quantities[variant.sku] ?? variant.stock;
+                const qty = quantities[variant.variantGid] ?? variant.stock;
                 const delta = qty - variant.stock;
                 const isLast = index === selectedProduct.variants.length - 1;
                 return (
                   <View
-                    key={variant.sku}
+                    key={variant.variantGid}
                     style={[styles.variantRow, !isLast && styles.variantRowBorder, !isLast && { borderBottomColor: c.border }]}
                   >
                     <View style={styles.variantInfo}>
@@ -168,7 +145,7 @@ export default function RestockScreen() {
                     <View style={styles.stepper}>
                       <Pressable
                         style={({ pressed }) => [styles.stepBtn, { backgroundColor: c.backgroundElement }, pressed && styles.stepBtnPressed]}
-                        onPress={() => adjust(variant.sku, -1)}
+                        onPress={() => adjust(variant.variantGid, -1)}
                         accessibilityLabel={`Decrease ${variant.label}`}
                       >
                         <Text style={[styles.stepBtnText, { color: c.text }]}>−</Text>
@@ -183,7 +160,7 @@ export default function RestockScreen() {
                       </Text>
                       <Pressable
                         style={({ pressed }) => [styles.stepBtn, { backgroundColor: c.backgroundElement }, pressed && styles.stepBtnPressed]}
-                        onPress={() => adjust(variant.sku, 1)}
+                        onPress={() => adjust(variant.variantGid, 1)}
                         accessibilityLabel={`Increase ${variant.label}`}
                       >
                         <Text style={[styles.stepBtnText, { color: c.text }]}>+</Text>
