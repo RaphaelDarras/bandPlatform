@@ -224,6 +224,18 @@ router.patch('/:id/applied', async (req, res) => {
       );
     if (!valid) return res.status(400).json({ error: 'Invalid applied lines' });
 
+    // Bounds-check against the stored sale (WR-02): an out-of-range lineIndex
+    // would make MongoDB pad items[] with nulls, and appliedDelta can never
+    // exceed the line's quantity.
+    const existing = await Sale.findOne({ idempotencyKey: `sale_create:${req.params.id}` });
+    if (!existing) return res.status(404).json({ error: 'Sale not found' });
+    const storedItems = Array.isArray(existing.items) ? existing.items : [];
+    const inBounds = lines.every((l) => {
+      const item = storedItems[l.lineIndex];
+      return item && Number.isInteger(item.quantity) && l.appliedDelta >= -item.quantity;
+    });
+    if (!inBounds) return res.status(400).json({ error: 'Applied line out of range' });
+
     const $set = {};
     for (const l of lines) $set[`items.${l.lineIndex}.appliedDelta`] = l.appliedDelta;
 

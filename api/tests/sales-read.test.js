@@ -60,6 +60,7 @@ beforeEach(() => {
 
 describe('PATCH /api/sales/:id/applied', () => {
   it('sets appliedDelta by idempotencyKey and returns 200', async () => {
+    mockSaleModule.findOne.mockResolvedValue({ items: [{ quantity: 2 }] });
     mockSaleModule.findOneAndUpdate.mockResolvedValue({ _id: 'x' });
     const res = await request(app)
       .patch('/api/sales/abc/applied')
@@ -75,7 +76,7 @@ describe('PATCH /api/sales/:id/applied', () => {
   });
 
   it('returns 404 when the sale is not synced yet', async () => {
-    mockSaleModule.findOneAndUpdate.mockResolvedValue(null);
+    mockSaleModule.findOne.mockResolvedValue(null);
     const res = await request(app)
       .patch('/api/sales/abc/applied')
       .set('Authorization', AUTH)
@@ -98,6 +99,31 @@ describe('PATCH /api/sales/:id/applied', () => {
       .send(body);
     expect(res.status).toBe(400);
     expect(mockSaleModule.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/sales/:id/applied bounds (WR-02)', () => {
+  it.each([
+    ['lineIndex past the last item', { lineIndex: 2, appliedDelta: -1 }],
+    ['appliedDelta below -quantity', { lineIndex: 0, appliedDelta: -3 }],
+  ])('returns 400 for %s without writing', async (_name, line) => {
+    mockSaleModule.findOne.mockResolvedValue({ items: [{ quantity: 2 }, { quantity: 1 }] });
+    const res = await request(app)
+      .patch('/api/sales/abc/applied')
+      .set('Authorization', AUTH)
+      .send({ lines: [line] });
+    expect(res.status).toBe(400);
+    expect(mockSaleModule.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('accepts appliedDelta equal to -quantity on the last line', async () => {
+    mockSaleModule.findOne.mockResolvedValue({ items: [{ quantity: 2 }, { quantity: 1 }] });
+    mockSaleModule.findOneAndUpdate.mockResolvedValue({ _id: 'x' });
+    const res = await request(app)
+      .patch('/api/sales/abc/applied')
+      .set('Authorization', AUTH)
+      .send({ lines: [{ lineIndex: 1, appliedDelta: -1 }] });
+    expect(res.status).toBe(200);
   });
 });
 
