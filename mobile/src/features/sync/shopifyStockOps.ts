@@ -28,7 +28,8 @@ import {
   incrementAttempt,
   insertOutboxEntries,
   markOutboxDone,
-  updateOutboxPayload,
+  getOutboxRow,
+  updatePendingOutboxPayload,
   type OutboxRow,
   type ShopifyStockPayload,
   type StockOpPlan,
@@ -96,11 +97,31 @@ async function dropOp(
     variantGid: payload.variantGid,
     reason,
   });
-  await runInTransaction(db, async () => {
-    await recordApplied(db, row, payload, 0);
-    await markOutboxDone(db, row.id);
-  });
+  await commit(db, row, payload, 0);
   return 'dropped';
+}
+
+/**
+ * One locked transaction: the applied delta, its sale_applied op and the done
+ * flag land together and cannot be rolled back by another flow (CR-04).
+ * An unplanned row (nothing was sent to Shopify) is only committed while it is
+ * still pending: a void/unvoid may have cancelled it meanwhile (CR-01).
+ */
+async function commit(
+  db: SQLiteDatabase,
+  row: OutboxRow,
+  payload: ShopifyStockPayload,
+  appliedDelta: number
+): Promise<boolean> {
+  return runInTransaction(db, async () => {
+    if (!payload.plan) {
+      const current = await getOutboxRow(db, row.id);
+      if (!current || current.status !== 'pending') return false;
+    }
+    await recordApplied(db, row, payload, appliedDelta);
+    await markOutboxDone(db, row.id);
+    return true;
+  });
 }
 
 async function finish(
@@ -109,16 +130,16 @@ async function finish(
   payload: ShopifyStockPayload,
   appliedDelta: number
 ): Promise<StockOpResult> {
-  // One locked transaction: the applied delta, its sale_applied op and the
-  // done flag land together and cannot be rolled back by another flow (CR-04).
-  await runInTransaction(db, async () => {
-    await recordApplied(db, row, payload, appliedDelta);
-    await markOutboxDone(db, row.id);
-  });
-  return 'done';
+  return (await commit(db, row, payload, appliedDelta)) ? 'done' : 'dropped';
 }
 
-async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
+async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResult> {
+  // The caller's row may be a stale snapshot (the sync run awaited API calls
+  // first): a void/unvoid may have cancelled it since (CR-01).
+  const fresh = await getOutboxRow(db, snapshot.id);
+  if (!fresh || fresh.status !== 'pending') return 'dropped';
+  const row = fresh;
+
   let payload: ShopifyStockPayload;
   try {
     payload = JSON.parse(row.payload) as ShopifyStockPayload;
@@ -196,7 +217,12 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
         key: keyOverride ?? row.id,
       };
       payload = { ...payload, plan };
-      await withDbLock(() => updateOutboxPayload(db, row.id, JSON.stringify(payload)));
+      // Persisting the plan is the commit point: conditional on the row still
+      // being pending, under the same lock enqueueReversal takes. Once planned
+      // a row can no longer be cancelled (enqueueReversal skips planned rows).
+      const planned = JSON.stringify(payload);
+      const committed = await withDbLock(() => updatePendingOutboxPayload(db, row.id, planned));
+      if (!committed) return 'dropped'; // cancelled while we were reading the level
     }
 
     const res = await adjustAvailable({
@@ -216,7 +242,7 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
         plan = undefined;
         const { plan: _dropped, ...rest } = payload;
         payload = rest as ShopifyStockPayload;
-        await withDbLock(() => updateOutboxPayload(db, row.id, JSON.stringify(payload)));
+        await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
         if (stale >= MAX_STALE_REPLANS) {
           await backoff(db, row);
           return 'retry';
@@ -229,7 +255,7 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
       case 'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED': {
         const newPlan: StockOpPlan = { ...plan, key: Crypto.randomUUID() };
         payload = { ...payload, plan: newPlan };
-        await withDbLock(() => updateOutboxPayload(db, row.id, JSON.stringify(payload)));
+        await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
         await backoff(db, row);
         return 'retry';
       }

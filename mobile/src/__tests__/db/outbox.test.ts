@@ -6,6 +6,7 @@ import {
   insertOutboxEntries,
   updateOutboxPayload,
   getAllPendingOutboxRows,
+  updatePendingOutboxPayload,
 } from '@/db/outbox';
 import type { LocalSale } from '@/db/outbox';
 
@@ -209,5 +210,14 @@ describe('incrementAttempt', () => {
       expect.stringContaining('attempt_count'),
       expect.arrayContaining([nextAttempt, 'outbox-id-1'])
     );
+  });
+});
+
+describe('updatePendingOutboxPayload (CR-01)', () => {
+  it('only writes while the row is pending and reports whether it did', async () => {
+    mockDb.runAsync.mockResolvedValueOnce({ lastInsertRowId: 0, changes: 0 });
+    expect(await updatePendingOutboxPayload(mockDb as any, 'r1', '{}')).toBe(false);
+    expect((mockDb.runAsync.mock.calls.at(-1) as any[])[0]).toContain("status = 'pending'");
+    expect(await updatePendingOutboxPayload(mockDb as any, 'r1', '{}')).toBe(true);
   });
 });

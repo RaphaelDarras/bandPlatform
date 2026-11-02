@@ -136,6 +136,31 @@ export async function updateOutboxPayload(
   await db.runAsync(`UPDATE outbox SET payload = ? WHERE id = ?`, [payload, id]);
 }
 
+/**
+ * Replaces a payload only while the row is still pending. Returns false when
+ * the row was cancelled/finished meanwhile (e.g. a void cancelled an unplanned
+ * deduct) - the caller must then NOT execute it (CR-01).
+ */
+export async function updatePendingOutboxPayload(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  payload: string
+): Promise<boolean> {
+  const r = await db.runAsync(
+    `UPDATE outbox SET payload = ? WHERE id = ? AND status = 'pending'`,
+    [payload, id]
+  );
+  return (r?.changes ?? 0) > 0;
+}
+
+/** Fresh read of one outbox row (null if missing). */
+export async function getOutboxRow(
+  db: SQLite.SQLiteDatabase,
+  id: string
+): Promise<OutboxRow | null> {
+  return (await db.getFirstAsync<OutboxRow>(`SELECT * FROM outbox WHERE id = ?`, [id])) ?? null;
+}
+
 /** All pending rows regardless of next_attempt_at, ordered by creation time. */
 export async function getAllPendingOutboxRows(
   db: SQLite.SQLiteDatabase

@@ -13,7 +13,8 @@ jest.mock('@/db/outbox', () => ({
   incrementAttempt: jest.fn(() => Promise.resolve()),
   insertOutboxEntries: jest.fn(() => Promise.resolve()),
   markOutboxDone: jest.fn(() => Promise.resolve()),
-  updateOutboxPayload: jest.fn(() => Promise.resolve()),
+  updatePendingOutboxPayload: jest.fn(() => Promise.resolve(true)),
+  getOutboxRow: jest.fn(),
 }));
 jest.mock('@/db/sales', () => ({
   getLocalSaleItems: jest.fn(),
@@ -27,7 +28,8 @@ import * as sales from '@/db/sales';
 
 const readLevel = shopify.readVariantLevel as jest.Mock;
 const adjust = shopify.adjustAvailable as jest.Mock;
-const updatePayload = outbox.updateOutboxPayload as jest.Mock;
+const updatePayload = outbox.updatePendingOutboxPayload as jest.Mock;
+const getRow = outbox.getOutboxRow as jest.Mock;
 const markDone = outbox.markOutboxDone as jest.Mock;
 const incAttempt = outbox.incrementAttempt as jest.Mock;
 const insertEntries = outbox.insertOutboxEntries as jest.Mock;
@@ -68,9 +70,15 @@ beforeEach(() => {
   pendingRows.mockResolvedValue([]);
 });
 
+/** Runs the executor with getOutboxRow returning the same (pending) row. */
+function exec(r: outbox.OutboxRow) {
+  getRow.mockResolvedValue(r);
+  return executeStockOp(db, r);
+}
+
 describe('executeStockOp', () => {
   it('deduct clamps, persists plan before mutating, records applied', async () => {
-    const res = await executeStockOp(db, row(deduct(2)));
+    const res = await exec(row(deduct(2)));
     expect(res).toBe('done');
     expect(JSON.parse(updatePayload.mock.calls[0][2]).plan).toEqual({
       inventoryItemId: 'inv1',
@@ -93,7 +101,7 @@ describe('executeStockOp', () => {
 
   it('deduct with 0 available applies nothing', async () => {
     readLevel.mockResolvedValue({ inventoryItemId: 'inv1', available: 0 });
-    expect(await executeStockOp(db, row(deduct(2)))).toBe('done');
+    expect(await exec(row(deduct(2)))).toBe('done');
     expect(adjust).not.toHaveBeenCalled();
     expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, 0);
     expect(insertEntries).toHaveBeenCalled();
@@ -102,7 +110,7 @@ describe('executeStockOp', () => {
   it('replays an existing plan without reading', async () => {
     const plan = { inventoryItemId: 'invX', changeFrom: 4, delta: -2, key: 'frozen' };
     adjust.mockResolvedValue({ ok: true, appliedDelta: -2 });
-    await executeStockOp(db, row(deduct(2, { plan })));
+    await exec(row(deduct(2, { plan })));
     expect(readLevel).not.toHaveBeenCalled();
     expect(adjust).toHaveBeenCalledWith(
       expect.objectContaining({ inventoryItemId: 'invX', delta: -2, changeFromQuantity: 4, idempotencyKey: 'frozen' })
@@ -111,7 +119,7 @@ describe('executeStockOp', () => {
 
   it('retryable ShopifyError backs off and keeps plan', async () => {
     adjust.mockRejectedValue(new shopify.ShopifyError('network', 'down', { retryable: true }));
-    expect(await executeStockOp(db, row(deduct(1), {}))).toBe('retry');
+    expect(await exec(row(deduct(1), {}))).toBe('retry');
     expect(incAttempt).toHaveBeenCalledWith(db, 'row1', expect.any(Number));
     expect(updatePayload).toHaveBeenCalledTimes(1); // only the initial plan persist
     expect(markDone).not.toHaveBeenCalled();
@@ -121,7 +129,7 @@ describe('executeStockOp', () => {
     adjust
       .mockResolvedValueOnce({ ok: false, code: 'CHANGE_FROM_QUANTITY_STALE', message: 'x' })
       .mockResolvedValueOnce({ ok: true, appliedDelta: -1 });
-    expect(await executeStockOp(db, row(deduct(1)))).toBe('done');
+    expect(await exec(row(deduct(1)))).toBe('done');
     expect(adjust.mock.calls[0][0].idempotencyKey).toBe('row1');
     expect(adjust.mock.calls[1][0].idempotencyKey).not.toBe('row1');
     expect(readLevel).toHaveBeenCalledTimes(2);
@@ -129,14 +137,14 @@ describe('executeStockOp', () => {
 
   it('gives up after 3 stale results', async () => {
     adjust.mockResolvedValue({ ok: false, code: 'CHANGE_FROM_QUANTITY_STALE', message: 'x' });
-    expect(await executeStockOp(db, row(deduct(1)))).toBe('retry');
+    expect(await exec(row(deduct(1)))).toBe('retry');
     expect(adjust).toHaveBeenCalledTimes(3);
     expect(incAttempt).toHaveBeenCalled();
   });
 
   it('drops when variant is not found', async () => {
     readLevel.mockResolvedValue(null);
-    expect(await executeStockOp(db, row(deduct(1)))).toBe('dropped');
+    expect(await exec(row(deduct(1)))).toBe('dropped');
     expect(console.warn).toHaveBeenCalled();
     expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, 0);
     expect(insertEntries).toHaveBeenCalled();
@@ -145,7 +153,7 @@ describe('executeStockOp', () => {
 
   it('drops on INVALID_INVENTORY_ITEM', async () => {
     adjust.mockResolvedValue({ ok: false, code: 'INVALID_INVENTORY_ITEM', message: 'x' });
-    expect(await executeStockOp(db, row(deduct(1)))).toBe('dropped');
+    expect(await exec(row(deduct(1)))).toBe('dropped');
     expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, 0);
     expect(markDone).toHaveBeenCalled();
   });
@@ -153,7 +161,7 @@ describe('executeStockOp', () => {
   it('restore re-adds the applied delta', async () => {
     getItems.mockResolvedValue([{ appliedDelta: -2 }]);
     adjust.mockResolvedValue({ ok: true, appliedDelta: 2 });
-    const r = await executeStockOp(db, row({ kind: 'restore', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 2 }));
+    const r = await exec(row({ kind: 'restore', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 2 }));
     expect(r).toBe('done');
     expect(adjust).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -170,8 +178,7 @@ describe('executeStockOp', () => {
     pendingRows.mockResolvedValue([
       row(deduct(1), { id: 'dedRow' }),
     ]);
-    const r = await executeStockOp(
-      db,
+    const r = await exec(
       row({ kind: 'restore', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 1 })
     );
     expect(r).toBe('deferred');
@@ -182,8 +189,7 @@ describe('executeStockOp', () => {
 
   it('restore with applied 0 makes no Shopify call', async () => {
     getItems.mockResolvedValue([{ appliedDelta: 0 }]);
-    const r = await executeStockOp(
-      db,
+    const r = await exec(
       row({ kind: 'restore', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 1 })
     );
     expect(r).toBe('done');
@@ -194,7 +200,7 @@ describe('executeStockOp', () => {
   it('unvoid clamps like deduct', async () => {
     readLevel.mockResolvedValue({ inventoryItemId: 'inv1', available: 2 });
     adjust.mockResolvedValue({ ok: true, appliedDelta: -2 });
-    await executeStockOp(db, row({ kind: 'unvoid', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 3 }));
+    await exec(row({ kind: 'unvoid', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 3 }));
     expect(adjust).toHaveBeenCalledWith(
       expect.objectContaining({ delta: -2, referenceDocumentUri: 'gid://band-pos/SaleUnvoid/s1' })
     );
@@ -203,7 +209,7 @@ describe('executeStockOp', () => {
 
   it('positive restock adds stock, no sale write', async () => {
     adjust.mockResolvedValue({ ok: true, appliedDelta: 5 });
-    await executeStockOp(db, row({ kind: 'restock', variantGid: 'v1', requested: 5 }));
+    await exec(row({ kind: 'restock', variantGid: 'v1', requested: 5 }));
     expect(adjust).toHaveBeenCalledWith(
       expect.objectContaining({
         delta: 5,
@@ -217,13 +223,13 @@ describe('executeStockOp', () => {
 
   it('negative restock clamps', async () => {
     adjust.mockResolvedValue({ ok: true, appliedDelta: -1 });
-    await executeStockOp(db, row({ kind: 'restock', variantGid: 'v1', requested: -4 }));
+    await exec(row({ kind: 'restock', variantGid: 'v1', requested: -4 }));
     expect(adjust).toHaveBeenCalledWith(expect.objectContaining({ delta: -1, changeFromQuantity: 1 }));
   });
 
   it('IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED keeps delta, rotates key', async () => {
     adjust.mockResolvedValue({ ok: false, code: 'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED', message: 'x' });
-    expect(await executeStockOp(db, row(deduct(1)))).toBe('retry');
+    expect(await exec(row(deduct(1)))).toBe('retry');
     const last = JSON.parse(updatePayload.mock.calls.at(-1)![2]).plan;
     expect(last.delta).toBe(-1);
     expect(last.changeFrom).toBe(1);
@@ -232,7 +238,37 @@ describe('executeStockOp', () => {
   });
 
   it('unparsable payload is marked done', async () => {
-    expect(await executeStockOp(db, row({}, { payload: 'not json' }))).toBe('dropped');
+    expect(await exec(row({}, { payload: 'not json' }))).toBe('dropped');
     expect(markDone).toHaveBeenCalled();
+  });
+});
+
+describe('executeStockOp vs concurrent void/unvoid (CR-01)', () => {
+  it('drops a stale snapshot whose row was already cancelled', async () => {
+    const snapshot = row(deduct(1));
+    getRow.mockResolvedValue({ ...snapshot, status: 'done' });
+    expect(await executeStockOp(db, snapshot)).toBe('dropped');
+    expect(readLevel).not.toHaveBeenCalled();
+    expect(adjust).not.toHaveBeenCalled();
+    expect(setApplied).not.toHaveBeenCalled();
+    expect(insertEntries).not.toHaveBeenCalled();
+  });
+
+  it('does not mutate when the row is cancelled while the level is read', async () => {
+    updatePayload.mockResolvedValueOnce(false); // conditional plan write hit 0 rows
+    expect(await exec(row(deduct(1)))).toBe('dropped');
+    expect(readLevel).toHaveBeenCalled();
+    expect(adjust).not.toHaveBeenCalled();
+    expect(setApplied).not.toHaveBeenCalled();
+    expect(markDone).not.toHaveBeenCalled();
+  });
+
+  it('does not record a no-op result for a row cancelled meanwhile', async () => {
+    readLevel.mockResolvedValue({ inventoryItemId: 'inv1', available: 0 });
+    const r = row(deduct(1));
+    getRow.mockResolvedValueOnce(r).mockResolvedValueOnce({ ...r, status: 'done' });
+    expect(await executeStockOp(db, r)).toBe('dropped');
+    expect(setApplied).not.toHaveBeenCalled();
+    expect(markDone).not.toHaveBeenCalled();
   });
 });
