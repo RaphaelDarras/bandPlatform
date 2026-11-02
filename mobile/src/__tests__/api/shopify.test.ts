@@ -146,6 +146,17 @@ describe('gql', () => {
     expect(err.retryable).toBe(false);
   });
 
+  it('exposes top-level extensions codes (WR-03)', async () => {
+    fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(
+      res(200, {
+        errors: [{ message: 'mismatch', extensions: { code: 'IDEMPOTENCY_KEY_PARAMETER_MISMATCH' } }],
+      })
+    );
+    const err = await gql<any>('q', {}).catch((e: any) => e);
+    expect(err.codes).toEqual(['IDEMPOTENCY_KEY_PARAMETER_MISMATCH']);
+    expect(err.retryable).toBe(false);
+  });
+
   it('network failure is retryable', async () => {
     fetchMock.mockResolvedValueOnce(tokenRes()).mockRejectedValueOnce(new Error('offline'));
     const err = await gql<any>('q', {}).catch((e: any) => e);

@@ -21,12 +21,19 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import * as Crypto from 'expo-crypto';
 
-import { readVariantLevel, adjustAvailable } from '@/api/shopify';
+import {
+  readVariantLevel,
+  adjustAvailable,
+  ShopifyError,
+  type AdjustInput,
+  type AdjustResult,
+} from '@/api/shopify';
 import {
   getAllPendingOutboxRows,
   incrementAttempt,
   upsertSaleApplied,
   markOutboxDone,
+  markOutboxFailed,
   getOutboxRow,
   updatePendingOutboxPayload,
   type OutboxRow,
@@ -37,9 +44,37 @@ import { getLocalSaleItems, setSaleLineApplied } from '@/db/sales';
 import { runInTransaction, withDbLock } from '@/db/lock';
 
 export const MAX_STALE_REPLANS = 3;
+/** Non-retryable failures (config, 4xx, unknown userErrors, key mismatch) before giving up (WR-03). */
+export const MAX_HARD_FAILURES = 5;
 const MAX_BACKOFF_MS = 30000;
 
-export type StockOpResult = 'done' | 'dropped' | 'retry' | 'deferred';
+export type StockOpResult = 'done' | 'dropped' | 'retry' | 'deferred' | 'failed';
+
+/**
+ * Shopify's @idempotent failures may arrive as userErrors[].code OR as
+ * top-level errors[].extensions.code (WR-03 - not verified against the
+ * 2026-07 schema), and the exact spelling is unconfirmed: normalise both.
+ */
+export function normaliseIdempotencyCode(code: string): string {
+  if (!code.startsWith('IDEMPOTENCY')) return code;
+  if (code.includes('MISMATCH')) return 'IDEMPOTENCY_KEY_PARAMETER_MISMATCH';
+  if (code.includes('CONCURRENT')) return 'IDEMPOTENCY_CONCURRENT_REQUEST';
+  if (code.includes('PREVIOUS') || code.includes('FAILED')) return 'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED';
+  return code;
+}
+
+async function adjustMapped(input: AdjustInput): Promise<AdjustResult> {
+  try {
+    const res = await adjustAvailable(input);
+    return res.ok ? res : { ...res, code: normaliseIdempotencyCode(res.code) };
+  } catch (err) {
+    if (err instanceof ShopifyError) {
+      const code = err.codes.find((c) => c.startsWith('IDEMPOTENCY'));
+      if (code) return { ok: false, code: normaliseIdempotencyCode(code), message: err.message };
+    }
+    throw err;
+  }
+}
 
 function referenceUri(kind: ShopifyStockPayload['kind'], payload: ShopifyStockPayload, rowId: string): string {
   switch (kind) {
@@ -157,122 +192,160 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
   let plan: StockOpPlan | undefined = payload.plan;
   let stale = 0;
 
-  for (;;) {
-    if (!plan) {
-      // Step 2: determine the signed amount.
-      let requested: number; // positive magnitude
-      let negative: boolean;
-      if (payload.kind === 'restore') {
-        const items =
-          payload.saleId !== undefined ? await getLocalSaleItems(db, payload.saleId) : null;
-        const line = items && payload.lineIndex !== undefined ? items[payload.lineIndex] : undefined;
-        if (line) {
-          // The restore amount is read from appliedDelta, so every op queued
-          // before this restore on the same line must have landed first,
-          // whatever appliedDelta currently says (CR-05). Ordering is
-          // (created_at, id) so two restores never wait on each other.
-          const pending = await getAllPendingOutboxRows(db);
-          const waiting = pending.some((r) => {
-            if (r.id === row.id || r.type !== 'shopify_stock') return false;
-            if (!isBefore(r, row)) return false;
-            try {
-              const p = JSON.parse(r.payload) as ShopifyStockPayload;
-              return p.saleId === payload.saleId && p.lineIndex === payload.lineIndex;
-            } catch {
-              return false;
+  try {
+    for (;;) {
+      if (!plan) {
+        // Step 2: determine the signed amount.
+        let requested: number; // positive magnitude
+        let negative: boolean;
+        if (payload.kind === 'restore') {
+          const items =
+            payload.saleId !== undefined ? await getLocalSaleItems(db, payload.saleId) : null;
+          const line = items && payload.lineIndex !== undefined ? items[payload.lineIndex] : undefined;
+          if (line) {
+            // The restore amount is read from appliedDelta, so every op queued
+            // before this restore on the same line must have landed first,
+            // whatever appliedDelta currently says (CR-05). Ordering is
+            // (created_at, id) so two restores never wait on each other.
+            const pending = await getAllPendingOutboxRows(db);
+            const waiting = pending.some((r) => {
+              if (r.id === row.id || r.type !== 'shopify_stock') return false;
+              if (!isBefore(r, row)) return false;
+              try {
+                const p = JSON.parse(r.payload) as ShopifyStockPayload;
+                return p.saleId === payload.saleId && p.lineIndex === payload.lineIndex;
+              } catch {
+                return false;
+              }
+            });
+            if (waiting) {
+              await backoff(db, row);
+              return 'deferred';
             }
-          });
-          if (waiting) {
-            await backoff(db, row);
-            return 'deferred';
           }
+          requested = Math.max(0, -(line?.appliedDelta ?? 0));
+          negative = false;
+          if (requested === 0) return finish(db, row, payload, 0);
+        } else if (payload.kind === 'restock') {
+          negative = payload.requested < 0;
+          requested = Math.abs(payload.requested);
+          if (requested === 0) return finish(db, row, payload, 0);
+        } else {
+          negative = true;
+          requested = payload.requested;
+          if (requested <= 0) return finish(db, row, payload, 0);
         }
-        requested = Math.max(0, -(line?.appliedDelta ?? 0));
-        negative = false;
-        if (requested === 0) return finish(db, row, payload, 0);
-      } else if (payload.kind === 'restock') {
-        negative = payload.requested < 0;
-        requested = Math.abs(payload.requested);
-        if (requested === 0) return finish(db, row, payload, 0);
-      } else {
-        negative = true;
-        requested = payload.requested;
-        if (requested <= 0) return finish(db, row, payload, 0);
+
+        const level = await readVariantLevel(payload.variantGid);
+        if (!level) return dropOp(db, row, payload, 'variant not found');
+
+        let delta: number;
+        let changeFrom: number | null;
+        if (negative) {
+          delta = -Math.min(requested, Math.max(level.available, 0));
+          changeFrom = level.available;
+        } else {
+          delta = requested;
+          changeFrom = null;
+        }
+        if (delta === 0) return finish(db, row, payload, 0);
+
+        plan = {
+          inventoryItemId: level.inventoryItemId,
+          changeFrom,
+          delta,
+          // nextKey is persisted on every replan, so a later sync run never
+          // reuses a key already burned with different variables (CR-02).
+          key: payload.nextKey ?? row.id,
+        };
+        payload = { ...payload, plan };
+        // Persisting the plan is the commit point: conditional on the row still
+        // being pending, under the same lock enqueueReversal takes. Once planned
+        // a row can no longer be cancelled (enqueueReversal skips planned rows).
+        const planned = JSON.stringify(payload);
+        const committed = await withDbLock(() => updatePendingOutboxPayload(db, row.id, planned));
+        if (!committed) return 'dropped'; // cancelled while we were reading the level
       }
 
-      const level = await readVariantLevel(payload.variantGid);
-      if (!level) return dropOp(db, row, payload, 'variant not found');
+      const res = await adjustMapped({
+        inventoryItemId: plan.inventoryItemId,
+        delta: plan.delta,
+        changeFromQuantity: plan.changeFrom,
+        referenceDocumentUri: referenceUri(payload.kind, payload, row.id),
+        idempotencyKey: plan.key,
+      });
 
-      let delta: number;
-      let changeFrom: number | null;
-      if (negative) {
-        delta = -Math.min(requested, Math.max(level.available, 0));
-        changeFrom = level.available;
-      } else {
-        delta = requested;
-        changeFrom = null;
-      }
-      if (delta === 0) return finish(db, row, payload, 0);
+      if (res.ok) return finish(db, row, payload, res.appliedDelta);
 
-      plan = {
-        inventoryItemId: level.inventoryItemId,
-        changeFrom,
-        delta,
-        // nextKey is persisted on every replan, so a later sync run never
-        // reuses a key already burned with different variables (CR-02).
-        key: payload.nextKey ?? row.id,
-      };
-      payload = { ...payload, plan };
-      // Persisting the plan is the commit point: conditional on the row still
-      // being pending, under the same lock enqueueReversal takes. Once planned
-      // a row can no longer be cancelled (enqueueReversal skips planned rows).
-      const planned = JSON.stringify(payload);
-      const committed = await withDbLock(() => updatePendingOutboxPayload(db, row.id, planned));
-      if (!committed) return 'dropped'; // cancelled while we were reading the level
-    }
-
-    const res = await adjustAvailable({
-      inventoryItemId: plan.inventoryItemId,
-      delta: plan.delta,
-      changeFromQuantity: plan.changeFrom,
-      referenceDocumentUri: referenceUri(payload.kind, payload, row.id),
-      idempotencyKey: plan.key,
-    });
-
-    if (res.ok) return finish(db, row, payload, res.appliedDelta);
-
-    switch (res.code) {
-      case 'CHANGE_FROM_QUANTITY_STALE': {
-        stale += 1;
-        plan = undefined;
-        const { plan: _dropped, ...rest } = payload;
-        payload = { ...rest, nextKey: Crypto.randomUUID() } as ShopifyStockPayload;
-        await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
-        if (stale >= MAX_STALE_REPLANS) {
+      switch (res.code) {
+        case 'CHANGE_FROM_QUANTITY_STALE': {
+          stale += 1;
+          plan = undefined;
+          const { plan: _dropped, ...rest } = payload;
+          payload = { ...rest, nextKey: Crypto.randomUUID() } as ShopifyStockPayload;
+          await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
+          if (stale >= MAX_STALE_REPLANS) {
+            await backoff(db, row);
+            return 'retry';
+          }
+          continue;
+        }
+        case 'INVALID_INVENTORY_ITEM':
+        case 'ITEM_NOT_STOCKED_AT_LOCATION':
+          return dropOp(db, row, payload, res.code);
+        case 'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED': {
+          const newPlan: StockOpPlan = { ...plan, key: Crypto.randomUUID() };
+          payload = { ...payload, plan: newPlan };
+          await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
           await backoff(db, row);
           return 'retry';
         }
-        continue;
+        case 'IDEMPOTENCY_CONCURRENT_REQUEST':
+          // the first request with this key is still in flight: just wait
+          await backoff(db, row);
+          return 'retry';
+        case 'IDEMPOTENCY_KEY_PARAMETER_MISMATCH':
+          console.error('[shopifyStockOps] idempotency parameter mismatch (bug)', { rowId: row.id });
+          return hardFailure(db, row, payload, res.code);
+        default:
+          return hardFailure(db, row, payload, res.code);
       }
-      case 'INVALID_INVENTORY_ITEM':
-      case 'ITEM_NOT_STOCKED_AT_LOCATION':
-        return dropOp(db, row, payload, res.code);
-      case 'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED': {
-        const newPlan: StockOpPlan = { ...plan, key: Crypto.randomUUID() };
-        payload = { ...payload, plan: newPlan };
-        await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
-        await backoff(db, row);
-        return 'retry';
-      }
-      case 'IDEMPOTENCY_KEY_PARAMETER_MISMATCH':
-        console.error('[shopifyStockOps] idempotency parameter mismatch (bug)', { rowId: row.id });
-        await backoff(db, row);
-        return 'retry';
-      default:
-        await backoff(db, row);
-        return 'retry';
     }
+  } catch (err) {
+    // Retryable errors (network, 5xx, 429, THROTTLED) back off forever in
+    // executeStockOp; non-retryable ones count toward MAX_HARD_FAILURES.
+    if (err instanceof ShopifyError && !err.retryable) {
+      return hardFailure(db, row, payload, err.message);
+    }
+    throw err;
   }
+}
+
+/**
+ * Counts a non-retryable failure in the payload; after MAX_HARD_FAILURES the
+ * row is marked failed so it stops retrying (and no longer counts as pending).
+ */
+async function hardFailure(
+  db: SQLiteDatabase,
+  row: OutboxRow,
+  payload: ShopifyStockPayload,
+  reason: string
+): Promise<StockOpResult> {
+  const count = (payload.hardFailures ?? 0) + 1;
+  if (count >= MAX_HARD_FAILURES) {
+    console.error('[shopifyStockOps] giving up, marking failed', {
+      rowId: row.id,
+      kind: payload.kind,
+      variantGid: payload.variantGid,
+      reason,
+    });
+    await withDbLock(() => markOutboxFailed(db, row.id));
+    return 'failed';
+  }
+  const next = JSON.stringify({ ...payload, hardFailures: count });
+  await withDbLock(() => updatePendingOutboxPayload(db, row.id, next));
+  await backoff(db, row);
+  return 'retry';
 }
 
 /**

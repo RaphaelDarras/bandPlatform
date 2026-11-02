@@ -13,6 +13,7 @@ jest.mock('@/db/outbox', () => ({
   incrementAttempt: jest.fn(() => Promise.resolve()),
   upsertSaleApplied: jest.fn(() => Promise.resolve()),
   markOutboxDone: jest.fn(() => Promise.resolve()),
+  markOutboxFailed: jest.fn(() => Promise.resolve()),
   updatePendingOutboxPayload: jest.fn(() => Promise.resolve(true)),
   getOutboxRow: jest.fn(),
 }));
@@ -21,7 +22,7 @@ jest.mock('@/db/sales', () => ({
   setSaleLineApplied: jest.fn(() => Promise.resolve()),
 }));
 
-import { executeStockOp } from '@/features/sync/shopifyStockOps';
+import { executeStockOp, MAX_HARD_FAILURES } from '@/features/sync/shopifyStockOps';
 import * as shopify from '@/api/shopify';
 import * as outbox from '@/db/outbox';
 import * as sales from '@/db/sales';
@@ -329,5 +330,59 @@ describe('per-line ordering and accumulation (CR-05)', () => {
     adjust.mockResolvedValue({ ok: true, appliedDelta: -2 });
     expect(await exec(row(unvoid))).toBe('done');
     expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, -2);
+  });
+});
+
+describe('non-retryable failures and top-level idempotency codes (WR-03)', () => {
+  const markFailed = outbox.markOutboxFailed as jest.Mock;
+  const gqlError = (code: string, retryable = false) =>
+    new shopify.ShopifyError('graphql', `Shopify GraphQL error: ${code}`, { retryable, codes: [code] });
+
+  it('maps a top-level PREVIOUS_ATTEMPT_FAILED error to the key-rotation branch', async () => {
+    adjust.mockRejectedValue(gqlError('IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED'));
+    expect(await exec(row(deduct(1)))).toBe('retry');
+    const last = JSON.parse(updatePayload.mock.calls.at(-1)![2]);
+    expect(last.plan.key).not.toBe('row1');
+    expect(last.plan.delta).toBe(-1);
+    expect(markFailed).not.toHaveBeenCalled();
+  });
+
+  it('treats a top-level concurrent-request error as transient', async () => {
+    adjust.mockRejectedValue(gqlError('IDEMPOTENCY_CONCURRENT_REQUEST'));
+    expect(await exec(row(deduct(1)))).toBe('retry');
+    expect(incAttempt).toHaveBeenCalled();
+    expect(JSON.parse(updatePayload.mock.calls.at(-1)![2]).hardFailures).toBeUndefined();
+  });
+
+  it('counts a top-level MISMATCH as a hard failure, keeping the frozen plan', async () => {
+    adjust.mockRejectedValue(gqlError('IDEMPOTENCY_KEY_PARAMETER_MISMATCH'));
+    expect(await exec(row(deduct(1)))).toBe('retry');
+    const last = JSON.parse(updatePayload.mock.calls.at(-1)![2]);
+    expect(last.hardFailures).toBe(1);
+    expect(last.plan.key).toBe('row1');
+  });
+
+  it('marks the op failed after MAX_HARD_FAILURES non-retryable errors', async () => {
+    adjust.mockRejectedValue(new shopify.ShopifyError('http', 'Shopify GraphQL request failed: 400', { status: 400 }));
+    const plan = { inventoryItemId: 'inv1', changeFrom: 1, delta: -1, key: 'row1' };
+    const r = row(deduct(1, { plan, hardFailures: MAX_HARD_FAILURES - 1 }));
+    expect(await exec(r)).toBe('failed');
+    expect(markFailed).toHaveBeenCalledWith(db, 'row1');
+    expect(markDone).not.toHaveBeenCalled();
+  });
+
+  it('an unknown userErrors code is bounded too', async () => {
+    adjust.mockResolvedValue({ ok: false, code: 'SOMETHING_NEW', message: 'x' });
+    const r = row(deduct(1, { hardFailures: MAX_HARD_FAILURES - 1 }));
+    expect(await exec(r)).toBe('failed');
+    expect(markFailed).toHaveBeenCalled();
+  });
+
+  it('retryable errors never count toward the limit', async () => {
+    adjust.mockRejectedValue(gqlError('THROTTLED', true));
+    const plan = { inventoryItemId: 'inv1', changeFrom: 1, delta: -1, key: 'row1' };
+    expect(await exec(row(deduct(1, { plan, hardFailures: MAX_HARD_FAILURES - 1 })))).toBe('retry');
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(updatePayload).not.toHaveBeenCalled();
   });
 });

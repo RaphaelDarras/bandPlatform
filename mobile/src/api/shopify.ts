@@ -7,21 +7,30 @@
 
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
+/**
+ * Top-level GraphQL codes worth retrying. The @idempotent concurrent-request
+ * code is a guess at Shopify's naming (WR-03) - matched loosely.
+ */
+const RETRYABLE_GQL_CODES = new Set(['THROTTLED', 'IDEMPOTENCY_CONCURRENT_REQUEST']);
+
 export class ShopifyError extends Error {
   kind: 'config' | 'network' | 'http' | 'graphql';
   status?: number;
   retryable: boolean;
+  /** Top-level GraphQL errors[].extensions.code values (WR-03), e.g. THROTTLED. */
+  codes: string[];
 
   constructor(
     kind: 'config' | 'network' | 'http' | 'graphql',
     message: string,
-    opts: { status?: number; retryable?: boolean } = {},
+    opts: { status?: number; retryable?: boolean; codes?: string[] } = {},
   ) {
     super(message);
     this.name = 'ShopifyError';
     this.kind = kind;
     this.status = opts.status;
     this.retryable = opts.retryable ?? false;
+    this.codes = opts.codes ?? [];
   }
 }
 
@@ -134,10 +143,13 @@ export async function gql<T>(query: string, variables: Record<string, unknown>):
             .join(' '),
         )
         .join(' | ');
+      const codes = (json.errors as { extensions?: { code?: string } }[])
+        .map((e) => e?.extensions?.code)
+        .filter((c): c is string => typeof c === 'string');
       throw new ShopifyError(
         'graphql',
         `${throttled ? 'Shopify GraphQL throttled' : 'Shopify GraphQL error'}${detail ? `: ${detail}` : ''}`,
-        { retryable: throttled },
+        { retryable: throttled || codes.some((c) => RETRYABLE_GQL_CODES.has(c)), codes },
       );
     }
     return json.data as T;

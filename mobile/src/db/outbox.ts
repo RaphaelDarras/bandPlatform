@@ -74,6 +74,7 @@ export interface ShopifyStockPayload {
   note?: string; // restock reason text (local audit only)
   plan?: StockOpPlan; // written BEFORE the first mutation attempt
   nextKey?: string; // key for the next plan after a stale replan (never reuse a burned key)
+  hardFailures?: number; // non-retryable failures so far (WR-03)
 }
 
 const INSERT_OUTBOX_SQL = `INSERT OR IGNORE INTO outbox
