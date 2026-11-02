@@ -38,7 +38,16 @@ export function Component() {
       {/* The release[0] entry is a YouTube video (D-17), so the hero is the
           release itself — player shown directly, no poster or play overlay. */}
       {highlightedRelease?.kind === 'youtube' && (
-        <FullscreenPlayer videoId={highlightedRelease.videoId} title="Eternal Scars" />
+        // Wrapped so the announcement sits tight on the player instead of
+        // taking a full PAGE_STACK gap. The player keeps the page's only h1,
+        // so the visible title here is a plain paragraph.
+        <div>
+          <div className="mb-6 sm:mb-8">
+            <p className="type-label text-[var(--color-accent)]">New album · Out now</p>
+            <p className="type-h1 mt-3 text-[var(--color-ink)]">Eternal Scars</p>
+          </div>
+          <FullscreenPlayer videoId={highlightedRelease.videoId} title="Eternal Scars" />
+        </div>
       )}
 
       {merch.length > 0 ? (

@@ -77,6 +77,17 @@ describe('Home page', () => {
     expect(h1s[0]).toHaveTextContent('Eternal Scars')
   })
 
+  it('announces the album release just above the player', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    const { container } = renderHome()
+
+    const announcement = screen.getByText(/new album · out now/i)
+    const iframe = container.querySelector('iframe')!
+    expect(
+      announcement.compareDocumentPosition(iframe) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it('lists the whole store under a single Merch section, no Preorder section', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     renderHome()
