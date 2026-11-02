@@ -68,8 +68,22 @@ export function mapCatalogue(
   });
 }
 
-/** Returns true when Shopify was fetched fully and the cache refreshed. */
-export async function refreshCatalogue(db: SQLite.SQLiteDatabase): Promise<boolean> {
+let inFlight: Promise<boolean> | null = null;
+
+/**
+ * Returns true when Shopify was fetched fully and the cache refreshed.
+ * Single-flight (WR-04): concurrent callers (dashboard focus + full sync +
+ * selling screen) share one fetch instead of each draining the cost bucket.
+ */
+export function refreshCatalogue(db: SQLite.SQLiteDatabase): Promise<boolean> {
+  if (inFlight) return inFlight;
+  inFlight = doRefreshCatalogue(db).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function doRefreshCatalogue(db: SQLite.SQLiteDatabase): Promise<boolean> {
   try {
     const products = await fetchCatalogue();
     const pendingRows = await getAllPendingOutboxRows(db);

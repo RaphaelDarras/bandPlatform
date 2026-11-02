@@ -78,3 +78,20 @@ describe('refreshCatalogue', () => {
     expect(products.reconcileActiveProducts).not.toHaveBeenCalled();
   });
 });
+
+describe('refreshCatalogue single-flight (WR-04)', () => {
+  it('concurrent callers share one Shopify fetch; a later call fetches again', async () => {
+    let release!: (v: unknown) => void;
+    (shopify.fetchCatalogue as jest.Mock).mockReturnValueOnce(new Promise((r) => (release = r)));
+    const a = refreshCatalogue({} as any);
+    const b = refreshCatalogue({} as any);
+    expect(b).toBe(a);
+    release(cat);
+    expect(await Promise.all([a, b])).toEqual([true, true]);
+    expect(shopify.fetchCatalogue).toHaveBeenCalledTimes(1);
+
+    (shopify.fetchCatalogue as jest.Mock).mockResolvedValueOnce(cat);
+    expect(await refreshCatalogue({} as any)).toBe(true);
+    expect(shopify.fetchCatalogue).toHaveBeenCalledTimes(2);
+  });
+});

@@ -6,6 +6,7 @@ import {
   readVariantLevel,
   adjustAvailable,
   ShopifyError,
+  _setSleepForTests,
 } from '../../api/shopify';
 
 const SECRET = 'super-secret-value';
@@ -18,6 +19,7 @@ const tokenRes = (expires = 86399, token = 'tok') =>
   res(200, { access_token: token, expires_in: expires });
 
 let fetchMock: jest.Mock;
+let sleepMock: jest.Mock;
 
 beforeEach(() => {
   process.env.EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN = 'shop.myshopify.com';
@@ -27,6 +29,8 @@ beforeEach(() => {
   delete process.env.EXPO_PUBLIC_SHOPIFY_API_VERSION;
   _resetTokenCache();
   fetchMock = jest.fn();
+  sleepMock = jest.fn(() => Promise.resolve());
+  _setSleepForTests(sleepMock);
   (globalThis as any).fetch = fetchMock;
 });
 
@@ -128,13 +132,46 @@ describe('gql', () => {
     expect(err.retryable).toBe(false);
   });
 
-  it('THROTTLED graphql error is retryable', async () => {
+  it('THROTTLED graphql error is retryable once gql gives up waiting', async () => {
     fetchMock
       .mockResolvedValueOnce(tokenRes())
-      .mockResolvedValueOnce(res(200, { errors: [{ extensions: { code: 'THROTTLED' } }] }));
+      .mockResolvedValue(res(200, { errors: [{ extensions: { code: 'THROTTLED' } }] }));
     const err = await gql<any>('q', {}).catch((e: any) => e);
     expect(err.kind).toBe('graphql');
     expect(err.retryable).toBe(true);
+    expect(sleepMock).toHaveBeenCalledTimes(3); // MAX_THROTTLE_RETRIES
+  });
+
+  it('waits out THROTTLED using extensions.cost and then succeeds (WR-04)', async () => {
+    const throttled = res(200, {
+      errors: [{ message: 'Throttled', extensions: { code: 'THROTTLED' } }],
+      extensions: {
+        cost: { requestedQueryCost: 300, throttleStatus: { currentlyAvailable: 100, restoreRate: 100 } },
+      },
+    });
+    fetchMock
+      .mockResolvedValueOnce(tokenRes())
+      .mockResolvedValueOnce(throttled)
+      .mockResolvedValueOnce(res(200, { data: { ok: 1 } }));
+    await expect(gql<any>('q', {})).resolves.toEqual({ ok: 1 });
+    expect(sleepMock).toHaveBeenCalledWith(2000); // (300 - 100) / 100 s
+  });
+
+  it('MAX_COST_EXCEEDED is retried with backoff too', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenRes())
+      .mockResolvedValueOnce(res(200, { errors: [{ extensions: { code: 'MAX_COST_EXCEEDED' } }] }))
+      .mockResolvedValueOnce(res(200, { data: { ok: 2 } }));
+    await expect(gql<any>('q', {})).resolves.toEqual({ ok: 2 });
+    expect(sleepMock).toHaveBeenCalledWith(1000);
+  });
+
+  it('does not wait on non-throttle GraphQL errors', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenRes())
+      .mockResolvedValueOnce(res(200, { errors: [{ message: 'bad' }] }));
+    await gql<any>('q', {}).catch(() => undefined);
+    expect(sleepMock).not.toHaveBeenCalled();
   });
 
   it('other graphql errors are not retryable', async () => {
@@ -241,6 +278,33 @@ describe('fetchCatalogue', () => {
     expect(out[1].variants[0].label).toBe('M / Black');
     expect(out[1].variants[1].sku).toBe('');
     expect(out[1].variants[1].available).toBe(0);
+  });
+
+  it('pages variants beyond the first page (WR-04)', async () => {
+    const first = product('p1', [variant('v1', [{ name: 'Size', value: 'S' }])]);
+    (first.variants as any).pageInfo = { hasNextPage: true, endCursor: 'vc1' };
+    fetchMock
+      .mockResolvedValueOnce(tokenRes())
+      .mockResolvedValueOnce(
+        res(200, { data: { products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [first] } } }),
+      )
+      .mockResolvedValueOnce(
+        res(200, {
+          data: {
+            product: {
+              variants: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [variant('v2', [{ name: 'Size', value: 'M' }])],
+              },
+            },
+          },
+        }),
+      );
+    const out = await fetchCatalogue();
+    expect(out[0].variants.map((v) => v.variantGid)).toEqual(['v1', 'v2']);
+    const body = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(body.variables).toEqual({ id: 'p1', after: 'vc1', loc: LOC });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).query).toContain('products(first: 25');
   });
 
   it('throws when a later page fails', async () => {

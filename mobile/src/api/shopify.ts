@@ -11,7 +11,42 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000;
  * Top-level GraphQL codes worth retrying. The @idempotent concurrent-request
  * code is a guess at Shopify's naming (WR-03) - matched loosely.
  */
-const RETRYABLE_GQL_CODES = new Set(['THROTTLED', 'IDEMPOTENCY_CONCURRENT_REQUEST']);
+const RETRYABLE_GQL_CODES = new Set([
+  'THROTTLED',
+  'MAX_COST_EXCEEDED',
+  'IDEMPOTENCY_CONCURRENT_REQUEST',
+]);
+
+/** Leaky-bucket codes gql() itself waits out and retries (WR-04). */
+const THROTTLE_CODES = new Set(['THROTTLED', 'MAX_COST_EXCEEDED']);
+const MAX_THROTTLE_RETRIES = 3;
+const MIN_THROTTLE_WAIT_MS = 250;
+const MAX_THROTTLE_WAIT_MS = 10000;
+
+let sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Test hook: replace the throttle wait. */
+export function _setSleepForTests(fn: (ms: number) => Promise<void>): void {
+  sleep = fn;
+}
+
+interface CostExtension {
+  requestedQueryCost?: number;
+  throttleStatus?: { currentlyAvailable?: number; restoreRate?: number };
+}
+
+/** Time until the bucket holds the requested cost, from extensions.cost. */
+function throttleWaitMs(cost: CostExtension | undefined): number | undefined {
+  const requested = cost?.requestedQueryCost;
+  const available = cost?.throttleStatus?.currentlyAvailable;
+  const rate = cost?.throttleStatus?.restoreRate;
+  if (typeof requested !== 'number' || typeof available !== 'number' || !rate || rate <= 0) {
+    return undefined;
+  }
+  const ms = Math.ceil(((requested - available) / rate) * 1000);
+  return Math.min(Math.max(ms, MIN_THROTTLE_WAIT_MS), MAX_THROTTLE_WAIT_MS);
+}
+
+let costLogged = false;
 
 export class ShopifyError extends Error {
   kind: 'config' | 'network' | 'http' | 'graphql';
@@ -19,11 +54,13 @@ export class ShopifyError extends Error {
   retryable: boolean;
   /** Top-level GraphQL errors[].extensions.code values (WR-03), e.g. THROTTLED. */
   codes: string[];
+  /** Suggested wait before retrying a throttled request (from extensions.cost). */
+  retryAfterMs?: number;
 
   constructor(
     kind: 'config' | 'network' | 'http' | 'graphql',
     message: string,
-    opts: { status?: number; retryable?: boolean; codes?: string[] } = {},
+    opts: { status?: number; retryable?: boolean; codes?: string[]; retryAfterMs?: number } = {},
   ) {
     super(message);
     this.name = 'ShopifyError';
@@ -31,6 +68,7 @@ export class ShopifyError extends Error {
     this.status = opts.status;
     this.retryable = opts.retryable ?? false;
     this.codes = opts.codes ?? [];
+    this.retryAfterMs = opts.retryAfterMs;
   }
 }
 
@@ -98,7 +136,27 @@ export async function getAccessToken(force = false): Promise<string> {
   return cached.token;
 }
 
+/**
+ * GraphQL call that waits out THROTTLED / MAX_COST_EXCEEDED (up to
+ * MAX_THROTTLE_RETRIES times) using the bucket state Shopify reports (WR-04).
+ */
 export async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await gqlOnce<T>(query, variables);
+    } catch (err) {
+      const throttled =
+        err instanceof ShopifyError && err.codes.some((c) => THROTTLE_CODES.has(c));
+      if (!throttled || attempt >= MAX_THROTTLE_RETRIES) throw err;
+      await sleep(
+        (err as ShopifyError).retryAfterMs ??
+          Math.min(1000 * Math.pow(2, attempt), MAX_THROTTLE_WAIT_MS),
+      );
+    }
+  }
+}
+
+async function gqlOnce<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const cfg = getConfig();
   const url = `https://${cfg.shop}/admin/api/${cfg.apiVersion}/graphql.json`;
 
@@ -129,6 +187,11 @@ export async function gql<T>(query: string, variables: Record<string, unknown>):
       });
     }
     const json = await res.json();
+    const cost: CostExtension | undefined = json?.extensions?.cost;
+    if (!costLogged && cost && typeof __DEV__ !== 'undefined' && __DEV__) {
+      costLogged = true;
+      console.log('[shopify] requestedQueryCost', cost.requestedQueryCost, cost.throttleStatus);
+    }
     if (json.errors && json.errors.length > 0) {
       const throttled = json.errors.some(
         (e: { extensions?: { code?: string } }) => e?.extensions?.code === 'THROTTLED',
@@ -149,7 +212,11 @@ export async function gql<T>(query: string, variables: Record<string, unknown>):
       throw new ShopifyError(
         'graphql',
         `${throttled ? 'Shopify GraphQL throttled' : 'Shopify GraphQL error'}${detail ? `: ${detail}` : ''}`,
-        { retryable: throttled || codes.some((c) => RETRYABLE_GQL_CODES.has(c)), codes },
+        {
+          retryable: throttled || codes.some((c) => RETRYABLE_GQL_CODES.has(c)),
+          codes,
+          retryAfterMs: throttleWaitMs(cost),
+        },
       );
     }
     return json.data as T;
@@ -178,16 +245,9 @@ export interface ShopifyCatalogueProduct {
 
 // Note: if featuredMedia path errors in the live smoke (assumption A3), fall
 // back to featuredImage { url }.
-const CATALOGUE_QUERY = `query Catalogue($after: String, $loc: ID!) {
-  products(first: 50, after: $after, query: "status:active") {
-    pageInfo { hasNextPage endCursor }
-    nodes {
-      id
-      title
-      featuredMedia { preview { image { url } } }
-      variants(first: 100) {
-        nodes {
-          id
+// Page sizes drive the requested query cost (products x variants x levels):
+// kept small so one page never drains the leaky bucket (WR-04).
+const VARIANT_FIELDS = `id
           title
           sku
           price
@@ -197,8 +257,31 @@ const CATALOGUE_QUERY = `query Catalogue($after: String, $loc: ID!) {
             inventoryLevel(locationId: $loc) {
               quantities(names: ["available"]) { name quantity }
             }
-          }
+          }`;
+
+const CATALOGUE_QUERY = `query Catalogue($after: String, $loc: ID!) {
+  products(first: 25, after: $after, query: "status:active") {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id
+      title
+      featuredMedia { preview { image { url } } }
+      variants(first: 50) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          ${VARIANT_FIELDS}
         }
+      }
+    }
+  }
+}`;
+
+const PRODUCT_VARIANTS_QUERY = `query ProductVariants($id: ID!, $after: String, $loc: ID!) {
+  product(id: $id) {
+    variants(first: 50, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        ${VARIANT_FIELDS}
       }
     }
   }
@@ -242,7 +325,32 @@ interface RawProduct {
   id: string;
   title: string;
   featuredMedia?: { preview?: { image?: { url?: string } | null } | null } | null;
-  variants: { nodes: RawVariant[] };
+  variants: { nodes: RawVariant[]; pageInfo?: { hasNextPage: boolean; endCursor: string | null } };
+}
+
+/** Fetches the remaining variant pages of a product with more than one page. */
+async function fetchRemainingVariants(
+  productGid: string,
+  after: string | null,
+  locationId: string,
+): Promise<RawVariant[]> {
+  const out: RawVariant[] = [];
+  let cursor = after;
+  for (;;) {
+    const data: {
+      product: {
+        variants: {
+          nodes: RawVariant[];
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+      } | null;
+    } = await gql(PRODUCT_VARIANTS_QUERY, { id: productGid, after: cursor, loc: locationId });
+    if (!data.product) break;
+    out.push(...data.product.variants.nodes);
+    if (!data.product.variants.pageInfo.hasNextPage) break;
+    cursor = data.product.variants.pageInfo.endCursor;
+  }
+  return out;
 }
 
 function mapVariant(v: RawVariant): ShopifyCatalogueVariant {
@@ -269,11 +377,17 @@ export async function fetchCatalogue(): Promise<ShopifyCatalogueProduct[]> {
       };
     } = await gql(CATALOGUE_QUERY, { after, loc: locationId });
     for (const p of data.products.nodes) {
+      let rawVariants = p.variants.nodes;
+      if (p.variants.pageInfo?.hasNextPage) {
+        rawVariants = rawVariants.concat(
+          await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor, locationId),
+        );
+      }
       out.push({
         productGid: p.id,
         name: p.title,
         imageUrl: p.featuredMedia?.preview?.image?.url ?? null,
-        variants: p.variants.nodes.map(mapVariant),
+        variants: rawVariants.map(mapVariant),
       });
     }
     if (!data.products.pageInfo.hasNextPage) break;
