@@ -22,7 +22,7 @@ import type { CachedProduct } from '@/db/products';
 import { stockColor } from '@/utils/stockColor';
 
 export default function RestockScreen() {
-  const { products, loading, refreshStock, restock } = useStock();
+  const { products, loading, refreshStock, restockMany } = useStock();
   const c = useTheme();
 
   const [selectedProduct, setSelectedProduct] = useState<CachedProduct | null>(null);
@@ -57,12 +57,15 @@ export default function RestockScreen() {
     if (!selectedProduct || !hasChanges) return;
     setSubmitting(true);
     try {
-      for (const variant of selectedProduct.variants) {
-        const delta = (quantities[variant.variantGid] ?? variant.stock) - variant.stock;
-        if (delta !== 0) {
-          await restock(variant.variantGid, delta, reason);
-        }
-      }
+      // One atomic submission for all variants (WR-09): on failure nothing
+      // was queued, so "try again" cannot double-apply earlier variants.
+      await restockMany(
+        selectedProduct.variants.map((variant) => ({
+          variantGid: variant.variantGid,
+          delta: (quantities[variant.variantGid] ?? variant.stock) - variant.stock,
+        })),
+        reason
+      );
       Alert.alert('Stock Updated', `${selectedProduct.name} stock has been adjusted.`, [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -71,7 +74,7 @@ export default function RestockScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [selectedProduct, quantities, hasChanges, reason, restock]);
+  }, [selectedProduct, quantities, hasChanges, reason, restockMany]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>

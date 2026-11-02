@@ -17,7 +17,7 @@ import * as catalogueModule from '@/features/stock/catalogue';
 import * as outboxModule from '@/db/outbox';
 import * as syncModule from '@/features/sync/SyncManager';
 
-const mockDb = { tag: 'db' };
+const mockDb = { tag: 'db', execAsync: jest.fn(() => Promise.resolve()) };
 
 jest.mock('@/db', () => ({
   getDb: jest.fn(() => Promise.resolve(mockDb)),
@@ -123,6 +123,53 @@ describe('useStock - restock', () => {
       await result.current.restock('V1', 0, '');
     });
     expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockRequestSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('useStock - restockMany (WR-09)', () => {
+  function twoVariantProduct() {
+    return {
+      ...makeProduct(),
+      variants: [
+        { variantGid: 'V1', sku: 'S', label: 'S', priceAdjustment: 0, stock: 5 },
+        { variantGid: 'V2', sku: 'M', label: 'M', priceAdjustment: 0, stock: 2 },
+      ],
+    };
+  }
+
+  it('queues every changed variant in one transaction, then one sync and one refresh', async () => {
+    mockGetCached.mockResolvedValue([twoVariantProduct()]);
+    const { result } = renderHook(() => useStock());
+    await act(async () => {
+      await result.current.restockMany(
+        [
+          { variantGid: 'V1', delta: 3 },
+          { variantGid: 'V2', delta: 0 },
+          { variantGid: 'V2', delta: -1 },
+        ],
+        'count'
+      );
+    });
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert.mock.calls[0][1]).toHaveLength(2);
+    expect(mockDb.execAsync.mock.calls.map((c: any[]) => c[0])).toEqual(['BEGIN', 'COMMIT']);
+    expect(mockRequestSync).toHaveBeenCalledTimes(1);
+    expect(mockRefreshCatalogue).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failure queues nothing (rolled back), so a retry cannot double-apply', async () => {
+    mockGetCached.mockResolvedValue([twoVariantProduct()]);
+    (productsModule.updateLocalStock as jest.Mock).mockRejectedValueOnce(new Error('disk'));
+    const { result } = renderHook(() => useStock());
+    let error: unknown;
+    await act(async () => {
+      await result.current
+        .restockMany([{ variantGid: 'V1', delta: 3 }, { variantGid: 'V2', delta: 1 }], '')
+        .catch((e) => (error = e));
+    });
+    expect(error).toBeInstanceOf(Error);
+    expect(mockDb.execAsync.mock.calls.map((c: any[]) => c[0])).toEqual(['BEGIN', 'ROLLBACK']);
     expect(mockRequestSync).not.toHaveBeenCalled();
   });
 });

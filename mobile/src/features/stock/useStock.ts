@@ -12,6 +12,7 @@ import { getDb } from '@/db';
 import { getCachedProducts, updateLocalStock, type CachedProduct } from '@/db/products';
 import { insertOutboxEntries } from '@/db/outbox';
 import { buildRestockEntry } from '@/db/stockOps';
+import { runInTransaction } from '@/db/lock';
 import { refreshCatalogue } from '@/features/stock/catalogue';
 import { requestSync } from '@/features/sync/SyncManager';
 import { apiClient } from '@/api/client';
@@ -40,21 +41,30 @@ export function useStock() {
   }, []);
 
   /**
-   * Queues a Shopify stock adjustment (positive restock or negative correction),
-   * updates the local cache optimistically and kicks the sync.
+   * Queues Shopify stock adjustments (positive restock or negative correction)
+   * for several variants at once: every op and its optimistic cache update
+   * commit in ONE transaction (all or nothing, so a retry after a failure can
+   * never double-queue earlier variants - WR-09), then one sync and one
+   * catalogue refresh.
    */
-  const restock = useCallback(
-    async (variantGid: string, delta: number, note: string): Promise<void> => {
-      if (delta === 0) return;
+  const restockMany = useCallback(
+    async (changes: { variantGid: string; delta: number }[], note: string): Promise<void> => {
+      const nonZero = changes.filter((c) => c.delta !== 0);
+      if (nonZero.length === 0) return;
       const db = await getDb();
-      const entry = buildRestockEntry(variantGid, delta, note, Date.now());
-      await insertOutboxEntries(db, [entry]);
+      const now = Date.now();
+      const entries = nonZero.map((c) => buildRestockEntry(c.variantGid, c.delta, note, now));
 
-      const cached = await getCachedProducts(db);
-      const product = cached.find((p) => p.variants.some((v) => v.variantGid === variantGid));
-      if (product) {
-        await updateLocalStock(db, product.id, variantGid, delta);
-      }
+      await runInTransaction(db, async () => {
+        await insertOutboxEntries(db, entries);
+        const cached = await getCachedProducts(db);
+        for (const c of nonZero) {
+          const product = cached.find((p) => p.variants.some((v) => v.variantGid === c.variantGid));
+          if (product) {
+            await updateLocalStock(db, product.id, c.variantGid, c.delta);
+          }
+        }
+      });
 
       void requestSync(db, apiClient);
       await refreshStock();
@@ -62,10 +72,18 @@ export function useStock() {
     [refreshStock]
   );
 
+  /** Single-variant convenience wrapper around restockMany. */
+  const restock = useCallback(
+    (variantGid: string, delta: number, note: string): Promise<void> =>
+      restockMany([{ variantGid, delta }], note),
+    [restockMany]
+  );
+
   return {
     products,
     loading,
     refreshStock,
     restock,
+    restockMany,
   };
 }
