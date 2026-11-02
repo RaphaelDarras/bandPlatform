@@ -3,8 +3,11 @@ learningPath.md
 .planning/
 .claude/
 node_modules/
-package-lock.json
-./api/package-lock.json
+# Track only the workspace-root lockfile: EAS picks its package manager from the
+# lockfile at the workspace root, and with none it falls back to yarn, which
+# aborts on "packageManager": "npm@...". Member lockfiles stay ignored
+# (api/package-lock.json was tracked before this rule and stays tracked for Render).
+*/package-lock.json
 temp
 
 # web (Vite) build output + local env
