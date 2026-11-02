@@ -459,3 +459,33 @@ describe('requestSync — sale_set_voided and permanent API errors (CR-06)', () 
     expect(mockIncrementAttempt).toHaveBeenCalledWith(mockDb, 'b', expect.any(Number));
   });
 });
+
+describe('requestSync — per-sale batch results (WR-01)', () => {
+  const mockMarkFailed = outboxModule.markOutboxFailed as jest.Mock;
+
+  it('marks created/skipped rows done and invalid rows failed', async () => {
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'r1', type: 'sale_create', idempotency_key: 'sale_create:a' }),
+      makeOutboxRow({ id: 'r2', type: 'sale_create', idempotency_key: 'sale_create:b' }),
+      makeOutboxRow({ id: 'r3', type: 'sale_create', idempotency_key: 'sale_create:c' }),
+      makeOutboxRow({ id: 'r4', type: 'sale_create', idempotency_key: 'sale_create:d' }),
+    ]);
+    mockApiClient.post.mockResolvedValueOnce({
+      data: {
+        results: [
+          { idempotencyKey: 'sale_create:a', status: 'created' },
+          { idempotencyKey: 'sale_create:b', status: 'invalid' },
+          { idempotencyKey: 'sale_create:c', status: 'skipped' },
+        ],
+      },
+    });
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'r1');
+    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'r3');
+    expect(mockMarkFailed).toHaveBeenCalledWith(mockDb, 'r2');
+    expect(mockMarkOutboxDone).not.toHaveBeenCalledWith(mockDb, 'r2');
+    // no result: stays pending
+    expect(mockMarkOutboxDone).not.toHaveBeenCalledWith(mockDb, 'r4');
+    expect(mockMarkFailed).not.toHaveBeenCalledWith(mockDb, 'r4');
+  });
+});

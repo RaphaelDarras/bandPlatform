@@ -272,14 +272,16 @@ describe('POST /api/sales/batch', () => {
     expect(mockSaleModule.create.mock.calls[0][0].items[0]).not.toHaveProperty('variantGid');
   });
 
-  it('returns 400 for quantity 0', async () => {
+  it('reports quantity 0 as invalid without creating it', async () => {
     mockSaleModule.findOne.mockResolvedValue(null);
     const res = await request(app)
       .post('/api/sales/batch')
       .set('Authorization', AUTH_HEADER)
       .send([makeSaleEntry({ items: [{ variantSku: 'X', quantity: 0, priceAtSale: 5 }] })]);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(res.body.invalid).toBe(1);
+    expect(res.body.results[0].status).toBe('invalid');
     expect(mockSaleModule.create).not.toHaveBeenCalled();
   });
 
@@ -290,8 +292,49 @@ describe('POST /api/sales/batch', () => {
       .set('Authorization', AUTH_HEADER)
       .send([makeSaleEntry({ items: [{ variantSku: 'X', quantity: 1, priceAtSale: 'abc' }] })]);
 
-    expect(res.status).toBe(400);
-    expect(res.body.index).toBe(0);
+    expect(res.status).toBe(201);
+    expect(res.body.results[0]).toMatchObject({ status: 'invalid', index: 0 });
+  });
+
+  it('one invalid sale does not block the rest of the batch (WR-01)', async () => {
+    mockSaleModule.findOne.mockResolvedValue(null);
+    mockSaleModule.create.mockResolvedValue(mockSaleDoc());
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', AUTH_HEADER)
+      .send([
+        makeSaleEntry({ idempotencyKey: 'sale_create:bad', items: [{ variantSku: 'X', quantity: 0, priceAtSale: 5 }] }),
+        makeSaleEntry({ idempotencyKey: 'sale_create:good' }),
+      ]);
+
+    expect(res.status).toBe(201);
+    expect(res.body.results).toEqual([
+      expect.objectContaining({ idempotencyKey: 'sale_create:bad', status: 'invalid' }),
+      { idempotencyKey: 'sale_create:good', status: 'created' },
+    ]);
+    expect(mockSaleModule.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps E11000 to skipped and a CastError to invalid, per sale (WR-01)', async () => {
+    mockSaleModule.findOne.mockResolvedValue(null);
+    const dup = Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+    const cast = Object.assign(new Error('Cast to ObjectId failed'), { name: 'CastError' });
+    mockSaleModule.create
+      .mockRejectedValueOnce(dup)
+      .mockRejectedValueOnce(cast)
+      .mockResolvedValueOnce(mockSaleDoc());
+    const res = await request(app)
+      .post('/api/sales/batch')
+      .set('Authorization', AUTH_HEADER)
+      .send([
+        makeSaleEntry({ idempotencyKey: 'k1' }),
+        makeSaleEntry({ idempotencyKey: 'k2', concertId: 'not-an-id' }),
+        makeSaleEntry({ idempotencyKey: 'k3' }),
+      ]);
+
+    expect(res.status).toBe(201);
+    expect(res.body.results.map((r) => r.status)).toEqual(['skipped', 'invalid', 'created']);
+    expect(res.body).toMatchObject({ created: 1, skipped: 1, invalid: 1 });
   });
 
   it('keeps a valid legacy productId on old-shape items', async () => {

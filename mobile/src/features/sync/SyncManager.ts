@@ -164,9 +164,28 @@ async function processSaleCreateBatch(
   try {
     const response = await apiClient.post('sales/batch', sales);
     console.log('[SyncManager] Batch sync success:', JSON.stringify(response.data));
-    // Mark all rows done and reset failure counter
+    // Settle each row from the server's per-sale results (WR-01): an invalid
+    // sale is marked failed instead of blocking every later batch. A server
+    // without `results` (pre-WR-01) only answers 201 when all were stored.
+    const results = (response.data as { results?: { idempotencyKey?: string; status?: string }[] })
+      ?.results;
+    const statusByKey = new Map<string, string>();
+    if (Array.isArray(results)) {
+      for (const r of results) {
+        if (r && typeof r.idempotencyKey === 'string' && typeof r.status === 'string') {
+          statusByKey.set(r.idempotencyKey, r.status);
+        }
+      }
+    }
     for (const row of rows) {
-      await withDbLock(() => markOutboxDone(db, row.id));
+      const status = Array.isArray(results) ? statusByKey.get(row.idempotency_key) : 'created';
+      if (status === 'created' || status === 'skipped') {
+        await withDbLock(() => markOutboxDone(db, row.id));
+      } else if (status === 'invalid') {
+        console.warn('[SyncManager] sale rejected by server, marking failed', { id: row.id });
+        await withDbLock(() => markOutboxFailed(db, row.id));
+      }
+      // no result for this row: leave it pending for the next run
     }
     useSyncStore.getState().resetFailures();
     useSyncStore.getState().setIsOnline(true);

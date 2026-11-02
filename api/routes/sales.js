@@ -103,7 +103,9 @@ async function enrichLegacyLines(sales) {
 /**
  * POST /api/sales/batch
  * Submit a batch of offline sales with idempotency key deduplication.
- * Duplicates (matching idempotencyKey) are silently skipped.
+ * Duplicates (matching idempotencyKey) are silently skipped. Each sale is
+ * validated/created independently; `results` reports created | skipped |
+ * invalid per idempotencyKey (WR-01).
  * Stock lives in Shopify (07.1); this route records sales only and never adjusts stock.
  */
 router.post('/batch', async (req, res) => {
@@ -117,16 +119,21 @@ router.post('/batch', async (req, res) => {
 
     let created = 0;
     let skipped = 0;
+    let invalid = 0;
     const sales = [];
+    // Per-sale outcome so one bad sale never blocks the rest of the batch and
+    // the client can settle each outbox row individually (WR-01).
+    const results = [];
 
     for (const saleData of batch) {
-      const { concertId, items, totalAmount, paymentMethod, paymentSplit, idempotencyKey, currency, discount, discountType } = saleData;
+      const { concertId, items, totalAmount, paymentMethod, paymentSplit, idempotencyKey, currency, discount, discountType } = saleData || {};
 
       // Check for duplicate idempotencyKey
       if (idempotencyKey) {
         const existing = await Sale.findOne({ idempotencyKey });
         if (existing) {
           skipped++;
+          results.push({ idempotencyKey, status: 'skipped' });
           continue;
         }
       }
@@ -134,12 +141,19 @@ router.post('/batch', async (req, res) => {
       // Validate + whitelist every line before creating anything
       const resolvedItems = [];
       const rawItems = Array.isArray(items) ? items : [];
+      let badIndex = -1;
       for (let index = 0; index < rawItems.length; index++) {
         const result = sanitizeSaleItem(rawItems[index]);
         if (!result.ok) {
-          return res.status(400).json({ error: 'Invalid sale item', index });
+          badIndex = index;
+          break;
         }
         resolvedItems.push(result.value);
+      }
+      if (badIndex >= 0) {
+        invalid++;
+        results.push({ idempotencyKey, status: 'invalid', error: 'Invalid sale item', index: badIndex });
+        continue;
       }
 
       // Normalise paymentMethod to backend enum
@@ -162,13 +176,27 @@ router.post('/batch', async (req, res) => {
       if (concertId) createPayload.concertId = concertId;
       if (paymentSplit && Array.isArray(paymentSplit)) createPayload.paymentSplit = paymentSplit;
 
-      const saleDoc = await Sale.create(createPayload);
-
-      sales.push(saleDoc);
-      created++;
+      try {
+        const saleDoc = await Sale.create(createPayload);
+        sales.push(saleDoc);
+        created++;
+        results.push({ idempotencyKey, status: 'created' });
+      } catch (err) {
+        if (err && err.code === 11000) {
+          // Concurrent duplicate (check-then-create race): already stored.
+          skipped++;
+          results.push({ idempotencyKey, status: 'skipped' });
+        } else if (err && (err.name === 'ValidationError' || err.name === 'CastError')) {
+          console.warn('Batch sale rejected:', err.message);
+          invalid++;
+          results.push({ idempotencyKey, status: 'invalid', error: 'Invalid sale' });
+        } else {
+          throw err; // infrastructure error: whole batch retried, created ones dedupe
+        }
+      }
     }
 
-    return res.status(201).json({ created, skipped, sales });
+    return res.status(201).json({ created, skipped, invalid, results, sales });
   } catch (error) {
     console.error('Batch sale error:', error.message, error.errors ?? '');
     return res.status(500).json({ error: 'Internal server error', detail: error.message });
