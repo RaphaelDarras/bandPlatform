@@ -7,6 +7,8 @@ import {
   updateOutboxPayload,
   getAllPendingOutboxRows,
   updatePendingOutboxPayload,
+  upsertSaleApplied,
+  markOutboxDoneIfPayload,
 } from '@/db/outbox';
 import type { LocalSale } from '@/db/outbox';
 
@@ -219,5 +221,24 @@ describe('updatePendingOutboxPayload (CR-01)', () => {
     expect(await updatePendingOutboxPayload(mockDb as any, 'r1', '{}')).toBe(false);
     expect((mockDb.runAsync.mock.calls.at(-1) as any[])[0]).toContain("status = 'pending'");
     expect(await updatePendingOutboxPayload(mockDb as any, 'r1', '{}')).toBe(true);
+  });
+});
+
+describe('sale_applied upsert (CR-03)', () => {
+  it('keys one row per sale line and returns it to pending with the current value', async () => {
+    await upsertSaleApplied(mockDb as any, 'id-1', 's1', 2, -3, 1000);
+    const [sql, params] = mockDb.runAsync.mock.calls.at(-1) as any[];
+    expect(sql).toContain('ON CONFLICT(idempotency_key) DO UPDATE');
+    expect(sql).toContain("status = 'pending'");
+    expect(sql).toContain('payload = excluded.payload');
+    expect(params[3]).toBe('sale_applied:s1:2');
+    expect(JSON.parse(params[2])).toEqual({ saleId: 's1', lines: [{ lineIndex: 2, appliedDelta: -3 }] });
+  });
+
+  it('marks done only if the payload is unchanged', async () => {
+    await markOutboxDoneIfPayload(mockDb as any, 'id-1', '{"a":1}');
+    const [sql, params] = mockDb.runAsync.mock.calls.at(-1) as any[];
+    expect(sql).toContain('AND payload = ?');
+    expect(params).toEqual(['id-1', '{"a":1}']);
   });
 });

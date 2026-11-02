@@ -11,7 +11,7 @@ jest.mock('@/db/outbox', () => ({
   SALE_APPLIED: 'sale_applied',
   getAllPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   incrementAttempt: jest.fn(() => Promise.resolve()),
-  insertOutboxEntries: jest.fn(() => Promise.resolve()),
+  upsertSaleApplied: jest.fn(() => Promise.resolve()),
   markOutboxDone: jest.fn(() => Promise.resolve()),
   updatePendingOutboxPayload: jest.fn(() => Promise.resolve(true)),
   getOutboxRow: jest.fn(),
@@ -32,7 +32,7 @@ const updatePayload = outbox.updatePendingOutboxPayload as jest.Mock;
 const getRow = outbox.getOutboxRow as jest.Mock;
 const markDone = outbox.markOutboxDone as jest.Mock;
 const incAttempt = outbox.incrementAttempt as jest.Mock;
-const insertEntries = outbox.insertOutboxEntries as jest.Mock;
+const insertEntries = outbox.upsertSaleApplied as jest.Mock;
 const pendingRows = outbox.getAllPendingOutboxRows as jest.Mock;
 const getItems = sales.getLocalSaleItems as jest.Mock;
 const setApplied = sales.setSaleLineApplied as jest.Mock;
@@ -96,7 +96,8 @@ describe('executeStockOp', () => {
       idempotencyKey: 'row1',
     });
     expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, -1);
-    expect(insertEntries.mock.calls[0][1][0].idempotency_key).toBe('sale_applied:row1');
+    // one row per sale line carrying the current value: (db, id, saleId, lineIndex, value, now)
+    expect(insertEntries.mock.calls[0].slice(2, 5)).toEqual(['s1', 0, -1]);
     expect(markDone).toHaveBeenCalledWith(db, 'row1');
   });
 

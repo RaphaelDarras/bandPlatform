@@ -23,6 +23,7 @@ jest.mock('@/db/outbox', () => ({
   SALE_APPLIED: 'sale_applied',
   getPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   markOutboxDone: jest.fn(() => Promise.resolve()),
+  markOutboxDoneIfPayload: jest.fn(() => Promise.resolve()),
   incrementAttempt: jest.fn(() => Promise.resolve()),
 }));
 
@@ -64,6 +65,7 @@ const mockExecuteStockOp = executeStockOp as jest.Mock;
 const mockPatchApplied = apiPatchSaleApplied as jest.Mock;
 const mockGetPendingOutboxRows = outboxModule.getPendingOutboxRows as jest.Mock;
 const mockMarkOutboxDone = outboxModule.markOutboxDone as jest.Mock;
+const mockMarkDoneIfPayload = outboxModule.markOutboxDoneIfPayload as jest.Mock;
 const mockIncrementAttempt = outboxModule.incrementAttempt as jest.Mock;
 
 // Build mock outbox rows
@@ -279,7 +281,7 @@ describe('requestSync — sale_void and sale_unvoid', () => {
       expect.stringContaining('sales/sale-abc/void'),
       expect.anything()
     );
-    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'row-1');
+    expect(mockMarkDoneIfPayload).toHaveBeenCalledWith(mockDb, 'row-1', row.payload);
   });
 
   it('calls POST /sales/:id/unvoid for sale_unvoid type', async () => {
@@ -296,7 +298,7 @@ describe('requestSync — sale_void and sale_unvoid', () => {
       expect.stringContaining('sales/sale-xyz/unvoid'),
       expect.anything()
     );
-    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'row-1');
+    expect(mockMarkDoneIfPayload).toHaveBeenCalledWith(mockDb, 'row-1', row.payload);
   });
 });
 
@@ -371,7 +373,13 @@ describe('requestSync — shopify_stock and sale_applied', () => {
     ]);
     await requestSync(mockDb as never, mockApiClient as never);
     expect(mockPatchApplied).toHaveBeenCalledWith('sale-1', lines);
-    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'sa');
+    // done only if the row still carries the value that was sent (CR-03)
+    expect(mockMarkDoneIfPayload).toHaveBeenCalledWith(
+      mockDb,
+      'sa',
+      JSON.stringify({ saleId: 'sale-1', lines })
+    );
+    expect(mockMarkOutboxDone).not.toHaveBeenCalledWith(mockDb, 'sa');
   });
 
   it('sale_applied 404 backs off and stays pending', async () => {

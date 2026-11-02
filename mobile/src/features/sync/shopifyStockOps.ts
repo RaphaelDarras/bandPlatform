@@ -23,10 +23,9 @@ import * as Crypto from 'expo-crypto';
 
 import { readVariantLevel, adjustAvailable } from '@/api/shopify';
 import {
-  SALE_APPLIED,
   getAllPendingOutboxRows,
   incrementAttempt,
-  insertOutboxEntries,
+  upsertSaleApplied,
   markOutboxDone,
   getOutboxRow,
   updatePendingOutboxPayload,
@@ -67,7 +66,6 @@ function isBefore(a: OutboxRow, b: OutboxRow): boolean {
 
 async function recordApplied(
   db: SQLiteDatabase,
-  row: OutboxRow,
   payload: ShopifyStockPayload,
   appliedDelta: number
 ): Promise<void> {
@@ -81,18 +79,14 @@ async function recordApplied(
   const current = items?.[payload.lineIndex]?.appliedDelta;
   const value = (current ?? 0) + appliedDelta;
   await setSaleLineApplied(db, payload.saleId, payload.lineIndex, value);
-  await insertOutboxEntries(db, [
-    {
-      id: Crypto.randomUUID(),
-      type: SALE_APPLIED,
-      payload: JSON.stringify({
-        saleId: payload.saleId,
-        lines: [{ lineIndex: payload.lineIndex, appliedDelta: value }],
-      }),
-      idempotency_key: `sale_applied:${row.id}`,
-      created_at: Date.now(),
-    },
-  ]);
+  await upsertSaleApplied(
+    db,
+    Crypto.randomUUID(),
+    payload.saleId,
+    payload.lineIndex,
+    value,
+    Date.now()
+  );
 }
 
 async function dropOp(
@@ -128,7 +122,7 @@ async function commit(
       const current = await getOutboxRow(db, row.id);
       if (!current || current.status !== 'pending') return false;
     }
-    await recordApplied(db, row, payload, appliedDelta);
+    await recordApplied(db, payload, appliedDelta);
     await markOutboxDone(db, row.id);
     return true;
   });

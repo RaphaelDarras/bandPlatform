@@ -24,6 +24,7 @@ import {
   SALE_APPLIED,
   getPendingOutboxRows,
   markOutboxDone,
+  markOutboxDoneIfPayload,
   incrementAttempt,
   type OutboxRow,
 } from '@/db/outbox';
@@ -214,7 +215,9 @@ async function processOtherRow(
       return;
     }
 
-    await withDbLock(() => markOutboxDone(db, row.id));
+    // Conditional on the payload that was sent: a sale_applied row re-upserted
+    // with a newer value meanwhile stays pending (CR-03).
+    await withDbLock(() => markOutboxDoneIfPayload(db, row.id, row.payload));
     useSyncStore.getState().resetFailures();
     useSyncStore.getState().setIsOnline(true);
     useSyncStore.getState().setLastSyncAt(Date.now());

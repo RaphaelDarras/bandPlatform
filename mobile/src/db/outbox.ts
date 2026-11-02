@@ -128,6 +128,52 @@ export async function insertOutboxEntries(
   }
 }
 
+/**
+ * Keeps at most ONE sale_applied row per sale line, carrying the line's
+ * CURRENT local appliedDelta (CR-03). Re-upserting returns the row to pending
+ * with a fresh backoff, so an older value can never be sent after a newer one.
+ */
+export async function upsertSaleApplied(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  saleId: string,
+  lineIndex: number,
+  appliedDelta: number,
+  now: number
+): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO outbox
+       (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
+     VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)
+     ON CONFLICT(idempotency_key) DO UPDATE SET
+       payload = excluded.payload, status = 'pending', attempt_count = 0,
+       next_attempt_at = 0, created_at = excluded.created_at`,
+    [
+      id,
+      SALE_APPLIED,
+      JSON.stringify({ saleId, lines: [{ lineIndex, appliedDelta }] }),
+      `sale_applied:${saleId}:${lineIndex}`,
+      now,
+    ]
+  );
+}
+
+/**
+ * Marks a row done only if its payload is still the one that was sent: a
+ * sale_applied row re-upserted with a newer value while the request was in
+ * flight must stay pending (CR-03).
+ */
+export async function markOutboxDoneIfPayload(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  payload: string
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE outbox SET status = 'done' WHERE id = ? AND payload = ?`,
+    [id, payload]
+  );
+}
+
 /** Replaces an outbox row's payload (e.g. to persist a stock op plan). */
 export async function updateOutboxPayload(
   db: SQLite.SQLiteDatabase,
