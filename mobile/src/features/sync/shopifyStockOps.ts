@@ -60,6 +60,11 @@ async function backoff(db: SQLiteDatabase, row: OutboxRow): Promise<void> {
   await withDbLock(() => incrementAttempt(db, row.id, Date.now() + delay));
 }
 
+/** Total order on outbox rows: created_at, then id. */
+function isBefore(a: OutboxRow, b: OutboxRow): boolean {
+  return a.created_at < b.created_at || (a.created_at === b.created_at && a.id < b.id);
+}
+
 async function recordApplied(
   db: SQLiteDatabase,
   row: OutboxRow,
@@ -69,7 +74,12 @@ async function recordApplied(
   if (payload.kind === 'restock' || payload.saleId === undefined || payload.lineIndex === undefined) {
     return;
   }
-  const value = payload.kind === 'restore' ? 0 : appliedDelta;
+  // Accumulate instead of overwriting (deduct/unvoid add a negative delta,
+  // restore a positive one) so the line's net delta does not depend on the
+  // order in which ops finish (CR-05).
+  const items = await getLocalSaleItems(db, payload.saleId);
+  const current = items?.[payload.lineIndex]?.appliedDelta;
+  const value = (current ?? 0) + appliedDelta;
   await setSaleLineApplied(db, payload.saleId, payload.lineIndex, value);
   await insertOutboxEntries(db, [
     {
@@ -162,17 +172,18 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
         const items =
           payload.saleId !== undefined ? await getLocalSaleItems(db, payload.saleId) : null;
         const line = items && payload.lineIndex !== undefined ? items[payload.lineIndex] : undefined;
-        if (line && line.appliedDelta === undefined) {
+        if (line) {
+          // The restore amount is read from appliedDelta, so every op queued
+          // before this restore on the same line must have landed first,
+          // whatever appliedDelta currently says (CR-05). Ordering is
+          // (created_at, id) so two restores never wait on each other.
           const pending = await getAllPendingOutboxRows(db);
           const waiting = pending.some((r) => {
             if (r.id === row.id || r.type !== 'shopify_stock') return false;
+            if (!isBefore(r, row)) return false;
             try {
               const p = JSON.parse(r.payload) as ShopifyStockPayload;
-              return (
-                (p.kind === 'deduct' || p.kind === 'unvoid') &&
-                p.saleId === payload.saleId &&
-                p.lineIndex === payload.lineIndex
-              );
+              return p.saleId === payload.saleId && p.lineIndex === payload.lineIndex;
             } catch {
               return false;
             }
@@ -182,7 +193,7 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
             return 'deferred';
           }
         }
-        requested = -(line?.appliedDelta ?? 0);
+        requested = Math.max(0, -(line?.appliedDelta ?? 0));
         negative = false;
         if (requested === 0) return finish(db, row, payload, 0);
       } else if (payload.kind === 'restock') {

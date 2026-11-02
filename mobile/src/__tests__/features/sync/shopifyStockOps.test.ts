@@ -68,6 +68,7 @@ beforeEach(() => {
   readLevel.mockResolvedValue({ inventoryItemId: 'inv1', available: 1 });
   adjust.mockResolvedValue({ ok: true, appliedDelta: -1 });
   pendingRows.mockResolvedValue([]);
+  getItems.mockResolvedValue(null);
 });
 
 /** Runs the executor with getOutboxRow returning the same (pending) row. */
@@ -289,5 +290,43 @@ describe('stale give-up keeps the rotated key (CR-02)', () => {
     expect(await exec(row({}, { payload: persisted }))).toBe('done');
     expect(adjust).toHaveBeenCalledTimes(1);
     expect(adjust.mock.calls[0][0].idempotencyKey).toBe(saved.nextKey);
+  });
+});
+
+describe('per-line ordering and accumulation (CR-05)', () => {
+  const restore = { kind: 'restore', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 2 };
+  const unvoid = { kind: 'unvoid', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 2 };
+
+  it('restore defers on an earlier pending op even when appliedDelta is already 0', async () => {
+    getItems.mockResolvedValue([{ appliedDelta: 0 }]);
+    pendingRows.mockResolvedValue([row(unvoid, { id: 'u1', created_at: 5 })]);
+    expect(await exec(row(restore, { id: 'r2', created_at: 9 }))).toBe('deferred');
+    expect(adjust).not.toHaveBeenCalled();
+    expect(markDone).not.toHaveBeenCalled();
+  });
+
+  it('restore does not wait for an op queued after it (no mutual wait)', async () => {
+    getItems.mockResolvedValue([{ appliedDelta: -2 }]);
+    adjust.mockResolvedValue({ ok: true, appliedDelta: 2 });
+    pendingRows.mockResolvedValue([row(restore, { id: 'r2', created_at: 9 })]);
+    expect(await exec(row(restore, { id: 'r1', created_at: 5 }))).toBe('done');
+    expect(adjust).toHaveBeenCalledWith(expect.objectContaining({ delta: 2 }));
+  });
+
+  it('a late restore adds to the current delta instead of writing 0', async () => {
+    // unvoid already applied -2 on top of the -2 the restore was planned against
+    getItems.mockResolvedValue([{ appliedDelta: -4 }]);
+    adjust.mockResolvedValue({ ok: true, appliedDelta: 2 });
+    const plan = { inventoryItemId: 'inv1', changeFrom: null, delta: 2, key: 'r1' };
+    expect(await exec(row({ ...restore, plan }, { id: 'r1' }))).toBe('done');
+    expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, -2);
+  });
+
+  it('an unvoid that lands after the restore leaves the line deducted', async () => {
+    getItems.mockResolvedValue([{ appliedDelta: 0 }]);
+    readLevel.mockResolvedValue({ inventoryItemId: 'inv1', available: 5 });
+    adjust.mockResolvedValue({ ok: true, appliedDelta: -2 });
+    expect(await exec(row(unvoid))).toBe('done');
+    expect(setApplied).toHaveBeenCalledWith(db, 's1', 0, -2);
   });
 });
