@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { LocalSale, LocalSaleItem, PaymentSplitEntry } from './outbox';
-import { getAllPendingOutboxRows, SHOPIFY_STOCK, SALE_APPLIED } from './outbox';
+import { getAllPendingOutboxRows, SHOPIFY_STOCK, SALE_APPLIED, SALE_SET_VOIDED } from './outbox';
 import type { ApiSale } from '@/api/sales';
 import { runInTransaction } from './lock';
 
@@ -135,8 +135,25 @@ export async function reconcileSalesFromServer(
     // Sales with in-flight stock ops: local appliedDelta is fresher than the server's
     const pendingRowsAll = await getAllPendingOutboxRows(db);
     const pendingSaleIds = new Set<string>();
+    // Sales whose local voided flag / concert is still on its way to the
+    // server: keep the local value until the op lands (WR-06).
+    const pendingVoidIds = new Set<string>();
+    const pendingConcertIds = new Set<string>();
+    const saleIdOf = (payload: string): string | undefined => {
+      try {
+        return (JSON.parse(payload) as { saleId?: string }).saleId;
+      } catch {
+        return undefined;
+      }
+    };
     for (const r of pendingRowsAll) {
-      if (r.type === SHOPIFY_STOCK || r.type === SALE_APPLIED) {
+      if (r.type === SALE_SET_VOIDED || r.type === 'sale_void' || r.type === 'sale_unvoid') {
+        const sid = saleIdOf(r.payload);
+        if (sid) pendingVoidIds.add(sid);
+      } else if (r.type === 'sale_update_concert') {
+        const sid = saleIdOf(r.payload);
+        if (sid) pendingConcertIds.add(sid);
+      } else if (r.type === SHOPIFY_STOCK || r.type === SALE_APPLIED) {
         try {
           const sid = (JSON.parse(r.payload) as { saleId?: string }).saleId;
           if (sid) pendingSaleIds.add(sid);
@@ -153,13 +170,26 @@ export async function reconcileSalesFromServer(
       const localId = localIdFromKey(sale.idempotencyKey) ?? sale.id;
       serverLocalIds.add(localId);
 
-      const voided = sale.voidedAt ? 1 : 0;
-      const voidedAt = sale.voidedAt ? new Date(sale.voidedAt).getTime() : null;
       const createdAt = new Date(sale.createdAt).getTime();
-      const existing = await db.getFirstAsync<{ items_json: string }>(
-        `SELECT items_json FROM sales WHERE id = ?`,
+      const existing = await db.getFirstAsync<{
+        items_json: string;
+        voided?: number;
+        voided_at?: number | null;
+        concert_id?: string;
+      }>(
+        `SELECT items_json, voided, voided_at, concert_id FROM sales WHERE id = ?`,
         [localId]
       );
+      const keepLocalVoid = !!existing && existing.voided !== undefined && pendingVoidIds.has(localId);
+      const voided = keepLocalVoid ? existing!.voided! : sale.voidedAt ? 1 : 0;
+      const voidedAt = keepLocalVoid
+        ? (existing!.voided_at ?? null)
+        : sale.voidedAt
+          ? new Date(sale.voidedAt).getTime()
+          : null;
+      const keepLocalConcert =
+        !!existing && existing.concert_id !== undefined && pendingConcertIds.has(localId);
+      const concertId = keepLocalConcert ? existing!.concert_id! : (sale.concertId ?? '');
       let localItems: LocalSaleItem[] = [];
       if (existing?.items_json) {
         try {
@@ -201,7 +231,7 @@ export async function reconcileSalesFromServer(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
         [
           localId,
-          sale.concertId ?? '',
+          concertId,
           itemsJson,
           sale.totalAmount,
           sale.paymentMethod,

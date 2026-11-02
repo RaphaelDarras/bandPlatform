@@ -136,3 +136,41 @@ describe('getLocalSaleItems / setSaleLineApplied', () => {
     expect(db.runAsync).not.toHaveBeenCalled();
   });
 });
+
+describe('reconcileSalesFromServer keeps local intent while API ops are pending (WR-06)', () => {
+  function dbWith(local: object, pending: unknown[]) {
+    const db = makeDb({ localItems: [{ ...base }], pending });
+    db.getFirstAsync.mockImplementation(() =>
+      Promise.resolve({ items_json: JSON.stringify([{ ...base }]), ...local } as any)
+    );
+    return db;
+  }
+  function writtenRow(db: ReturnType<typeof makeDb>) {
+    const call = (db.runAsync.mock.calls as any[][]).find((c) =>
+      String(c[0]).includes('INSERT OR REPLACE INTO sales')
+    )!;
+    return { concertId: call[1][1], voided: call[1][9], voidedAt: call[1][10] };
+  }
+
+  it('keeps the local voided flag while a sale_set_voided op is pending', async () => {
+    const db = dbWith({ voided: 1, voided_at: 1234, concert_id: 'c1' }, [
+      { type: 'sale_set_voided', payload: JSON.stringify({ saleId: 's1', voided: true }), idempotency_key: 'k' },
+    ]);
+    await reconcileSalesFromServer(db as any, [sale([{ ...base }])]); // server: not voided
+    expect(writtenRow(db)).toMatchObject({ voided: 1, voidedAt: 1234 });
+  });
+
+  it('keeps the local concert while a sale_update_concert op is pending', async () => {
+    const db = dbWith({ voided: 0, voided_at: null, concert_id: 'c-new' }, [
+      { type: 'sale_update_concert', payload: JSON.stringify({ saleId: 's1', concertId: 'c-new' }), idempotency_key: 'k' },
+    ]);
+    await reconcileSalesFromServer(db as any, [sale([{ ...base }])]); // server: c1
+    expect(writtenRow(db).concertId).toBe('c-new');
+  });
+
+  it('takes the server state when nothing is pending', async () => {
+    const db = dbWith({ voided: 1, voided_at: 1234, concert_id: 'c-old' }, []);
+    await reconcileSalesFromServer(db as any, [sale([{ ...base }])]);
+    expect(writtenRow(db)).toMatchObject({ concertId: 'c1', voided: 0, voidedAt: null });
+  });
+});
