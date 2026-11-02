@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { runInTransaction } from './lock';
 
 export interface CachedConcert {
   id: string;
@@ -157,8 +158,7 @@ export async function replacePriceOverrides(
   concertId: string,
   overrides: Array<{ productId: string; price: number }>
 ): Promise<void> {
-  await db.execAsync('BEGIN');
-  try {
+  await runInTransaction(db, async () => {
     await db.runAsync('DELETE FROM concert_price_overrides WHERE concert_id = ?', [concertId]);
     for (const ov of overrides) {
       await db.runAsync(
@@ -166,9 +166,5 @@ export async function replacePriceOverrides(
         [concertId, ov.productId, ov.price]
       );
     }
-    await db.execAsync('COMMIT');
-  } catch (e) {
-    await db.execAsync('ROLLBACK');
-    throw e;
-  }
+  });
 }

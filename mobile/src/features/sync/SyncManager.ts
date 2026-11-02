@@ -27,6 +27,7 @@ import {
   incrementAttempt,
   type OutboxRow,
 } from '@/db/outbox';
+import { withDbLock } from '@/db/lock';
 import { apiUpdateSale, apiPatchSaleApplied } from '@/api/sales';
 import { executeStockOp } from '@/features/sync/shopifyStockOps';
 import { useSyncStore } from '@/stores/syncStore';
@@ -161,7 +162,7 @@ async function processSaleCreateBatch(
     console.log('[SyncManager] Batch sync success:', JSON.stringify(response.data));
     // Mark all rows done and reset failure counter
     for (const row of rows) {
-      await markOutboxDone(db, row.id);
+      await withDbLock(() => markOutboxDone(db, row.id));
     }
     useSyncStore.getState().resetFailures();
     useSyncStore.getState().setIsOnline(true);
@@ -176,7 +177,7 @@ async function processSaleCreateBatch(
     // Increment attempt for all rows in batch
     for (const row of rows) {
       const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
-      await incrementAttempt(db, row.id, Date.now() + delay);
+      await withDbLock(() => incrementAttempt(db, row.id, Date.now() + delay));
     }
 
     // Distinguish network errors from server errors:
@@ -209,17 +210,17 @@ async function processOtherRow(
       await apiPatchSaleApplied(payload.saleId, payload.lines);
     } else {
       // Unknown type — skip and mark done to avoid blocking queue
-      await markOutboxDone(db, row.id);
+      await withDbLock(() => markOutboxDone(db, row.id));
       return;
     }
 
-    await markOutboxDone(db, row.id);
+    await withDbLock(() => markOutboxDone(db, row.id));
     useSyncStore.getState().resetFailures();
     useSyncStore.getState().setIsOnline(true);
     useSyncStore.getState().setLastSyncAt(Date.now());
   } catch (err: unknown) {
     const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
-    await incrementAttempt(db, row.id, Date.now() + delay);
+    await withDbLock(() => incrementAttempt(db, row.id, Date.now() + delay));
     const axiosErr = err as { response?: unknown };
     if (axiosErr.response) {
       useSyncStore.getState().setIsOnline(true);

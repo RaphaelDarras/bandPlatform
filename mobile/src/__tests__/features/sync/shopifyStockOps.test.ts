@@ -35,7 +35,7 @@ const pendingRows = outbox.getAllPendingOutboxRows as jest.Mock;
 const getItems = sales.getLocalSaleItems as jest.Mock;
 const setApplied = sales.setSaleLineApplied as jest.Mock;
 
-const db = {} as any;
+const db = { execAsync: jest.fn(() => Promise.resolve()) } as any;
 
 function row(payload: object, over: Partial<outbox.OutboxRow> = {}): outbox.OutboxRow {
   return {

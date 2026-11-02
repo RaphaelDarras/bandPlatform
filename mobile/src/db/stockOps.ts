@@ -16,6 +16,7 @@ import {
   insertOutboxEntries,
   markOutboxDone,
 } from '@/db/outbox';
+import { runInTransaction } from '@/db/lock';
 import type {
   LocalSaleItem,
   OutboxEntryInput,
@@ -88,21 +89,6 @@ function parseStockRow(
     return { row, payload };
   } catch {
     return null;
-  }
-}
-
-async function runInTransaction<T>(
-  db: SQLite.SQLiteDatabase,
-  fn: () => Promise<T>
-): Promise<T> {
-  await db.execAsync('BEGIN');
-  try {
-    const result = await fn();
-    await db.execAsync('COMMIT');
-    return result;
-  } catch (e) {
-    await db.execAsync('ROLLBACK');
-    throw e;
   }
 }
 

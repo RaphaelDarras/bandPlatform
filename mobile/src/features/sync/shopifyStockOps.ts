@@ -34,6 +34,7 @@ import {
   type StockOpPlan,
 } from '@/db/outbox';
 import { getLocalSaleItems, setSaleLineApplied } from '@/db/sales';
+import { runInTransaction, withDbLock } from '@/db/lock';
 
 export const MAX_STALE_REPLANS = 3;
 const MAX_BACKOFF_MS = 30000;
@@ -55,7 +56,7 @@ function referenceUri(kind: ShopifyStockPayload['kind'], payload: ShopifyStockPa
 
 async function backoff(db: SQLiteDatabase, row: OutboxRow): Promise<void> {
   const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
-  await incrementAttempt(db, row.id, Date.now() + delay);
+  await withDbLock(() => incrementAttempt(db, row.id, Date.now() + delay));
 }
 
 async function recordApplied(
@@ -95,8 +96,10 @@ async function dropOp(
     variantGid: payload.variantGid,
     reason,
   });
-  await recordApplied(db, row, payload, 0);
-  await markOutboxDone(db, row.id);
+  await runInTransaction(db, async () => {
+    await recordApplied(db, row, payload, 0);
+    await markOutboxDone(db, row.id);
+  });
   return 'dropped';
 }
 
@@ -106,8 +109,12 @@ async function finish(
   payload: ShopifyStockPayload,
   appliedDelta: number
 ): Promise<StockOpResult> {
-  await recordApplied(db, row, payload, appliedDelta);
-  await markOutboxDone(db, row.id);
+  // One locked transaction: the applied delta, its sale_applied op and the
+  // done flag land together and cannot be rolled back by another flow (CR-04).
+  await runInTransaction(db, async () => {
+    await recordApplied(db, row, payload, appliedDelta);
+    await markOutboxDone(db, row.id);
+  });
   return 'done';
 }
 
@@ -118,7 +125,7 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
     if (!payload || typeof payload.variantGid !== 'string' || !payload.kind) throw new Error('bad payload');
   } catch {
     console.warn('[shopifyStockOps] unparsable payload, dropping', { rowId: row.id });
-    await markOutboxDone(db, row.id);
+    await withDbLock(() => markOutboxDone(db, row.id));
     return 'dropped';
   }
 
@@ -189,7 +196,7 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
         key: keyOverride ?? row.id,
       };
       payload = { ...payload, plan };
-      await updateOutboxPayload(db, row.id, JSON.stringify(payload));
+      await withDbLock(() => updateOutboxPayload(db, row.id, JSON.stringify(payload)));
     }
 
     const res = await adjustAvailable({
@@ -209,7 +216,7 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
         plan = undefined;
         const { plan: _dropped, ...rest } = payload;
         payload = rest as ShopifyStockPayload;
-        await updateOutboxPayload(db, row.id, JSON.stringify(payload));
+        await withDbLock(() => updateOutboxPayload(db, row.id, JSON.stringify(payload)));
         if (stale >= MAX_STALE_REPLANS) {
           await backoff(db, row);
           return 'retry';
@@ -222,7 +229,7 @@ async function run(db: SQLiteDatabase, row: OutboxRow): Promise<StockOpResult> {
       case 'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED': {
         const newPlan: StockOpPlan = { ...plan, key: Crypto.randomUUID() };
         payload = { ...payload, plan: newPlan };
-        await updateOutboxPayload(db, row.id, JSON.stringify(payload));
+        await withDbLock(() => updateOutboxPayload(db, row.id, JSON.stringify(payload)));
         await backoff(db, row);
         return 'retry';
       }

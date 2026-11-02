@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { runInTransaction } from './lock';
 
 /**
  * The outbox holds two independent op families (D-14):
@@ -88,8 +89,7 @@ export async function recordSaleLocally(
   sale: LocalSale,
   outboxEntries: OutboxEntryInput[]
 ): Promise<void> {
-  await db.execAsync('BEGIN');
-  try {
+  await runInTransaction(db, async () => {
     await db.runAsync(
       `INSERT INTO sales (id, concert_id, items_json, total_amount, payment_method,
         payment_split_json, currency, discount, discount_type, created_at)
@@ -111,16 +111,12 @@ export async function recordSaleLocally(
     for (const entry of outboxEntries) {
       await db.runAsync(INSERT_OUTBOX_SQL, outboxParams(entry));
     }
-    await db.execAsync('COMMIT');
-  } catch (e) {
-    await db.execAsync('ROLLBACK');
-    throw e;
-  }
+  });
 }
 
 /**
  * Inserts outbox entries (INSERT OR IGNORE). No transaction of its own;
- * callers needing atomicity wrap it in BEGIN/COMMIT.
+ * callers needing atomicity wrap it in runInTransaction (db/lock).
  */
 export async function insertOutboxEntries(
   db: SQLite.SQLiteDatabase,

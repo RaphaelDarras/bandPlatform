@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import type { LocalSale, LocalSaleItem, PaymentSplitEntry } from './outbox';
 import { getAllPendingOutboxRows, SHOPIFY_STOCK, SALE_APPLIED } from './outbox';
 import type { ApiSale } from '@/api/sales';
+import { runInTransaction } from './lock';
 
 export interface LocalSaleRow extends Omit<LocalSale, 'items' | 'paymentSplit'> {
   items_json: string;
@@ -127,25 +128,27 @@ export async function reconcileSalesFromServer(
   // Build set of local IDs that the server knows about
   const serverLocalIds = new Set<string>();
 
-  // Sales with in-flight stock ops: local appliedDelta is fresher than the server's
-  const pendingRowsAll = await getAllPendingOutboxRows(db);
-  const pendingSaleIds = new Set<string>();
-  for (const r of pendingRowsAll) {
-    if (r.type === SHOPIFY_STOCK || r.type === SALE_APPLIED) {
-      try {
-        const sid = (JSON.parse(r.payload) as { saleId?: string }).saleId;
-        if (sid) pendingSaleIds.add(sid);
-      } catch {
-        // ignore malformed payload
+  // Everything (pending-op scan, per-sale read of items_json, write) runs in
+  // one locked transaction so a concurrent executor write (setSaleLineApplied)
+  // cannot land between the read and the INSERT OR REPLACE (CR-04).
+  await runInTransaction(db, async () => {
+    // Sales with in-flight stock ops: local appliedDelta is fresher than the server's
+    const pendingRowsAll = await getAllPendingOutboxRows(db);
+    const pendingSaleIds = new Set<string>();
+    for (const r of pendingRowsAll) {
+      if (r.type === SHOPIFY_STOCK || r.type === SALE_APPLIED) {
+        try {
+          const sid = (JSON.parse(r.payload) as { saleId?: string }).saleId;
+          if (sid) pendingSaleIds.add(sid);
+        } catch {
+          // ignore malformed payload
+        }
+      } else if (r.type === 'sale_create') {
+        const id = localIdFromKey(r.idempotency_key);
+        if (id) pendingSaleIds.add(id);
       }
-    } else if (r.type === 'sale_create') {
-      const id = localIdFromKey(r.idempotency_key);
-      if (id) pendingSaleIds.add(id);
     }
-  }
 
-  await db.execAsync('BEGIN');
-  try {
     for (const sale of serverSales) {
       const localId = localIdFromKey(sale.idempotencyKey) ?? sale.id;
       serverLocalIds.add(localId);
@@ -230,12 +233,7 @@ export async function reconcileSalesFromServer(
         await db.runAsync(`DELETE FROM sales WHERE id = ?`, [row.id]);
       }
     }
-
-    await db.execAsync('COMMIT');
-  } catch (e) {
-    await db.execAsync('ROLLBACK');
-    throw e;
-  }
+  });
 }
 
 /** Returns the parsed items of a local sale, or null if the sale does not exist. */
