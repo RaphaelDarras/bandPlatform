@@ -92,23 +92,36 @@ export async function requestSync(
       (r) => r.type !== 'sale_create' && r.type !== SHOPIFY_STOCK
     );
 
-    // Process sale_create in a single batch (up to BATCH_SIZE)
-    if (saleCreateRows.length > 0) {
-      await processSaleCreateBatch(db, apiClient, saleCreateRows.slice(0, BATCH_SIZE));
-    }
+    // The API loop and the Shopify loop run concurrently (WR-08): a Render
+    // cold start or an offline API no longer delays Shopify stock writes by
+    // the axios timeouts. DB writes from both are serialised by db/lock, and
+    // executeStockOp re-reads each row before acting on it (CR-01).
+    const apiPart = async () => {
+      // Process sale_create in a single batch (up to BATCH_SIZE)
+      if (saleCreateRows.length > 0) {
+        await processSaleCreateBatch(db, apiClient, saleCreateRows.slice(0, BATCH_SIZE));
+      }
 
-    // Process void/unvoid rows individually
-    for (const row of otherRows) {
-      await processOtherRow(db, apiClient, row);
-    }
+      // Process void/unvoid/concert/applied rows individually
+      for (const row of otherRows) {
+        await processOtherRow(db, apiClient, row);
+      }
+    };
 
     // Shopify stock ops: sequential, isolated, no syncStore signals (D-14)
-    for (const row of stockRows) {
-      try {
-        await executeStockOp(db, row);
-      } catch {
-        console.warn('[SyncManager] stock op error', row.id);
+    const stockPart = async () => {
+      for (const row of stockRows) {
+        try {
+          await executeStockOp(db, row);
+        } catch {
+          console.warn('[SyncManager] stock op error', row.id);
+        }
       }
+    };
+
+    const [apiResult] = await Promise.allSettled([apiPart(), stockPart()]);
+    if (apiResult.status === 'rejected') {
+      console.warn('[SyncManager] API ops error', apiResult.reason);
     }
 
     // Re-query actual pending count — don't estimate, since batch/individual

@@ -489,3 +489,21 @@ describe('requestSync — per-sale batch results (WR-01)', () => {
     expect(mockMarkFailed).not.toHaveBeenCalledWith(mockDb, 'r4');
   });
 });
+
+describe('requestSync — Shopify ops do not wait for the API (WR-08)', () => {
+  it('starts stock ops while the sale_create batch is still in flight', async () => {
+    let releaseApi!: (v: { data: object }) => void;
+    mockApiClient.post.mockReturnValueOnce(new Promise<{ data: object }>((r) => (releaseApi = r)));
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'c', type: 'sale_create' }),
+      makeOutboxRow({ id: 's', type: 'shopify_stock' }),
+    ]);
+    mockExecuteStockOp.mockResolvedValue('done');
+    const p = requestSync(mockDb as never, mockApiClient as never);
+    await new Promise<void>((r) => setImmediate(() => r()));
+    expect(mockExecuteStockOp).toHaveBeenCalled(); // API batch not answered yet
+    releaseApi({ data: {} });
+    await p;
+    expect(mockMarkOutboxDone).toHaveBeenCalledWith(mockDb, 'c');
+  });
+});
