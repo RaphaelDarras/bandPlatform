@@ -42,10 +42,11 @@ export function Component() {
         // taking a full PAGE_STACK gap. The player keeps the page's only h1,
         // so the visible title here is a plain paragraph.
         <div>
-          <div className="mb-6 sm:mb-8">
-            <p className="type-label text-[var(--color-accent)]">New album · Out now</p>
-            <p className="type-h1 mt-3 text-[var(--color-ink)]">Eternal Scars</p>
-          </div>
+          {/* One line at h1 size; wraps between the two halves on narrow screens. */}
+          <p className="type-h1 mb-6 flex flex-wrap gap-x-[0.3em] sm:mb-8">
+            <span className="text-[var(--color-accent)]">New album · Out now</span>
+            <span className="text-[var(--color-ink)]">Eternal Scars</span>
+          </p>
           <FullscreenPlayer videoId={highlightedRelease.videoId} title="Eternal Scars" />
         </div>
       )}
