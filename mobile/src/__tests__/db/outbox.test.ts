@@ -8,6 +8,8 @@ import {
   getAllPendingOutboxRows,
   updatePendingOutboxPayload,
   upsertSaleApplied,
+  upsertSetVoided,
+  markOutboxFailed,
   markOutboxDoneIfPayload,
 } from '@/db/outbox';
 import type { LocalSale } from '@/db/outbox';
@@ -240,5 +242,27 @@ describe('sale_applied upsert (CR-03)', () => {
     const [sql, params] = mockDb.runAsync.mock.calls.at(-1) as any[];
     expect(sql).toContain('AND payload = ?');
     expect(params).toEqual(['id-1', '{"a":1}']);
+  });
+});
+
+describe('sale_set_voided op (CR-06)', () => {
+  it('replaces any earlier row for the sale (even a done one) with a pending one', async () => {
+    await upsertSetVoided(mockDb as any, 'id-2', 's1', false, 1000);
+    const [sql, params] = mockDb.runAsync.mock.calls.at(-1) as any[];
+    expect(sql).toContain('INSERT OR REPLACE INTO outbox');
+    expect(params).toEqual([
+      'id-2',
+      'sale_set_voided',
+      JSON.stringify({ saleId: 's1', voided: false }),
+      'sale_set_voided:s1',
+      1000,
+    ]);
+  });
+
+  it('markOutboxFailed sets status failed', async () => {
+    await markOutboxFailed(mockDb as any, 'id-3');
+    const [sql, params] = mockDb.runAsync.mock.calls.at(-1) as any[];
+    expect(sql).toContain("status = 'failed'");
+    expect(params).toEqual(['id-3']);
   });
 });

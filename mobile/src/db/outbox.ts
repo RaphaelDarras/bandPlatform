@@ -3,11 +3,14 @@ import { runInTransaction } from './lock';
 
 /**
  * The outbox holds two independent op families (D-14):
- *  - API (Mongo): sale_create / sale_void / sale_unvoid / sale_update_concert / sale_applied
+ *  - API (Mongo): sale_create / sale_set_voided / sale_update_concert / sale_applied
+ *    (legacy sale_void / sale_unvoid rows are still processed)
  *  - Shopify:     shopify_stock (one row per sale line / restock)
  */
 export const SHOPIFY_STOCK = 'shopify_stock';
 export const SALE_APPLIED = 'sale_applied';
+/** Desired voided state of a sale (replaces sale_void / sale_unvoid, CR-06). */
+export const SALE_SET_VOIDED = 'sale_set_voided';
 
 export interface OutboxRow {
   id: string;
@@ -156,6 +159,34 @@ export async function upsertSaleApplied(
       now,
     ]
   );
+}
+
+/**
+ * One desired-state op per sale for the API voided flag (CR-06). INSERT OR
+ * REPLACE swaps in a fresh pending row (new id) even when an earlier void /
+ * unvoid row for the sale is already done, so the latest intent always syncs.
+ */
+export async function upsertSetVoided(
+  db: SQLite.SQLiteDatabase,
+  id: string,
+  saleId: string,
+  voided: boolean,
+  now: number
+): Promise<void> {
+  await db.runAsync(
+    `INSERT OR REPLACE INTO outbox
+       (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
+     VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
+    [id, SALE_SET_VOIDED, JSON.stringify({ saleId, voided }), `sale_set_voided:${saleId}`, now]
+  );
+}
+
+/** Marks a row as permanently failed (non-retryable); it no longer counts as pending. */
+export async function markOutboxFailed(
+  db: SQLite.SQLiteDatabase,
+  id: string
+): Promise<void> {
+  await db.runAsync(`UPDATE outbox SET status = 'failed' WHERE id = ?`, [id]);
 }
 
 /**

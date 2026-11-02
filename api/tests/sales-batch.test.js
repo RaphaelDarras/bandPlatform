@@ -399,16 +399,18 @@ describe('POST /api/sales/:id/void', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 400 when sale is already voided', async () => {
-    const alreadyVoided = mockSaleDoc({ voidedAt: new Date(), voidedBy: 'admin1' });
+  it('is idempotent: 200 without re-saving when the sale is already voided (CR-06)', async () => {
+    const voidedAt = new Date('2026-01-01T00:00:00Z');
+    const alreadyVoided = mockSaleDoc({ voidedAt, voidedBy: 'admin1' });
     mockSaleModule.findById.mockResolvedValue(alreadyVoided);
 
     const res = await request(app)
       .post('/api/sales/507f1f77bcf86cd799439099/void')
       .set('Authorization', AUTH_HEADER);
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/already voided/i);
+    expect(res.status).toBe(200);
+    expect(alreadyVoided.voidedAt).toBe(voidedAt);
+    expect(alreadyVoided.save).not.toHaveBeenCalled();
   });
 
   it('voids sale without touching Product stock', async () => {
@@ -454,7 +456,7 @@ describe('POST /api/sales/:id/unvoid', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 400 when sale is not voided', async () => {
+  it('is idempotent: 200 without saving when the sale is not voided (CR-06)', async () => {
     const activeSale = mockSaleDoc({ voidedAt: undefined });
     mockSaleModule.findById.mockResolvedValue(activeSale);
 
@@ -462,8 +464,8 @@ describe('POST /api/sales/:id/unvoid', () => {
       .post('/api/sales/507f1f77bcf86cd799439099/unvoid')
       .set('Authorization', AUTH_HEADER);
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/not voided/i);
+    expect(res.status).toBe(200);
+    expect(activeSale.save).not.toHaveBeenCalled();
   });
 
   it('unvoids sale without touching Product stock', async () => {

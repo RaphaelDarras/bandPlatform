@@ -74,6 +74,7 @@ jest.mock('@/db/outbox', () => ({
   getPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   markOutboxDone: jest.fn(() => Promise.resolve()),
   incrementAttempt: jest.fn(() => Promise.resolve()),
+  upsertSetVoided: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock API sales (void/unvoid — network calls silenced in tests)
@@ -248,33 +249,33 @@ describe('useHistory — voidSale', () => {
     expect(mockVoidLocalSale).toHaveBeenCalled();
   });
 
-  it('inserts an outbox entry with type sale_void when voiding', async () => {
-    // Clear runAsync spy so we can check fresh calls
-    mockDb.runAsync.mockClear();
-
-    mockGetLocalSales.mockResolvedValue([
-      makeSaleRow({ id: 'sale-1', concertId: 'concert-1', voided: 0 }),
-    ]);
+  it('queues the desired voided state as one replaceable op per sale (CR-06)', async () => {
+    const upsert = outboxModule.upsertSetVoided as jest.Mock;
+    const markDone = outboxModule.markOutboxDone as jest.Mock;
+    upsert.mockClear();
+    markDone.mockClear();
 
     const { result } = renderHook(() => useHistory());
 
     await act(async () => {
-      await result.current.loadHistory();
+      await result.current.voidSale('sale-1');
     });
-
+    await act(async () => {
+      await result.current.unvoidSale('sale-1');
+    });
     await act(async () => {
       await result.current.voidSale('sale-1');
     });
 
-    // Should call runAsync to insert outbox entry with type sale_void
-    const insertCalls = mockDb.runAsync.mock.calls.filter(
-      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('outbox')
-    );
-    expect(insertCalls.length).toBeGreaterThan(0);
-    const outboxInsert = insertCalls.find(
-      (call: unknown[]) => Array.isArray(call[1]) && (call[1] as unknown[]).includes('sale_void')
-    );
-    expect(outboxInsert).toBeDefined();
+    // void -> unvoid -> void: every step re-queues the latest intent (no
+    // INSERT OR IGNORE on a done 'sale_void:<id>' key swallowing the second void)
+    expect(upsert.mock.calls.map((c) => [c[2], c[3]])).toEqual([
+      ['sale-1', true],
+      ['sale-1', false],
+      ['sale-1', true],
+    ]);
+    // the immediate API success marks exactly the row it created
+    expect(markDone.mock.calls.map((c) => c[1])).toEqual(upsert.mock.calls.map((c) => c[1]));
   });
 });
 

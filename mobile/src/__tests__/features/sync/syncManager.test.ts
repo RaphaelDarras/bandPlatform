@@ -21,6 +21,8 @@ import { useSyncStore } from '@/stores/syncStore';
 jest.mock('@/db/outbox', () => ({
   SHOPIFY_STOCK: 'shopify_stock',
   SALE_APPLIED: 'sale_applied',
+  SALE_SET_VOIDED: 'sale_set_voided',
+  markOutboxFailed: jest.fn(() => Promise.resolve()),
   getPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   markOutboxDone: jest.fn(() => Promise.resolve()),
   markOutboxDoneIfPayload: jest.fn(() => Promise.resolve()),
@@ -417,5 +419,43 @@ describe('startPeriodicSync / stopPeriodicSync', () => {
     jest.advanceTimersByTime(120000);
     // No calls after stopping
     expect(mockGetPendingOutboxRows).not.toHaveBeenCalled();
+  });
+});
+
+describe('requestSync — sale_set_voided and permanent API errors (CR-06)', () => {
+  const mockMarkFailed = outboxModule.markOutboxFailed as jest.Mock;
+
+  it('posts void or unvoid according to the desired state', async () => {
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'v', type: 'sale_set_voided', payload: JSON.stringify({ saleId: 's9', voided: true }) }),
+      makeOutboxRow({ id: 'u', type: 'sale_set_voided', payload: JSON.stringify({ saleId: 's8', voided: false }) }),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockApiClient.post).toHaveBeenCalledWith('sales/s9/void', {});
+    expect(mockApiClient.post).toHaveBeenCalledWith('sales/s8/unvoid', {});
+  });
+
+  it('marks a 400-rejected op failed instead of retrying forever', async () => {
+    mockApiClient.post.mockRejectedValueOnce({ response: { status: 400, data: { error: 'Sale already voided' } } });
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'v', type: 'sale_void', payload: JSON.stringify({ saleId: 's9' }) }),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockMarkFailed).toHaveBeenCalledWith(mockDb, 'v');
+    expect(mockIncrementAttempt).not.toHaveBeenCalledWith(mockDb, 'v', expect.any(Number));
+  });
+
+  it('keeps retrying 404 (sale not synced yet) and 5xx', async () => {
+    mockApiClient.post
+      .mockRejectedValueOnce({ response: { status: 404 } })
+      .mockRejectedValueOnce({ response: { status: 503 } });
+    mockGetPendingOutboxRows.mockResolvedValue([
+      makeOutboxRow({ id: 'a', type: 'sale_set_voided', payload: JSON.stringify({ saleId: 's1', voided: true }) }),
+      makeOutboxRow({ id: 'b', type: 'sale_set_voided', payload: JSON.stringify({ saleId: 's2', voided: true }) }),
+    ]);
+    await requestSync(mockDb as never, mockApiClient as never);
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+    expect(mockIncrementAttempt).toHaveBeenCalledWith(mockDb, 'a', expect.any(Number));
+    expect(mockIncrementAttempt).toHaveBeenCalledWith(mockDb, 'b', expect.any(Number));
   });
 });

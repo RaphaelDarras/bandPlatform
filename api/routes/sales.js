@@ -278,8 +278,10 @@ router.post('/:id/void', async (req, res) => {
       return res.status(404).json({ error: 'Sale not found' });
     }
 
+    // Idempotent: a retried void (e.g. the client timed out after the server
+    // applied it) succeeds instead of failing forever in the outbox (CR-06).
     if (sale.voidedAt) {
-      return res.status(400).json({ error: 'Sale already voided' });
+      return res.status(200).json(sale);
     }
 
     sale.voidedAt = new Date();
@@ -309,8 +311,9 @@ router.post('/:id/unvoid', async (req, res) => {
       return res.status(404).json({ error: 'Sale not found' });
     }
 
+    // Idempotent: unvoiding an active sale is a no-op success (CR-06).
     if (!sale.voidedAt) {
-      return res.status(400).json({ error: 'Sale is not voided' });
+      return res.status(200).json(sale);
     }
 
     sale.voidedAt = undefined;

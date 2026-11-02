@@ -10,7 +10,8 @@ import {
   unvoidLocalSale,
   reconcileSalesFromServer,
 } from '@/db/sales';
-import type { LocalSaleItem } from '@/db/outbox';
+import { markOutboxDone, upsertSetVoided, type LocalSaleItem } from '@/db/outbox';
+import { withDbLock } from '@/db/lock';
 import { enqueueVoidRestores, enqueueUnvoidDeducts } from '@/db/stockOps';
 import { updateLocalStock } from '@/db/products';
 import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
@@ -158,17 +159,15 @@ export function useHistory() {
     // 3. Add outbox entry for the API voidedAt flag
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
-    await db.runAsync(
-      `INSERT OR IGNORE INTO outbox
-       (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
-       VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
-      [outboxId, 'sale_void', JSON.stringify({ saleId }), `sale_void:${saleId}`, now]
-    );
+    // Desired-state op (CR-06): replaces any earlier void/unvoid row for the
+    // sale, even a done one, so the latest intent always reaches the server.
+    await withDbLock(() => upsertSetVoided(db, outboxId, saleId, true, now));
 
     // 4. Try immediate API call (best effort — outbox handles retry if offline)
     try {
       await apiVoidSale(saleId);
-      await db.runAsync(`UPDATE outbox SET status = 'done' WHERE id = ?`, [outboxId]);
+      // By id: a newer void/unvoid replaced this row with a new id and stays pending.
+      await withDbLock(() => markOutboxDone(db, outboxId));
     } catch {
       // Offline or API error — outbox will sync later
     }
@@ -200,17 +199,15 @@ export function useHistory() {
     // 3. Add outbox entry for the API flag
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
-    await db.runAsync(
-      `INSERT OR IGNORE INTO outbox
-       (id, type, payload, idempotency_key, status, attempt_count, next_attempt_at, created_at)
-       VALUES (?, ?, ?, ?, 'pending', 0, 0, ?)`,
-      [outboxId, 'sale_unvoid', JSON.stringify({ saleId }), `sale_unvoid:${saleId}`, now]
-    );
+    // Desired-state op (CR-06): replaces any earlier void/unvoid row for the
+    // sale, even a done one, so the latest intent always reaches the server.
+    await withDbLock(() => upsertSetVoided(db, outboxId, saleId, false, now));
 
     // 4. Try immediate API call (best effort)
     try {
       await apiUnvoidSale(saleId);
-      await db.runAsync(`UPDATE outbox SET status = 'done' WHERE id = ?`, [outboxId]);
+      // By id: a newer void/unvoid replaced this row with a new id and stays pending.
+      await withDbLock(() => markOutboxDone(db, outboxId));
     } catch {
       // Offline or API error — outbox will sync later
     }

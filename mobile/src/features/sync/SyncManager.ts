@@ -2,7 +2,8 @@
  * SyncManager — background outbox processor.
  *
  * Processes pending outbox rows in batches of 10.
- * Supports sale_create (batched), sale_void, sale_unvoid, sale_update_concert and
+ * Supports sale_create (batched), sale_set_voided (plus legacy sale_void /
+ * sale_unvoid), sale_update_concert and
  * sale_applied (API ops) plus shopify_stock (direct-to-Shopify stock ops, 07.1 D-14).
  * Shopify failures never flip API connectivity (syncStore) and never block API ops.
  * Exponential backoff on failure (capped at 30s).
@@ -25,6 +26,8 @@ import {
   getPendingOutboxRows,
   markOutboxDone,
   markOutboxDoneIfPayload,
+  markOutboxFailed,
+  SALE_SET_VOIDED,
   incrementAttempt,
   type OutboxRow,
 } from '@/db/outbox';
@@ -193,6 +196,15 @@ async function processSaleCreateBatch(
   }
 }
 
+/**
+ * 4xx responses that retrying cannot fix. 404 is excluded (the sale may not be
+ * synced yet), as are auth (401/403), timeout (408) and rate limiting (429).
+ */
+function isPermanentClientError(status: number | undefined): boolean {
+  if (status === undefined || status < 400 || status >= 500) return false;
+  return ![401, 403, 404, 408, 429].includes(status);
+}
+
 async function processOtherRow(
   db: SQLiteDatabase,
   apiClient: AxiosInstance,
@@ -201,7 +213,9 @@ async function processOtherRow(
   try {
     const payload = JSON.parse(row.payload);
 
-    if (row.type === 'sale_void') {
+    if (row.type === SALE_SET_VOIDED) {
+      await apiClient.post(`sales/${payload.saleId}/${payload.voided ? 'void' : 'unvoid'}`, {});
+    } else if (row.type === 'sale_void') {
       await apiClient.post(`sales/${payload.saleId}/void`, {});
     } else if (row.type === 'sale_unvoid') {
       await apiClient.post(`sales/${payload.saleId}/unvoid`, {});
@@ -222,9 +236,18 @@ async function processOtherRow(
     useSyncStore.getState().setIsOnline(true);
     useSyncStore.getState().setLastSyncAt(Date.now());
   } catch (err: unknown) {
+    const axiosErr = err as { response?: { status?: number } };
+    const status = axiosErr.response?.status;
+    if (isPermanentClientError(status)) {
+      // Retrying a request the server rejects as invalid can never succeed and
+      // would keep pendingCount above 0 forever (CR-06).
+      console.warn('[SyncManager] API op rejected, marking failed', { id: row.id, type: row.type, status });
+      await withDbLock(() => markOutboxFailed(db, row.id));
+      useSyncStore.getState().setIsOnline(true);
+      return;
+    }
     const delay = Math.min(1000 * Math.pow(2, row.attempt_count), MAX_BACKOFF_MS);
     await withDbLock(() => incrementAttempt(db, row.id, Date.now() + delay));
-    const axiosErr = err as { response?: unknown };
     if (axiosErr.response) {
       useSyncStore.getState().setIsOnline(true);
     } else {
