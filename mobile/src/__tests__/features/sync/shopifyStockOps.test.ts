@@ -272,3 +272,22 @@ describe('executeStockOp vs concurrent void/unvoid (CR-01)', () => {
     expect(markDone).not.toHaveBeenCalled();
   });
 });
+
+describe('stale give-up keeps the rotated key (CR-02)', () => {
+  it('the next sync run plans with the persisted nextKey, not the burned row.id', async () => {
+    adjust.mockResolvedValue({ ok: false, code: 'CHANGE_FROM_QUANTITY_STALE', message: 'x' });
+    expect(await exec(row(deduct(1)))).toBe('retry');
+    const persisted = updatePayload.mock.calls.at(-1)![2] as string;
+    const saved = JSON.parse(persisted);
+    expect(saved.plan).toBeUndefined();
+    expect(saved.nextKey).toBeDefined();
+    expect(saved.nextKey).not.toBe('row1');
+
+    // Next run, from the persisted payload
+    adjust.mockReset();
+    adjust.mockResolvedValue({ ok: true, appliedDelta: -1 });
+    expect(await exec(row({}, { payload: persisted }))).toBe('done');
+    expect(adjust).toHaveBeenCalledTimes(1);
+    expect(adjust.mock.calls[0][0].idempotencyKey).toBe(saved.nextKey);
+  });
+});

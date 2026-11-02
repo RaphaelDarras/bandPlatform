@@ -151,7 +151,6 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
   }
 
   let plan: StockOpPlan | undefined = payload.plan;
-  let keyOverride: string | undefined;
   let stale = 0;
 
   for (;;) {
@@ -214,7 +213,9 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
         inventoryItemId: level.inventoryItemId,
         changeFrom,
         delta,
-        key: keyOverride ?? row.id,
+        // nextKey is persisted on every replan, so a later sync run never
+        // reuses a key already burned with different variables (CR-02).
+        key: payload.nextKey ?? row.id,
       };
       payload = { ...payload, plan };
       // Persisting the plan is the commit point: conditional on the row still
@@ -238,10 +239,9 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
     switch (res.code) {
       case 'CHANGE_FROM_QUANTITY_STALE': {
         stale += 1;
-        keyOverride = Crypto.randomUUID();
         plan = undefined;
         const { plan: _dropped, ...rest } = payload;
-        payload = rest as ShopifyStockPayload;
+        payload = { ...rest, nextKey: Crypto.randomUUID() } as ShopifyStockPayload;
         await withDbLock(() => updatePendingOutboxPayload(db, row.id, JSON.stringify(payload)));
         if (stale >= MAX_STALE_REPLANS) {
           await backoff(db, row);

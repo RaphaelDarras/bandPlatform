@@ -70,6 +70,7 @@ export interface ShopifyStockPayload {
   requested: number; // deduct/unvoid: positive qty; restock: signed delta; restore: display estimate only
   note?: string; // restock reason text (local audit only)
   plan?: StockOpPlan; // written BEFORE the first mutation attempt
+  nextKey?: string; // key for the next plan after a stale replan (never reuse a burned key)
 }
 
 const INSERT_OUTBOX_SQL = `INSERT OR IGNORE INTO outbox
