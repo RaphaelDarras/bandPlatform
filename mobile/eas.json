@@ -8,7 +8,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://10.0.2.2:5000/api",
-        "EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN": "hurakan-band.myshopify.com",
+        "EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN": "vxek3g-tc.myshopify.com",
         "EXPO_PUBLIC_SHOPIFY_API_VERSION": "2026-07",
         "EXPO_PUBLIC_SHOPIFY_LOCATION_ID": "gid://shopify/Location/108437307658",
         "EXPO_PUBLIC_SHOPIFY_CLIENT_ID": "4545746375a125b4f4b1fa208b62ce56"
@@ -21,7 +21,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://hurakan-band-platform.onrender.com/api",
-        "EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN": "hurakan-band.myshopify.com",
+        "EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN": "vxek3g-tc.myshopify.com",
         "EXPO_PUBLIC_SHOPIFY_API_VERSION": "2026-07",
         "EXPO_PUBLIC_SHOPIFY_LOCATION_ID": "gid://shopify/Location/108437307658",
         "EXPO_PUBLIC_SHOPIFY_CLIENT_ID": "4545746375a125b4f4b1fa208b62ce56"
@@ -31,7 +31,7 @@
     "production": {
       "env": {
         "EXPO_PUBLIC_API_URL": "https://hurakan-band-platform.onrender.com/api",
-        "EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN": "hurakan-band.myshopify.com",
+        "EXPO_PUBLIC_SHOPIFY_SHOP_DOMAIN": "vxek3g-tc.myshopify.com",
         "EXPO_PUBLIC_SHOPIFY_API_VERSION": "2026-07",
         "EXPO_PUBLIC_SHOPIFY_LOCATION_ID": "gid://shopify/Location/108437307658",
         "EXPO_PUBLIC_SHOPIFY_CLIENT_ID": "4545746375a125b4f4b1fa208b62ce56"
