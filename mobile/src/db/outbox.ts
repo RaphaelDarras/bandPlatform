@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { runInTransaction } from './lock';
+import { updateLocalStock } from './products';
 
 /**
  * The outbox holds two independent op families (D-14):
@@ -85,14 +86,22 @@ function outboxParams(e: OutboxEntryInput): (string | number)[] {
   return [e.id, e.type, e.payload, e.idempotency_key, e.created_at];
 }
 
+export interface LocalStockUpdate {
+  productGid: string;
+  variantGid: string;
+  delta: number;
+}
+
 /**
- * Atomic write: sale + all outbox entries (sale_create + shopify_stock rows) in one transaction.
+ * Atomic write: sale + all outbox entries (sale_create + shopify_stock rows)
+ * + the optimistic local stock updates, in one transaction (WR-10).
  * Called the instant the user taps "Confirm" - write is the first operation.
  */
 export async function recordSaleLocally(
   db: SQLite.SQLiteDatabase,
   sale: LocalSale,
-  outboxEntries: OutboxEntryInput[]
+  outboxEntries: OutboxEntryInput[],
+  stockUpdates: LocalStockUpdate[] = []
 ): Promise<void> {
   await runInTransaction(db, async () => {
     await db.runAsync(
@@ -115,6 +124,9 @@ export async function recordSaleLocally(
     // INSERT OR IGNORE prevents duplicate on retry
     for (const entry of outboxEntries) {
       await db.runAsync(INSERT_OUTBOX_SQL, outboxParams(entry));
+    }
+    for (const u of stockUpdates) {
+      await updateLocalStock(db, u.productGid, u.variantGid, u.delta);
     }
   });
 }

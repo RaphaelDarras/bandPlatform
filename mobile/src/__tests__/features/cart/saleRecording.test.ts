@@ -30,6 +30,7 @@ jest.mock('@/db', () => ({
 
 jest.mock('@/db/outbox', () => ({
   recordSaleLocally: jest.fn(() => Promise.resolve()),
+  getPendingOutboxRows: jest.fn(() => Promise.resolve([])),
   SHOPIFY_STOCK: 'shopify_stock',
 }));
 
@@ -137,28 +138,19 @@ describe('useSaleRecording', () => {
     });
   });
 
-  it('calls updateLocalStock for each cart item', async () => {
+  it('passes the optimistic stock decrements into the sale transaction (WR-10)', async () => {
     const { result } = renderHook(() => useSaleRecording());
 
     await act(async () => {
       await result.current.recordSale('Card');
     });
 
-    // 2 items => 2 updateLocalStock calls
-    expect(mockUpdateLocalStock).toHaveBeenCalledTimes(2);
-
-    expect(mockUpdateLocalStock).toHaveBeenCalledWith(
-      expect.anything(), // db
-      'gid://shopify/Product/1',
-      'gid://shopify/ProductVariant/S',
-      -2 // -quantity
-    );
-    expect(mockUpdateLocalStock).toHaveBeenCalledWith(
-      expect.anything(), // db
-      'gid://shopify/Product/2',
-      'gid://shopify/ProductVariant/ST',
-      -1
-    );
+    // applied by recordSaleLocally inside its transaction, not afterwards
+    expect(mockUpdateLocalStock).not.toHaveBeenCalled();
+    expect(mockRecordSaleLocally.mock.calls[0][3]).toEqual([
+      { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/S', delta: -2 },
+      { productGid: 'gid://shopify/Product/2', variantGid: 'gid://shopify/ProductVariant/ST', delta: -1 },
+    ]);
   });
 
   it('clears the cart after recording', async () => {
@@ -171,7 +163,10 @@ describe('useSaleRecording', () => {
     expect(useCartStore.getState().items).toHaveLength(0);
   });
 
-  it('increments syncStore.pendingCount by 1 + one per deduct line', async () => {
+  it('sets syncStore.pendingCount from the outbox, not a stale closure value (WR-10)', async () => {
+    // badge says 7 (stale), outbox actually holds 3 pending rows after the write
+    useSyncStore.setState({ pendingCount: 7 });
+    (outboxModule.getPendingOutboxRows as jest.Mock).mockResolvedValueOnce([{}, {}, {}]);
     const { result } = renderHook(() => useSaleRecording());
 
     await act(async () => {

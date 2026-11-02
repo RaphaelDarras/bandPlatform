@@ -2,9 +2,8 @@ import * as Crypto from 'expo-crypto';
 
 import { getDb } from '@/db';
 import { buildDeductEntries } from '@/db/stockOps';
-import { recordSaleLocally } from '@/db/outbox';
+import { recordSaleLocally, getPendingOutboxRows } from '@/db/outbox';
 import type { LocalSale } from '@/db/outbox';
-import { updateLocalStock } from '@/db/products';
 import { useCartStore } from '@/stores/cartStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { requestSync } from '@/features/sync/SyncManager';
@@ -23,7 +22,6 @@ export function useSaleRecording() {
   const discountType = useCartStore((state) => state.discountType);
   const totalFn = useCartStore((state) => state.total);
   const clearCart = useCartStore((state) => state.clearCart);
-  const pendingCount = useSyncStore((state) => state.pendingCount);
   const setPendingCount = useSyncStore((state) => state.setPendingCount);
 
   /**
@@ -119,18 +117,24 @@ export function useSaleRecording() {
       created_at: now,
     };
     const stockEntries = buildDeductEntries(saleId, sale.items, now);
-    await recordSaleLocally(db, sale, [saleCreateEntry, ...stockEntries]);
-
-    // 2. Update local product stock for each item
-    for (const item of cartItems) {
-      await updateLocalStock(db, item.productGid, item.variantGid, -item.quantity);
-    }
+    // 2. ...with the optimistic local stock decrement in the same transaction (WR-10)
+    await recordSaleLocally(
+      db,
+      sale,
+      [saleCreateEntry, ...stockEntries],
+      cartItems.map((item) => ({
+        productGid: item.productGid,
+        variantGid: item.variantGid,
+        delta: -item.quantity,
+      }))
+    );
 
     // 3. Clear cart
     clearCart();
 
-    // 4. Increment sync pending count
-    setPendingCount(pendingCount + 1 + stockEntries.length);
+    // 4. Pending count from the outbox itself, not a render-time closure value
+    // that two quick sales or a finishing sync make stale (WR-10).
+    setPendingCount((await getPendingOutboxRows(db)).length);
 
     // 5. Kick off sync immediately (fire-and-forget)
     requestSync(db, apiClient);

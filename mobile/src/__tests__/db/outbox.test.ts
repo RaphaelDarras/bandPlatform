@@ -54,6 +54,38 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+describe('recordSaleLocally optimistic stock (WR-10)', () => {
+  it('updates local stock inside the same BEGIN/COMMIT', async () => {
+    mockDb.execAsync.mockClear();
+    mockDb.runAsync.mockClear();
+    (mockDb.getFirstAsync as jest.Mock).mockResolvedValueOnce({
+      id: 'gid://shopify/Product/1',
+      name: 'Tee',
+      price: 15,
+      variants_json: JSON.stringify([{ variantGid: 'gid://shopify/ProductVariant/2', sku: 's', label: 'M', priceAdjustment: 0, stock: 5 }]),
+      image_url: null,
+      active: 1,
+      updated_at: 1,
+    });
+    const order: string[] = [];
+    (mockDb.execAsync as jest.Mock).mockImplementation(async (sql: string) => {
+      order.push(sql);
+    });
+    (mockDb.runAsync as jest.Mock).mockImplementation(async (sql: string) => {
+      order.push(sql.includes('UPDATE products') ? 'UPDATE products' : 'write');
+      return { lastInsertRowId: 1, changes: 1 };
+    });
+    await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry], [
+      { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/2', delta: -2 },
+    ]);
+    expect(order[0]).toBe('BEGIN');
+    expect(order).toContain('UPDATE products');
+    expect(order.indexOf('UPDATE products')).toBeLessThan(order.indexOf('COMMIT'));
+    (mockDb.execAsync as jest.Mock).mockImplementation(() => Promise.resolve());
+    (mockDb.runAsync as jest.Mock).mockImplementation(() => Promise.resolve({ lastInsertRowId: 1, changes: 1 }));
+  });
+});
+
 describe('recordSaleLocally', () => {
   it('wraps writes in BEGIN/COMMIT', async () => {
     await recordSaleLocally(mockDb as any, mockSale, [mockOutboxEntry]);
