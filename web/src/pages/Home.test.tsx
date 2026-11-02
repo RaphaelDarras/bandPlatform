@@ -74,18 +74,29 @@ describe('Home page', () => {
 
     const h1s = screen.getAllByRole('heading', { level: 1 })
     expect(h1s).toHaveLength(1)
-    expect(h1s[0]).toHaveTextContent('Disgrace')
+    expect(h1s[0]).toHaveTextContent('Eternal Scars')
   })
 
-  it('splits the store into Preorder and Merch, in that order', () => {
+  it('lists the whole store under a single Merch section, no Preorder section', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     renderHome()
 
     const sections = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(sections).toEqual(['Preorder', 'Merch', 'Next Show'])
+    expect(sections).toEqual(['Merch', 'Next Show'])
   })
 
-  it('lists no product twice across the two sections', () => {
+  it('puts the album products first in the Merch grid', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
+    const { container } = renderHome()
+
+    const hrefs = [
+      ...container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
+    ].map((a) => a.getAttribute('href'))
+
+    expect(hrefs[0]).toContain('preorder-cd-eternal-scars')
+  })
+
+  it('lists every product exactly once', () => {
     vi.mocked(useLoaderData).mockReturnValue({ events, catalogue })
     const { container } = renderHome()
 
@@ -124,7 +135,6 @@ describe('Home page', () => {
     })
     const { container } = renderHome()
 
-    expect(screen.queryByRole('heading', { name: /^preorder$/i })).not.toBeInTheDocument()
     expect(
       container.querySelectorAll('a[href^="https://shop.hurakanband.fr/products/"]'),
     ).toHaveLength(0)

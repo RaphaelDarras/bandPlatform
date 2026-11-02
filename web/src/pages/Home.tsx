@@ -13,12 +13,11 @@ import Reveal from '../components/Reveal'
 
 // Landing hub (D-25). Order:
 //   1. player   — the latest release, full-bleed, shown directly
-//   2. preorder — the album; expires when the window closes
-//   3. merch    — the rest of the store (all-no-preorder collection)
-//   4. next show— dated
+//   2. merch    — the whole store, album products first
+//   3. next show— dated
 //
-// The two product sections partition the store, so nothing is listed twice.
-// Every card deep-links to its own Shopify detail page; the store root appears
+// The catalogue's preorder/merch slices partition the store, so concatenating
+// them lists every product exactly once. Every card deep-links to its own Shopify detail page; the store root appears
 // once, on "Open the shop".
 //
 // All Bandsintown text renders as escaped React text (T-04-xss).
@@ -30,26 +29,16 @@ export function Component() {
   // re-filter against the visitor's clock before picking the teaser.
   const next = nextEvent(useUpcomingEvents(events ?? []))
   const highlightedRelease = releases[0]
-  const preorder = catalogue?.preorder ?? []
-  const merch = catalogue?.merch ?? []
+  // Preorders are over: the album products (still the "preorder" slice, i.e.
+  // outside the all-no-preorder collection) lead the single Merch grid.
+  const merch = [...(catalogue?.preorder ?? []), ...(catalogue?.merch ?? [])]
 
   return (
     <div className={PAGE_STACK}>
       {/* The release[0] entry is a YouTube video (D-17), so the hero is the
           release itself — player shown directly, no poster or play overlay. */}
       {highlightedRelease?.kind === 'youtube' && (
-        <FullscreenPlayer videoId={highlightedRelease.videoId} title="Disgrace" />
-      )}
-
-      {preorder.length > 0 && (
-        <Reveal>
-          <Section title="Preorder">
-            <p className="type-body mb-7 text-[var(--color-ink-dim)]">
-              Out October 30th, shipping from November 1st.
-            </p>
-            <ProductGrid products={preorder} />
-          </Section>
-        </Reveal>
+        <FullscreenPlayer videoId={highlightedRelease.videoId} title="Eternal Scars" />
       )}
 
       {merch.length > 0 ? (

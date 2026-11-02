@@ -8,7 +8,8 @@ export type Release =
   | { kind: 'youtube'; videoId: string }
 
 export const releases: Release[] = [
-  { kind: 'youtube', videoId: 'MIedEJXKJ34' }, // Disgrace — latest release (video)
+  { kind: 'youtube', videoId: 'jGJVFamwZLw' }, // Eternal Scars — latest release (full album)
+  { kind: 'youtube', videoId: 'MIedEJXKJ34' }, // Disgrace (video)
   { kind: 'youtube', videoId: 'P5whjxluBpo' }, // Dogma (video)
   { kind: 'youtube', videoId: 'a57M7zclUE4' }, // Parasite (video)
 ]
