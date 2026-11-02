@@ -46,8 +46,8 @@ jest.mock('@/db/sales', () => ({
 }));
 
 jest.mock('@/db/stockOps', () => ({
-  enqueueVoidRestores: jest.fn(() => Promise.resolve({ cancelled: 0, enqueued: 0 })),
-  enqueueUnvoidDeducts: jest.fn(() => Promise.resolve({ cancelled: 0, enqueued: 0 })),
+  queueVoidRestores: jest.fn(() => Promise.resolve({ cancelled: 0, enqueued: 0 })),
+  queueUnvoidDeducts: jest.fn(() => Promise.resolve({ cancelled: 0, enqueued: 0 })),
 }));
 
 jest.mock('@/db/products', () => ({
@@ -89,8 +89,8 @@ const mockVoidLocalSale = salesModule.voidLocalSale as jest.Mock;
 const mockUnvoidLocalSale = salesModule.unvoidLocalSale as jest.Mock;
 const mockUpdateLocalStock = productsModule.updateLocalStock as jest.Mock;
 const mockGetLocalSaleItems = salesModule.getLocalSaleItems as jest.Mock;
-const mockEnqueueVoidRestores = stockOpsModule.enqueueVoidRestores as jest.Mock;
-const mockEnqueueUnvoidDeducts = stockOpsModule.enqueueUnvoidDeducts as jest.Mock;
+const mockEnqueueVoidRestores = stockOpsModule.queueVoidRestores as jest.Mock;
+const mockEnqueueUnvoidDeducts = stockOpsModule.queueUnvoidDeducts as jest.Mock;
 
 // Build a mock LocalSaleRow
 function makeSaleRow(overrides: Partial<{
@@ -309,5 +309,39 @@ describe('useHistory — unvoidSale', () => {
     });
     expect(mockEnqueueUnvoidDeducts).toHaveBeenCalledWith(expect.anything(), 's1', items, expect.any(Number));
     expect(mockUpdateLocalStock).toHaveBeenCalledWith(expect.anything(), 'gid://p/1', 'gid://v/1', -3);
+  });
+});
+
+describe('useHistory — void is atomic (WR-07)', () => {
+  it('rolls back the local void when queueing the restores fails', async () => {
+    mockDb.execAsync.mockClear();
+    const upsert = outboxModule.upsertSetVoided as jest.Mock;
+    upsert.mockClear();
+    mockGetLocalSaleItems.mockResolvedValue([
+      { productGid: 'gid://p/1', variantGid: 'gid://v/1', variantSku: 'S', quantity: 1, priceAtSale: 5 },
+    ]);
+    mockEnqueueVoidRestores.mockRejectedValueOnce(new Error('db busy'));
+    const { result } = renderHook(() => useHistory());
+    let error: unknown;
+    await act(async () => {
+      await result.current.voidSale('s1').catch((e) => (error = e));
+    });
+    expect(error).toBeInstanceOf(Error);
+    const sql = mockDb.execAsync.mock.calls.map((c: unknown[]) => c[0]);
+    expect(sql).toEqual(['BEGIN', 'ROLLBACK']);
+    expect(mockVoidLocalSale).toHaveBeenCalled(); // ran inside the rolled-back transaction
+    expect(upsert).not.toHaveBeenCalled();
+    expect(mockUpdateLocalStock).not.toHaveBeenCalled();
+  });
+
+  it('commits flag, restores, stock and API op in one transaction', async () => {
+    mockDb.execAsync.mockClear();
+    const { result } = renderHook(() => useHistory());
+    await act(async () => {
+      await result.current.voidSale('s1');
+    });
+    const sql = mockDb.execAsync.mock.calls.map((c: unknown[]) => c[0]);
+    expect(sql).toEqual(['BEGIN', 'COMMIT']);
+    expect(outboxModule.upsertSetVoided).toHaveBeenCalled();
   });
 });

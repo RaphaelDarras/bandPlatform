@@ -150,14 +150,15 @@ async function commit(
   db: SQLiteDatabase,
   row: OutboxRow,
   payload: ShopifyStockPayload,
-  appliedDelta: number
+  appliedDelta: number,
+  record = true
 ): Promise<boolean> {
   return runInTransaction(db, async () => {
     if (!payload.plan) {
       const current = await getOutboxRow(db, row.id);
       if (!current || current.status !== 'pending') return false;
     }
-    await recordApplied(db, payload, appliedDelta);
+    if (record) await recordApplied(db, payload, appliedDelta);
     await markOutboxDone(db, row.id);
     return true;
   });
@@ -202,26 +203,35 @@ async function run(db: SQLiteDatabase, snapshot: OutboxRow): Promise<StockOpResu
           const items =
             payload.saleId !== undefined ? await getLocalSaleItems(db, payload.saleId) : null;
           const line = items && payload.lineIndex !== undefined ? items[payload.lineIndex] : undefined;
-          if (line) {
-            // The restore amount is read from appliedDelta, so every op queued
-            // before this restore on the same line must have landed first,
-            // whatever appliedDelta currently says (CR-05). Ordering is
-            // (created_at, id) so two restores never wait on each other.
-            const pending = await getAllPendingOutboxRows(db);
-            const waiting = pending.some((r) => {
-              if (r.id === row.id || r.type !== 'shopify_stock') return false;
-              if (!isBefore(r, row)) return false;
-              try {
-                const p = JSON.parse(r.payload) as ShopifyStockPayload;
-                return p.saleId === payload.saleId && p.lineIndex === payload.lineIndex;
-              } catch {
-                return false;
-              }
+          if (!line) {
+            // No local line to read the applied delta from: never post a
+            // made-up appliedDelta 0 for it (WR-07); the next catalogue refresh
+            // corrects the optimistic local stock.
+            console.warn('[shopifyStockOps] restore without local sale line, dropping', {
+              rowId: row.id,
+              saleId: payload.saleId,
             });
-            if (waiting) {
-              await backoff(db, row);
-              return 'deferred';
+            await commit(db, row, payload, 0, false);
+            return 'dropped';
+          }
+          // The restore amount is read from appliedDelta, so every op queued
+          // before this restore on the same line must have landed first,
+          // whatever appliedDelta currently says (CR-05). Ordering is
+          // (created_at, id) so two restores never wait on each other.
+          const pending = await getAllPendingOutboxRows(db);
+          const waiting = pending.some((r) => {
+            if (r.id === row.id || r.type !== 'shopify_stock') return false;
+            if (!isBefore(r, row)) return false;
+            try {
+              const p = JSON.parse(r.payload) as ShopifyStockPayload;
+              return p.saleId === payload.saleId && p.lineIndex === payload.lineIndex;
+            } catch {
+              return false;
             }
+          });
+          if (waiting) {
+            await backoff(db, row);
+            return 'deferred';
           }
           requested = Math.max(0, -(line?.appliedDelta ?? 0));
           negative = false;

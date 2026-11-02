@@ -386,3 +386,15 @@ describe('non-retryable failures and top-level idempotency codes (WR-03)', () =>
     expect(updatePayload).not.toHaveBeenCalled();
   });
 });
+
+describe('restore without a local sale line (WR-07)', () => {
+  it('drops without posting a made-up appliedDelta 0', async () => {
+    getItems.mockResolvedValue(null);
+    const r = row({ kind: 'restore', variantGid: 'v1', saleId: 's1', lineIndex: 0, requested: 2 });
+    expect(await exec(r)).toBe('dropped');
+    expect(insertEntries).not.toHaveBeenCalled(); // no sale_applied upsert
+    expect(setApplied).not.toHaveBeenCalled();
+    expect(markDone).toHaveBeenCalledWith(db, 'row1');
+    expect(adjust).not.toHaveBeenCalled();
+  });
+});

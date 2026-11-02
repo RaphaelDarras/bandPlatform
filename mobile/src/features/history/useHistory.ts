@@ -11,8 +11,8 @@ import {
   reconcileSalesFromServer,
 } from '@/db/sales';
 import { markOutboxDone, upsertSetVoided, type LocalSaleItem } from '@/db/outbox';
-import { withDbLock } from '@/db/lock';
-import { enqueueVoidRestores, enqueueUnvoidDeducts } from '@/db/stockOps';
+import { runInTransaction, withDbLock } from '@/db/lock';
+import { queueVoidRestores, queueUnvoidDeducts } from '@/db/stockOps';
 import { updateLocalStock } from '@/db/products';
 import { getCachedConcerts, type CachedConcert } from '@/db/concerts';
 import { apiGetSales, apiVoidSale, apiUnvoidSale } from '@/api/sales';
@@ -139,29 +139,33 @@ export function useHistory() {
    */
   const voidSale = useCallback(async (saleId: string, items?: LocalSaleItem[]) => {
     const db = await getDb();
-    const resolvedItems = await resolveItems(db, saleId, items);
-
-    // 1. Void in SQLite
-    await voidLocalSale(db, saleId);
-
-    // 2. Queue Shopify restores (exact applied delta) + optimistic local stock
-    await enqueueVoidRestores(db, saleId, resolvedItems, Date.now());
-    for (const item of resolvedItems) {
-      if (!item.variantGid) continue;
-      await updateLocalStock(
-        db,
-        item.productGid ?? '',
-        item.variantGid,
-        item.appliedDelta !== undefined ? -item.appliedDelta : item.quantity
-      );
-    }
-
-    // 3. Add outbox entry for the API voidedAt flag
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
-    // Desired-state op (CR-06): replaces any earlier void/unvoid row for the
-    // sale, even a done one, so the latest intent always reaches the server.
-    await withDbLock(() => upsertSetVoided(db, outboxId, saleId, true, now));
+
+    // 1-3 commit together (WR-07): the local flag, the Shopify restores, the
+    // optimistic stock and the API flag op - never a voided sale without them.
+    await runInTransaction(db, async () => {
+      const resolvedItems = await resolveItems(db, saleId, items);
+
+      // 1. Void in SQLite
+      await voidLocalSale(db, saleId);
+
+      // 2. Queue Shopify restores (exact applied delta) + optimistic local stock
+      await queueVoidRestores(db, saleId, resolvedItems, now);
+      for (const item of resolvedItems) {
+        if (!item.variantGid) continue;
+        await updateLocalStock(
+          db,
+          item.productGid ?? '',
+          item.variantGid,
+          item.appliedDelta !== undefined ? -item.appliedDelta : item.quantity
+        );
+      }
+
+      // 3. Desired-state op for the API voidedAt flag (CR-06): replaces any
+      // earlier void/unvoid row for the sale, even a done one.
+      await upsertSetVoided(db, outboxId, saleId, true, now);
+    });
 
     // 4. Try immediate API call (best effort — outbox handles retry if offline)
     try {
@@ -184,24 +188,26 @@ export function useHistory() {
    */
   const unvoidSale = useCallback(async (saleId: string, items?: LocalSaleItem[]) => {
     const db = await getDb();
-    const resolvedItems = await resolveItems(db, saleId, items);
-
-    // 1. Unvoid in SQLite
-    await unvoidLocalSale(db, saleId);
-
-    // 2. Queue clamped Shopify re-deducts + optimistic local stock
-    await enqueueUnvoidDeducts(db, saleId, resolvedItems, Date.now());
-    for (const item of resolvedItems) {
-      if (!item.variantGid) continue;
-      await updateLocalStock(db, item.productGid ?? '', item.variantGid, -item.quantity);
-    }
-
-    // 3. Add outbox entry for the API flag
     const outboxId = Crypto.randomUUID();
     const now = Date.now();
-    // Desired-state op (CR-06): replaces any earlier void/unvoid row for the
-    // sale, even a done one, so the latest intent always reaches the server.
-    await withDbLock(() => upsertSetVoided(db, outboxId, saleId, false, now));
+
+    // 1-3 commit together (WR-07).
+    await runInTransaction(db, async () => {
+      const resolvedItems = await resolveItems(db, saleId, items);
+
+      // 1. Unvoid in SQLite
+      await unvoidLocalSale(db, saleId);
+
+      // 2. Queue clamped Shopify re-deducts + optimistic local stock
+      await queueUnvoidDeducts(db, saleId, resolvedItems, now);
+      for (const item of resolvedItems) {
+        if (!item.variantGid) continue;
+        await updateLocalStock(db, item.productGid ?? '', item.variantGid, -item.quantity);
+      }
+
+      // 3. Desired-state op for the API flag (CR-06)
+      await upsertSetVoided(db, outboxId, saleId, false, now);
+    });
 
     // 4. Try immediate API call (best effort)
     try {
