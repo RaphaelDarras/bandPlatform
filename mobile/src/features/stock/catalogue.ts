@@ -43,6 +43,15 @@ export function computePendingStockDelta(rows: OutboxRow[]): Map<string, number>
   return delta;
 }
 
+/** Per-variant minimum of two pending-delta snapshots (missing = 0). */
+export function minDelta(a: Map<string, number>, b: Map<string, number>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const key of new Set([...a.keys(), ...b.keys()])) {
+    out.set(key, Math.min(a.get(key) ?? 0, b.get(key) ?? 0));
+  }
+  return out;
+}
+
 export function mapCatalogue(
   products: ShopifyCatalogueProduct[],
   pending: Map<string, number>
@@ -85,9 +94,14 @@ export function refreshCatalogue(db: SQLite.SQLiteDatabase): Promise<boolean> {
 
 async function doRefreshCatalogue(db: SQLite.SQLiteDatabase): Promise<boolean> {
   try {
+    // Snapshot pending ops on BOTH sides of the fetch (WR-05): an op that
+    // applies in Shopify after it answered but before the second read would
+    // otherwise be in neither `available` nor the pending delta. Keeping the
+    // lower stock per variant errs toward not overselling.
+    const before = computePendingStockDelta(await getAllPendingOutboxRows(db));
     const products = await fetchCatalogue();
-    const pendingRows = await getAllPendingOutboxRows(db);
-    const mapped = mapCatalogue(products, computePendingStockDelta(pendingRows));
+    const after = computePendingStockDelta(await getAllPendingOutboxRows(db));
+    const mapped = mapCatalogue(products, minDelta(before, after));
     if (mapped.length > 0) await upsertProducts(db, mapped);
     await reconcileActiveProducts(db, products.map((p) => p.productGid));
     return true;

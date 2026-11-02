@@ -1,4 +1,4 @@
-import { computePendingStockDelta, mapCatalogue, refreshCatalogue } from '@/features/stock/catalogue';
+import { computePendingStockDelta, mapCatalogue, minDelta, refreshCatalogue } from '@/features/stock/catalogue';
 import * as shopify from '@/api/shopify';
 import * as products from '@/db/products';
 import * as outbox from '@/db/outbox';
@@ -93,5 +93,25 @@ describe('refreshCatalogue single-flight (WR-04)', () => {
     (shopify.fetchCatalogue as jest.Mock).mockResolvedValueOnce(cat);
     expect(await refreshCatalogue({} as any)).toBe(true);
     expect(shopify.fetchCatalogue).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('pending snapshot around the fetch (WR-05)', () => {
+  it('minDelta keeps the lower stock per variant', () => {
+    const m = minDelta(new Map([['A', -2], ['B', 3]]), new Map([['B', 1], ['C', -1]]));
+    expect(Object.fromEntries(m)).toEqual({ A: -2, B: 1, C: -1 });
+  });
+
+  it('a deduct that applies during the fetch is still subtracted', async () => {
+    // pending before the fetch; done (applied in Shopify) by the time it returns,
+    // but the fetched `available` predates it.
+    (outbox.getAllPendingOutboxRows as jest.Mock)
+      .mockResolvedValueOnce([row({ kind: 'deduct', variantGid: 'V1', requested: 2 })])
+      .mockResolvedValueOnce([]);
+    (shopify.fetchCatalogue as jest.Mock).mockResolvedValueOnce(cat);
+    expect(await refreshCatalogue({} as any)).toBe(true);
+    const upserted = (products.upsertProducts as jest.Mock).mock.calls[0][1];
+    expect(upserted[0].variants[0].stock).toBe(3); // 5 - 2, not 5
+    expect(outbox.getAllPendingOutboxRows).toHaveBeenCalledTimes(2);
   });
 });
