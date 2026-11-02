@@ -124,9 +124,19 @@ export async function gql<T>(query: string, variables: Record<string, unknown>):
       const throttled = json.errors.some(
         (e: { extensions?: { code?: string } }) => e?.extensions?.code === 'THROTTLED',
       );
+      // Carry Shopify's own reason (message + code + path) so a failure is
+      // diagnosable from the log. GraphQL error bodies never echo the token.
+      const detail = (json.errors as { message?: string; path?: unknown[]; extensions?: { code?: string } }[])
+        .slice(0, 3)
+        .map((e) =>
+          [e?.extensions?.code, e?.message, e?.path ? `at ${e.path.join('.')}` : '']
+            .filter(Boolean)
+            .join(' '),
+        )
+        .join(' | ');
       throw new ShopifyError(
         'graphql',
-        throttled ? 'Shopify GraphQL throttled' : 'Shopify GraphQL error',
+        `${throttled ? 'Shopify GraphQL throttled' : 'Shopify GraphQL error'}${detail ? `: ${detail}` : ''}`,
         { retryable: throttled },
       );
     }
