@@ -45,7 +45,7 @@ export function VariantPicker({ product, onClose }: Props) {
       <Text style={[styles.title, { color: c.text }]}>{product.name}</Text>
       <View style={{ height: 1, backgroundColor: c.cardBorder, marginBottom: 4 }} />
       {product.variants.map((variant, index) => (
-        <React.Fragment key={variant.sku}>
+        <React.Fragment key={variant.variantGid ?? variant.sku}>
           {index > 0 && <View style={{ height: 1, backgroundColor: c.cardBorder, marginHorizontal: 4 }} />}
           <Pressable
             style={({ pressed }) => [
