@@ -1,4 +1,4 @@
-import { parseJwtExp, scheduleExpiryWarning, clearExpiryWarning } from '@/features/auth/sessionExpiry';
+import { parseJwtExp, scheduleExpiryWarning, clearExpiryWarning, isTokenExpired, shouldEndExpiredSession } from '@/features/auth/sessionExpiry';
 
 // Helper: build a minimal JWT with a known exp claim
 function makeJwt(exp: number | undefined): string {
@@ -121,5 +121,39 @@ describe('clearExpiryWarning', () => {
   it('is safe to call when no timer is active', () => {
     // Should not throw
     expect(() => clearExpiryWarning()).not.toThrow();
+  });
+});
+
+describe('isTokenExpired', () => {
+  const now = 1_800_000_000_000;
+  it('is false with no token', () => {
+    expect(isTokenExpired(null, now)).toBe(false);
+  });
+  it('is false before exp and true at/after exp', () => {
+    expect(isTokenExpired(makeJwt(now / 1000 + 60), now)).toBe(false);
+    expect(isTokenExpired(makeJwt(now / 1000), now)).toBe(true);
+    expect(isTokenExpired(makeJwt(now / 1000 - 60), now)).toBe(true);
+  });
+  it('treats an unreadable token as expired', () => {
+    expect(isTokenExpired('not-a-jwt', now)).toBe(true);
+    expect(isTokenExpired(makeJwt(undefined), now)).toBe(true);
+  });
+});
+
+describe('shouldEndExpiredSession', () => {
+  const now = 1_800_000_000_000;
+  const expired = makeJwt(now / 1000 - 60);
+  const valid = makeJwt(now / 1000 + 3600);
+  it('ends an expired session when the API is reachable', () => {
+    expect(shouldEndExpiredSession(expired, true, now)).toBe(true);
+  });
+  it('ends an expired session when reachability is unknown', () => {
+    expect(shouldEndExpiredSession(expired, null, now)).toBe(true);
+  });
+  it('keeps an expired session offline (offline PIN login reuses the cached token)', () => {
+    expect(shouldEndExpiredSession(expired, false, now)).toBe(false);
+  });
+  it('never ends a valid session', () => {
+    expect(shouldEndExpiredSession(valid, true, now)).toBe(false);
   });
 });

@@ -58,6 +58,31 @@ export function scheduleExpiryWarning(
   };
 }
 
+/** True when the token's exp has passed (or it is unreadable). */
+export function isTokenExpired(token: string | null, now: number = Date.now()): boolean {
+  if (!token) return false;
+  const exp = parseJwtExp(token);
+  return exp === null || exp * 1000 <= now;
+}
+
+/**
+ * Whether an expired session should be ended now (user sent to the PIN screen).
+ *
+ * Only when the API is reachable: offline, the PIN screen can only re-issue the
+ * same cached (expired) token, so logging out would just bounce the user back
+ * to the PIN screen on every app resume at a venue with no signal — while the
+ * POS (local SQLite + Shopify stock ops) still works fine on the old session.
+ * Unknown reachability (null) counts as reachable: an unnecessary trip to the
+ * PIN screen is recoverable offline, a dashboard that silently 401s is not.
+ */
+export function shouldEndExpiredSession(
+  token: string | null,
+  apiReachable: boolean | null,
+  now: number = Date.now()
+): boolean {
+  return isTokenExpired(token, now) && apiReachable !== false;
+}
+
 /**
  * Cancels any active session expiry timer.
  */
