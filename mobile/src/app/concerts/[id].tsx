@@ -425,7 +425,7 @@ export default function ConcertDetailScreen() {
                   <View key={productName} style={styles.productGroup}>
                     <Text style={[styles.productGroupName, { color: c.text }]}>{productName}</Text>
                     {variants.map((vb) => (
-                      <View key={`${vb.variantSku}:${vb.currency}`} style={styles.variantRow}>
+                      <View key={vb.key} style={styles.variantRow}>
                         <Text style={[styles.variantLabel, { color: c.textSecondary }]}>{vb.variantLabel}</Text>
                         <Text style={[styles.variantQty, { color: c.textSecondary }]}>{`×${vb.quantitySold}`}</Text>
                         <Text style={[styles.variantRevenue, { color: c.text }]}>{`${vb.currency} ${vb.revenue.toFixed(2)}`}</Text>

@@ -27,6 +27,8 @@ export interface ConcertTotals {
 }
 
 export interface VariantSaleBreakdown {
+  /** Aggregation key (variant id + SKU + currency) — unique per row; use as the React key. */
+  key: string;
   productId: string;
   productName: string;
   variantSku: string;
@@ -118,6 +120,7 @@ export async function getConcertReport(concertId: string): Promise<ConcertReport
         existing.revenue += netRevenue;
       } else {
         variantMap.set(key, {
+          key,
           productId: item.productGid ?? item.productId ?? '',
           productName: item.productName || item.variantSku || 'Unknown item',
           variantSku: item.variantSku,

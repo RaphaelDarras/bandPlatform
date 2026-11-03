@@ -169,6 +169,28 @@ describe('getConcertReport', () => {
       );
     });
 
+    it('gives SKU-less variants distinct row keys (no duplicate ":EUR" React keys)', async () => {
+      mockGetLocalSales.mockResolvedValue([
+        buildSale({
+          id: 'sale-1',
+          items_json: JSON.stringify([
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/RED', productName: 'Tee', variantLabel: 'Red', variantSku: '', quantity: 1, priceAtSale: 10 },
+            { productGid: 'gid://shopify/Product/1', variantGid: 'gid://shopify/ProductVariant/BLUE', productName: 'Tee', variantLabel: 'Blue', variantSku: '', quantity: 2, priceAtSale: 10 },
+          ]),
+          totalAmount: 30,
+          total_amount: 30,
+          paymentMethod: 'Cash',
+          currency: 'EUR',
+          voided: 0,
+        }),
+      ] as never);
+
+      const report = await getConcertReport('concert-1');
+      expect(report.variantBreakdowns).toHaveLength(2);
+      const keys = report.variantBreakdowns.map((b) => b.key);
+      expect(new Set(keys).size).toBe(2);
+    });
+
     it('returns correct ConcertTotals fields (transactionCount, itemsSold, revenuesByCurrency)', async () => {
       mockGetLocalSales.mockResolvedValue([
         buildSale({
